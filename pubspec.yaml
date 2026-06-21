@@ -9,16 +9,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^2.24.0
-  firebase_auth: ^4.16.0
-  cloud_firestore: ^4.13.6
-  provider: ^6.1.1
-  intl: ^0.18.1
-  google_fonts: ^6.1.0
-  fl_chart: ^0.66.0            # reports ke liye (optional)
-  pdf: ^3.10.4                 # PDF reports ke liye (optional)
-  printing: ^5.11.1            # PDF print/share ke liye (optional)
-  path_provider: ^2.1.1        # PDF save karne ke liye (optional)
+  firebase_core:
+  firebase_auth:
+  cloud_firestore:
+  provider:
+  intl:
+  google_fonts:
+  fl_chart:            # reports ke liye (optional)
+  pdf:                  # PDF reports ke liye (optional)
+  printing:             # PDF print/share ke liye (optional)
+  path_provider:         # PDF save karne ke liye (optional)
 
 dev_dependencies:
   flutter_test:

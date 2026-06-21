@@ -21,6 +21,18 @@ class SchoolApp extends StatelessWidget {
         theme: ThemeData(
           primarySwatch: Colors.indigo,
           fontFamily: 'Roboto',
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+          inputDecorationTheme: InputDecorationTheme(
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: Colors.grey.shade50,
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
         ),
         home: const AuthGate(),
       ),
