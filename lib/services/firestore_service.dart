@@ -16,7 +16,8 @@ class FirestoreService {
   Future<List<Student>> getStudents() async {
     QuerySnapshot snapshot = await studentsCollection.get();
     return snapshot.docs
-        .map((doc) => Student.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+        .map((doc) =>
+        Student.fromMap(doc.data() as Map<String, dynamic>, doc.id))
         .toList();
   }
 
@@ -39,7 +40,8 @@ class FirestoreService {
   Future<List<Teacher>> getTeachers() async {
     QuerySnapshot snapshot = await teachersCollection.get();
     return snapshot.docs
-        .map((doc) => Teacher.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+        .map((doc) =>
+        Teacher.fromMap(doc.data() as Map<String, dynamic>, doc.id))
         .toList();
   }
 
@@ -59,15 +61,50 @@ class FirestoreService {
   CollectionReference get classesCollection =>
       _db.collection('schools').doc('school1').collection('classes');
 
+  Future<void> addClass(ClassModel classModel) {
+    return classesCollection.add(classModel.toMap());
+  }
+
+  Future<void> updateClass(String id, ClassModel classModel) {
+    return classesCollection.doc(id).update(classModel.toMap());
+  }
+
+  Future<bool> deleteClassSafe(String className) async {
+    final studentsSnap = await _db
+        .collection('schools')
+        .doc('school1')
+        .collection('students')
+        .where('className', isEqualTo: className)
+        .limit(1)
+        .get();
+    if (studentsSnap.docs.isNotEmpty) return false;
+
+    final teachersSnap = await _db
+        .collection('schools')
+        .doc('school1')
+        .collection('teachers')
+        .where('assignedClass', isEqualTo: className)
+        .limit(1)
+        .get();
+    if (teachersSnap.docs.isNotEmpty) return false;
+
+    final classSnap = await classesCollection
+        .where('name', isEqualTo: className)
+        .limit(1)
+        .get();
+    if (classSnap.docs.isNotEmpty) {
+      await classSnap.docs.first.reference.delete();
+      return true;
+    }
+    return false;
+  }
+
   Future<List<ClassModel>> getClasses() async {
     QuerySnapshot snapshot = await classesCollection.get();
     return snapshot.docs
-        .map((doc) => ClassModel.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+        .map((doc) =>
+        ClassModel.fromMap(doc.data() as Map<String, dynamic>, doc.id))
         .toList();
-  }
-
-  Future<void> addClass(ClassModel classModel) {
-    return classesCollection.add(classModel.toMap());
   }
 
   // ---------- Fee Structure ----------
@@ -77,7 +114,8 @@ class FirestoreService {
   Future<List<FeeStructure>> getFeeStructures() async {
     QuerySnapshot snapshot = await feeStructureCollection.get();
     return snapshot.docs
-        .map((doc) => FeeStructure.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+        .map((doc) => FeeStructure.fromMap(
+        doc.data() as Map<String, dynamic>, doc.id))
         .toList();
   }
 
@@ -98,14 +136,16 @@ class FirestoreService {
         .where('studentId', isEqualTo: studentId)
         .get();
     return snapshot.docs
-        .map((doc) => FeeReceipt.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+        .map((doc) =>
+        FeeReceipt.fromMap(doc.data() as Map<String, dynamic>, doc.id))
         .toList();
   }
 
   Future<List<FeeReceipt>> getAllReceipts() async {
     QuerySnapshot snapshot = await feeReceiptsCollection.get();
     return snapshot.docs
-        .map((doc) => FeeReceipt.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+        .map((doc) =>
+        FeeReceipt.fromMap(doc.data() as Map<String, dynamic>, doc.id))
         .toList();
   }
 
@@ -120,7 +160,8 @@ class FirestoreService {
   Future<List<Expense>> getExpenses() async {
     QuerySnapshot snapshot = await expensesCollection.get();
     return snapshot.docs
-        .map((doc) => Expense.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+        .map((doc) =>
+        Expense.fromMap(doc.data() as Map<String, dynamic>, doc.id))
         .toList();
   }
 }

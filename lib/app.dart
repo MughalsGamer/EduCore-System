@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'providers/auth_provider.dart';  // Correct import
+import 'providers/auth_provider.dart';
+import 'providers/class_provider.dart';
+import 'providers/student_provider.dart';
+import 'providers/teacher_provider.dart';
+import 'providers/fee_provider.dart';
+import 'providers/expense_provider.dart';
 import 'screens/login_screen.dart';
-import 'screens/admin_dashboard.dart';
-import 'screens/accountant_dashboard.dart';
-import 'screens/teacher_dashboard.dart';
+import 'screens/dashboard_screen.dart';
 
 class SchoolApp extends StatelessWidget {
   const SchoolApp({super.key});
@@ -14,6 +17,11 @@ class SchoolApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthProvider>(create: (_) => AuthProvider()),
+        ChangeNotifierProvider<ClassProvider>(create: (_) => ClassProvider()),
+        ChangeNotifierProvider<StudentProvider>(create: (_) => StudentProvider()),
+        ChangeNotifierProvider<TeacherProvider>(create: (_) => TeacherProvider()),
+        ChangeNotifierProvider<FeeProvider>(create: (_) => FeeProvider()),
+        ChangeNotifierProvider<ExpenseProvider>(create: (_) => ExpenseProvider()),
       ],
       child: MaterialApp(
         title: 'School Management',
@@ -49,15 +57,7 @@ class AuthGate extends StatelessWidget {
     if (auth.user == null) {
       return const LoginScreen();
     }
-    switch (auth.role) {
-      case 'admin':
-        return const AdminDashboard();
-      case 'accountant':
-        return const AccountantDashboard();
-      case 'teacher':
-        return const TeacherDashboard();
-      default:
-        return const LoginScreen();
-    }
+    // Single dashboard for all roles
+    return const DashboardScreen();
   }
 }

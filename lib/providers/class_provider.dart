@@ -22,4 +22,17 @@ class ClassProvider extends ChangeNotifier {
     await _firestoreService.addClass(classModel);
     await fetchClasses();
   }
+
+  Future<void> updateClass(String id, ClassModel classModel) async {
+    await _firestoreService.updateClass(id, classModel);
+    await fetchClasses();
+  }
+
+  Future<bool> deleteClass(String className) async {
+    bool success = await _firestoreService.deleteClassSafe(className);
+    if (success) {
+      await fetchClasses();
+    }
+    return success;
+  }
 }
