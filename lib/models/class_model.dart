@@ -1,137 +1,138 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ---- TimeTableEntry (unchanged) ----
-class TimeTableEntry {
-  String day;
+class TimetablePeriod {
+  String subject;
   String startTime;
   String endTime;
-  String subject;
-  String teacher;
-  bool isLunch;
+  bool isLunchBreak;
 
-  TimeTableEntry({
-    required this.day,
-    required this.startTime,
-    required this.endTime,
+  TimetablePeriod({
     this.subject = '',
-    this.teacher = '',
-    this.isLunch = false,
+    this.startTime = '09:00',
+    this.endTime = '09:45',
+    this.isLunchBreak = false,
   });
 
   Map<String, dynamic> toMap() => {
-    'day': day,
+    'subject': subject,
     'startTime': startTime,
     'endTime': endTime,
-    'subject': subject,
-    'teacher': teacher,
-    'isLunch': isLunch,
+    'isLunchBreak': isLunchBreak,
   };
 
-  factory TimeTableEntry.fromMap(Map<String, dynamic> map) => TimeTableEntry(
-    day: map['day'] ?? '',
-    startTime: map['startTime'] ?? '',
-    endTime: map['endTime'] ?? '',
+  factory TimetablePeriod.fromMap(Map<String, dynamic> map) => TimetablePeriod(
     subject: map['subject'] ?? '',
-    teacher: map['teacher'] ?? '',
-    isLunch: map['isLunch'] ?? false,
+    startTime: map['startTime'] ?? '09:00',
+    endTime: map['endTime'] ?? '09:45',
+    isLunchBreak: map['isLunchBreak'] ?? false,
   );
 }
 
-// ---- SectionModel (now also holds its own document ID) ----
-class SectionModel {
-  String? id; // Firestore document ID (optional for new sections)
-  String name;
-  String? headTeacher;
-  double? monthlyFee;
-  List<String> subjects;
-  List<TimeTableEntry> timeTable;
+class TimetableDay {
+  String day;
+  List<TimetablePeriod> periods;
 
-  SectionModel({
-    this.id,
-    required this.name,
-    this.headTeacher,
-    this.monthlyFee,
-    List<String>? subjects,
-    List<TimeTableEntry>? timeTable,
-  })  : subjects = subjects ?? [],
-        timeTable = timeTable ?? [];
+  TimetableDay({this.day = 'Monday', List<TimetablePeriod>? periods})
+      : periods = periods ?? [];
 
   Map<String, dynamic> toMap() => {
-    'name': name,
-    'headTeacher': headTeacher ?? '',
-    'monthlyFee': monthlyFee ?? 0,
-    'subjects': subjects,
-    'timeTable': timeTable.map((e) => e.toMap()).toList(),
+    'day': day,
+    'periods': periods.map((p) => p.toMap()).toList(),
   };
 
-  factory SectionModel.fromMap(Map<String, dynamic> map, {String? id}) =>
-      SectionModel(
-        id: id,
-        name: map['name'] ?? '',
-        headTeacher: map['headTeacher']?.isNotEmpty == true
-            ? map['headTeacher']
-            : null,
-        monthlyFee: (map['monthlyFee'] as num?)?.toDouble(),
-        subjects: List<String>.from(map['subjects'] ?? []),
-        timeTable: (map['timeTable'] as List<dynamic>?)
-            ?.map((e) => TimeTableEntry.fromMap(e as Map<String, dynamic>))
-            .toList() ??
-            [],
-      );
+  factory TimetableDay.fromMap(Map<String, dynamic> map) => TimetableDay(
+    day: map['day'] ?? 'Monday',
+    periods: (map['periods'] as List<dynamic>?)
+        ?.map((p) =>
+        TimetablePeriod.fromMap(p as Map<String, dynamic>))
+        .toList() ??
+        [],
+  );
 }
 
-// ---- ClassModel (main document) ----
-class ClassModel {
-  String? id;
-  String name;
-  bool hasSections;
-  // These are only used when hasSections == false
-  String? headTeacher;
+class Section {
+  String sectionName;
+  String headOfTeacher;
   double? monthlyFee;
-  List<String> subjects;
-  List<TimeTableEntry> timeTable;
-  // Sections are NOT stored as a list here – they are subcollections.
-  // We keep a local list for UI state, but it's not persisted in the main doc.
-  List<SectionModel> sections; // only for UI, saved separately
+  List<String>? subjects;
+  List<TimetableDay>? timetable;
 
-  ClassModel({
-    this.id,
-    required this.name,
-    required this.hasSections,
-    this.headTeacher,
+  Section({
+    this.sectionName = '',
+    this.headOfTeacher = '',
     this.monthlyFee,
-    List<String>? subjects,
-    List<TimeTableEntry>? timeTable,
-    List<SectionModel>? sections,
-  })  : subjects = subjects ?? [],
-        timeTable = timeTable ?? [],
-        sections = sections ?? [];
+    this.subjects,
+    this.timetable,
+  });
 
-  // Map for the main document (does not include sections)
   Map<String, dynamic> toMap() => {
-    'name': name,
-    'hasSections': hasSections,
-    'headTeacher': headTeacher ?? '',
-    'monthlyFee': monthlyFee ?? 0,
+    'sectionName': sectionName,
+    'headOfTeacher': headOfTeacher,
+    'monthlyFee': monthlyFee,
     'subjects': subjects,
-    'timeTable': timeTable.map((e) => e.toMap()).toList(),
+    'timetable': timetable?.map((t) => t.toMap()).toList(),
   };
 
-  factory ClassModel.fromMap(Map<String, dynamic> map, String id) =>
-      ClassModel(
+  factory Section.fromMap(Map<String, dynamic> map) => Section(
+    sectionName: map['sectionName'] ?? '',
+    headOfTeacher: map['headOfTeacher'] ?? '',
+    monthlyFee: map['monthlyFee']?.toDouble(),
+    subjects:
+    map['subjects'] != null ? List<String>.from(map['subjects']) : null,
+    timetable: (map['timetable'] as List<dynamic>?)
+        ?.map((t) => TimetableDay.fromMap(t as Map<String, dynamic>))
+        .toList(),
+  );
+}
+
+class SchoolClass {
+  String? id;
+  String name;
+  String headOfClassTeacher;
+  double? monthlyFee;
+  List<String>? subjects;
+  List<TimetableDay>? timetable;
+  List<Section> sections;
+
+  SchoolClass({
+    this.id,
+    this.name = '',
+    this.headOfClassTeacher = '',
+    this.monthlyFee,
+    this.subjects,
+    this.timetable,
+    List<Section>? sections,
+  }) : sections = sections ?? [];
+
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'headOfClassTeacher': headOfClassTeacher,
+    'monthlyFee': monthlyFee,
+    'subjects': subjects,
+    'timetable': timetable?.map((t) => t.toMap()).toList(),
+    'sections': sections.map((s) => s.toMap()).toList(),
+  };
+
+  factory SchoolClass.fromMap(Map<String, dynamic> map, String id) =>
+      SchoolClass(
         id: id,
         name: map['name'] ?? '',
-        hasSections: map['hasSections'] ?? false,
-        headTeacher: map['headTeacher']?.isNotEmpty == true
-            ? map['headTeacher']
-            : null,
-        monthlyFee: (map['monthlyFee'] as num?)?.toDouble(),
-        subjects: List<String>.from(map['subjects'] ?? []),
-        timeTable: (map['timeTable'] as List<dynamic>?)
-            ?.map((e) => TimeTableEntry.fromMap(e as Map<String, dynamic>))
+        headOfClassTeacher: map['headOfClassTeacher'] ?? '',
+        monthlyFee: map['monthlyFee']?.toDouble(),
+        subjects:
+        map['subjects'] != null ? List<String>.from(map['subjects']) : null,
+        timetable: (map['timetable'] as List<dynamic>?)
+            ?.map((t) => TimetableDay.fromMap(t as Map<String, dynamic>))
+            .toList(),
+        sections: (map['sections'] as List<dynamic>?)
+            ?.map((s) => Section.fromMap(s as Map<String, dynamic>))
             .toList() ??
             [],
-        // sections are loaded separately from subcollection
-        sections: [],
       );
+
+  // Firebase Document ke liye additional factory
+  factory SchoolClass.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return SchoolClass.fromMap(data, doc.id);
+  }
 }

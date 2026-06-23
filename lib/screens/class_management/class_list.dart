@@ -1,356 +1,419 @@
+// import 'package:flutter/material.dart';
+// import 'package:provider/provider.dart';
+//
+// import '../../providers/class_provider.dart';
+// import 'add_class.dart';
+//
+//
+// class ClassesListScreen extends StatelessWidget {
+//   const ClassesListScreen({super.key});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: const Text('Classes'),
+//         centerTitle: true,
+//       ),
+//       floatingActionButton: FloatingActionButton(
+//         onPressed: () async {
+//           final result = await Navigator.push(
+//             context,
+//             MaterialPageRoute(builder: (_) => const AddEditClassScreen()),
+//           );
+//           if (result == true) {
+//             // refresh handled by stream
+//           }
+//         },
+//         child: const Icon(Icons.add),
+//       ),
+//       body: Consumer<ClassProvider>(
+//         builder: (context, provider, _) {
+//           if (provider.isLoading && provider.classes.isEmpty) {
+//             return const Center(child: CircularProgressIndicator());
+//           }
+//
+//           if (provider.error != null) {
+//             return Center(
+//               child: Column(
+//                 mainAxisAlignment: MainAxisAlignment.center,
+//                 children: [
+//                   Text('Error: ${provider.error}'),
+//                   ElevatedButton(
+//                     onPressed: () => provider.clearError(),
+//                     child: const Text('Retry'),
+//                   ),
+//                 ],
+//               ),
+//             );
+//           }
+//
+//           if (provider.classes.isEmpty) {
+//             return const Center(child: Text('No classes found'));
+//           }
+//
+//           return ListView.builder(
+//             padding: const EdgeInsets.all(16),
+//             itemCount: provider.classes.length,
+//             itemBuilder: (context, index) {
+//               final schoolClass = provider.classes[index];
+//               return Card(
+//                 margin: const EdgeInsets.only(bottom: 12),
+//                 child: ListTile(
+//                   title: Text(schoolClass.name),
+//                   subtitle: Text('${schoolClass.subjects?.length ?? 0} subjects'),
+//                   trailing: Row(
+//                     mainAxisSize: MainAxisSize.min,
+//                     children: [
+//                       IconButton(
+//                         icon: const Icon(Icons.edit),
+//                         onPressed: () {
+//                           Navigator.push(
+//                             context,
+//                             MaterialPageRoute(
+//                               builder: (_) => AddEditClassScreen(existingClass: schoolClass),
+//                             ),
+//                           );
+//                         },
+//                       ),
+//                       IconButton(
+//                         icon: const Icon(Icons.delete, color: Colors.red),
+//                         onPressed: () async {
+//                           final confirm = await showDialog<bool>(
+//                             context: context,
+//                             builder: (ctx) => AlertDialog(
+//                               title: const Text('Delete Class'),
+//                               content: Text(
+//                                   'Are you sure you want to delete ${schoolClass.name}?'),
+//                               actions: [
+//                                 TextButton(
+//                                   onPressed: () => Navigator.pop(ctx, false),
+//                                   child: const Text('Cancel'),
+//                                 ),
+//                                 TextButton(
+//                                   onPressed: () => Navigator.pop(ctx, true),
+//                                   child: const Text('Delete',
+//                                       style: TextStyle(color: Colors.red)),
+//                                 ),
+//                               ],
+//                             ),
+//                           );
+//                           if (confirm == true) {
+//                             try {
+//                               await provider.deleteClass(
+//                                   schoolClass.id!, schoolClass.name);
+//                             } catch (e) {
+//                               ScaffoldMessenger.of(context).showSnackBar(
+//                                 SnackBar(
+//                                     content: Text('Delete failed: $e'),
+//                                     backgroundColor: Colors.red),
+//                               );
+//                             }
+//                           }
+//                         },
+//                       ),
+//                     ],
+//                   ),
+//                 ),
+//               );
+//             },
+//           );
+//         },
+//       ),
+//     );
+//   }
+// }
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/class_provider.dart';
-import '../../providers/auth_provider.dart';
-import '../../models/class_model.dart';
-import 'add_class.dart';
 
-class ClassListScreen extends StatefulWidget {
-  const ClassListScreen({super.key});
+import '../../models/class_model.dart';
+import '../../providers/class_provider.dart';
+import 'add_class.dart';  // AddEditClassScreen
+
+class ClassesListScreen extends StatefulWidget {
+  const ClassesListScreen({super.key});
 
   @override
-  State<ClassListScreen> createState() => _ClassListScreenState();
+  State<ClassesListScreen> createState() => _ClassesListScreenState();
 }
 
-class _ClassListScreenState extends State<ClassListScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // Load classes (including their sections) on startup
-    Future.microtask(() =>
-        Provider.of<ClassProvider>(context, listen: false).fetchClasses());
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
-  }
-
-  void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
-    );
-  }
-
+class _ClassesListScreenState extends State<ClassesListScreen> {
   @override
   Widget build(BuildContext context) {
-    final auth = Provider.of<AuthProvider>(context);
-    final isAdmin = auth.role == 'admin';
-    final provider = Provider.of<ClassProvider>(context);
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Classes', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Classes'),
         centerTitle: true,
-        elevation: 0,
       ),
-      floatingActionButton: isAdmin
-          ? FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ClassFormScreen()),
-        ).then((_) => provider.fetchClasses()),
-        icon: const Icon(Icons.add),
-        label: const Text('Add Class'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
-      )
-          : null,
-      body: provider.loading
-          ? const Center(child: CircularProgressIndicator())
-          : provider.classes.isEmpty
-          ? Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.school, size: 80, color: theme.colorScheme.outline),
-            const SizedBox(height: 16),
-            Text('No classes yet',
-                style: theme.textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 8),
-            Text('Tap + to add your first class',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant)),
-          ],
-        ),
-      )
-          : RefreshIndicator(
-        onRefresh: () => provider.fetchClasses(),
-        child: ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-          itemCount: provider.classes.length,
-          itemBuilder: (ctx, i) {
-            final c = provider.classes[i];
-            return _ClassCard(
-              classModel: c,
-              isAdmin: isAdmin,
-              onEdit: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => ClassFormScreen(classModel: c)),
-              ).then((_) => provider.fetchClasses()),
-              onDelete: () async {
-                // Confirm deletion
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Delete Class'),
-                    content: Text(
-                        'Are you sure you want to delete ${c.name}?'),
-                    actions: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Cancel')),
-                      FilledButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('Delete')),
-                    ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddEditClassScreen()),
+          );
+          if (result == true) {
+            // refresh handled by Provider stream
+          }
+        },
+        child: const Icon(Icons.add),
+      ),
+      body: Consumer<ClassProvider>(
+        builder: (context, provider, _) {
+          if (provider.isLoading && provider.classes.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (provider.error != null) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Error: ${provider.error}'),
+                  ElevatedButton(
+                    onPressed: () => provider.clearError(),
+                    child: const Text('Retry'),
                   ),
-                );
-                if (confirm == true) {
-                  try {
-                    // Use the document ID (not the name)
-                    await provider.deleteClass(c.id!);
-                    _showSuccess('Class deleted successfully');
-                  } catch (e) {
-                    _showError(
-                        'Cannot delete class. Students or teachers may still be assigned.');
-                  }
-                }
-              },
+                ],
+              ),
             );
-          },
-        ),
+          }
+
+          if (provider.classes.isEmpty) {
+            return const Center(child: Text('No classes found'));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: provider.classes.length,
+            itemBuilder: (context, index) {
+              final schoolClass = provider.classes[index];
+              return _ExpandableClassCard(schoolClass: schoolClass);
+            },
+          );
+        },
       ),
     );
   }
 }
 
-// ------------------- Card Widget -------------------
-class _ClassCard extends StatefulWidget {
-  final ClassModel classModel;
-  final bool isAdmin;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  const _ClassCard({
-    required this.classModel,
-    required this.isAdmin,
-    required this.onEdit,
-    required this.onDelete,
-  });
+// ---------- Expandable Class Card ----------
+class _ExpandableClassCard extends StatefulWidget {
+  final SchoolClass schoolClass;
+  const _ExpandableClassCard({required this.schoolClass});
 
   @override
-  State<_ClassCard> createState() => _ClassCardState();
+  State<_ExpandableClassCard> createState() => _ExpandableClassCardState();
 }
 
-class _ClassCardState extends State<_ClassCard> {
+class _ExpandableClassCardState extends State<_ExpandableClassCard> {
   bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
-    final c = widget.classModel;
-    final theme = Theme.of(context);
-
+    final cls = widget.schoolClass;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => setState(() => _expanded = !_expanded),
-        child: AnimatedSize(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.class_,
-                          color: theme.colorScheme.onPrimaryContainer),
+      child: Column(
+        children: [
+          // Header – always visible, toggles expansion
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          cls.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${cls.subjects?.length ?? 0} subjects',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(c.name,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold)),
-                          if (c.headTeacher != null)
-                            Text('Head: ${c.headTeacher}',
-                                style: theme.textTheme.bodySmall),
-                          if (c.hasSections)
-                            Text('${c.sections.length} sections',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.primary)),
-                          if (!c.hasSections)
-                            Text(c.monthlyFee != null
-                                ? 'Fee: ${c.monthlyFee}'
-                                : 'No fee set',
-                                style: theme.textTheme.bodySmall),
-                        ],
-                      ),
-                    ),
-                    if (widget.isAdmin) ...[
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        color: theme.colorScheme.primary,
-                        onPressed: widget.onEdit,
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        color: theme.colorScheme.error,
-                        onPressed: widget.onDelete,
-                      ),
+                  ),
+                  // Edit & Delete buttons
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 20),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AddEditClassScreen(existingClass: cls),
+                        ),
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                    onPressed: () => _confirmDelete(context, cls),
+                  ),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Expanded details
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: _buildDetails(cls),
+            crossFadeState:
+            _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 300),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetails(SchoolClass cls) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(),
+          // Head of class teacher
+          if (cls.headOfClassTeacher != null && cls.headOfClassTeacher!.isNotEmpty)
+            _detailRow(Icons.person, 'Head Teacher: ${cls.headOfClassTeacher}'),
+          // Monthly fee
+          if (cls.monthlyFee != null)
+            _detailRow(Icons.money, 'Monthly Fee: \$${cls.monthlyFee!.toStringAsFixed(2)}'),
+          // Subjects
+          if (cls.subjects != null && cls.subjects!.isNotEmpty) ...[
+            _detailRow(Icons.book, 'Subjects: ${cls.subjects!.join(", ")}'),
+          ],
+          const SizedBox(height: 8),
+
+          // Class Timetable
+          if (cls.timetable != null && cls.timetable!.isNotEmpty) ...[
+            Text('Class Timetable:', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            ...cls.timetable!.map((day) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Card(
+                elevation: 0,
+                color: Colors.grey.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(day.day, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 4),
+                      ...day.periods.map((p) => ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: p.isLunchBreak
+                            ? const Icon(Icons.fastfood, size: 18)
+                            : const Icon(Icons.access_time, size: 18),
+                        title: Text(
+                          '${p.startTime} - ${p.endTime} ${p.isLunchBreak ? "(Lunch)" : (p.subject ?? "")}',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      )),
                     ],
-                    Icon(
-                      _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                  ),
+                ),
+              ),
+            )),
+          ],
+
+          // Sections
+          if (cls.sections != null && cls.sections!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('Sections:', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            ...cls.sections!.map((section) => Card(
+              elevation: 0,
+              color: Colors.grey.shade50,
+              margin: const EdgeInsets.only(bottom: 8),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(section.sectionName,
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    if (section.headOfTeacher != null && section.headOfTeacher!.isNotEmpty)
+                      Text('Head: ${section.headOfTeacher}'),
+                    if (section.monthlyFee != null)
+                      Text('Fee: \$${section.monthlyFee!.toStringAsFixed(2)}'),
+                    if (section.subjects != null && section.subjects!.isNotEmpty)
+                      Text('Subjects: ${section.subjects!.join(", ")}'),
+                    if (section.timetable != null && section.timetable!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text('Timetable:', style: TextStyle(fontWeight: FontWeight.w600)),
+                      ...section.timetable!.map((day) => Padding(
+                        padding: const EdgeInsets.only(left: 8, top: 2),
+                        child: Text(
+                          '${day.day}: ${day.periods.map((p) => "${p.startTime}-${p.endTime} ${p.isLunchBreak ? "(Lunch)" : p.subject ?? ""}").join(" → ")}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      )),
+                    ],
                   ],
                 ),
               ),
-              if (_expanded) ...[
-                const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: _buildDetails(c, theme),
-                ),
-              ],
-            ],
-          ),
-        ),
+            )),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _buildDetails(ClassModel c, ThemeData theme) {
-    if (c.hasSections) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Sections',
-              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          ...c.sections.map((sec) => _SectionDetail(sec, theme)),
-        ],
-      );
-    } else {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (c.monthlyFee != null)
-            _infoRow('Monthly Fee', c.monthlyFee.toString(), theme),
-          if (c.subjects.isNotEmpty)
-            _infoRow('Subjects', c.subjects.join(', '), theme),
-          if (c.timeTable.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text('Time Table',
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            ...c.timeTable.map((t) => _TimetableChip(t, theme)),
-          ],
-        ],
-      );
-    }
-  }
-
-  Widget _infoRow(String label, String value, ThemeData theme) {
+  Widget _detailRow(IconData icon, String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 100,
-            child: Text('$label:',
-                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-          ),
-          Expanded(child: Text(value, style: theme.textTheme.bodySmall)),
+          Icon(icon, size: 18, color: Colors.grey),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text)),
         ],
       ),
     );
   }
-}
 
-// ------------------- Section Detail Widget -------------------
-class _SectionDetail extends StatelessWidget {
-  final SectionModel section;
-  final ThemeData theme;
-
-  const _SectionDetail(this.section, this.theme);
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 0,
-      color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(section.name,
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-            if (section.headTeacher != null)
-              Text('Head: ${section.headTeacher}', style: theme.textTheme.bodySmall),
-            if (section.monthlyFee != null)
-              Text('Fee: ${section.monthlyFee}', style: theme.textTheme.bodySmall),
-            if (section.subjects.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text('Subjects: ${section.subjects.join(', ')}',
-                    style: theme.textTheme.bodySmall),
-              ),
-            if (section.timeTable.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text('Timetable',
-                  style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              ...section.timeTable.map((t) => _TimetableChip(t, theme)),
-            ],
-          ],
-        ),
+  void _confirmDelete(BuildContext context, SchoolClass cls) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Class'),
+        content: Text('Are you sure you want to delete ${cls.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
-  }
-}
-
-// ------------------- Timetable Chip -------------------
-class _TimetableChip extends StatelessWidget {
-  final TimeTableEntry entry;
-  final ThemeData theme;
-
-  const _TimetableChip(this.entry, this.theme);
-
-  @override
-  Widget build(BuildContext context) {
-    final label = entry.isLunch
-        ? '🍽 Lunch ${entry.day} ${entry.startTime} - ${entry.endTime}'
-        : '${entry.day} ${entry.startTime}-${entry.endTime} ${entry.subject} (${entry.teacher})';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: entry.isLunch ? Colors.orange.shade50 : theme.colorScheme.surfaceVariant,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(label, style: theme.textTheme.bodySmall),
-    );
+    if (confirm == true) {
+      try {
+        await context.read<ClassProvider>().deleteClass(cls.id!, cls.name);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 }

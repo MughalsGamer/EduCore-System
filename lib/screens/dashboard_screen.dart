@@ -59,7 +59,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterUserScreen()));
           }),
           DashboardCard('Classes', Icons.class_, () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const ClassListScreen()));
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const ClassesListScreen()));
           }),
           DashboardCard('Students', Icons.people, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentListScreen()));
