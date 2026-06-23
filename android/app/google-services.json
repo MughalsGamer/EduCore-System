@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "449935855868",
+    "project_id": "educationcoresystem",
+    "storage_bucket": "educationcoresystem.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:449935855868:android:d3aacbded3bf2d2f3c4779",
+        "android_client_info": {
+          "package_name": "com.example.educoresystem"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDaPMaC8Ltk_WIk8VO2yxMEKHScNPTUeQs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
