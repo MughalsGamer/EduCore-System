@@ -1268,6 +1268,7 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Day selector and delete
                 Row(
                   children: [
                     Expanded(
@@ -1291,6 +1292,7 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
+                // Editable periods: subject, start, end, lunch checkbox, delete
                 ...day.periods.asMap().entries.map((periodEntry) {
                   final pIndex = periodEntry.key;
                   final period = periodEntry.value;
@@ -1367,6 +1369,124 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
       }).toList(),
     );
   }
+  // Widget _buildTimetableCard(
+  //     List<TimetableDay> timetable,
+  //     Function(int) onRemoveDay,
+  //     Function(int) onAddPeriod,
+  //     Function(int, int) onRemovePeriod,
+  //     )
+  // {
+  //   return Column(
+  //     children: timetable.asMap().entries.map((dayEntry) {
+  //       final dayIndex = dayEntry.key;
+  //       final day = dayEntry.value;
+  //       return Card(
+  //         margin: const EdgeInsets.symmetric(vertical: 4),
+  //         elevation: 1,
+  //         child: Padding(
+  //           padding: const EdgeInsets.all(8),
+  //           child: Column(
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: [
+  //               Row(
+  //                 children: [
+  //                   Expanded(
+  //                     child: DropdownButtonFormField<String>(
+  //                       value: day.day,
+  //                       decoration: const InputDecoration(
+  //                         labelText: 'Day',
+  //                         border: OutlineInputBorder(),
+  //                         isDense: true,
+  //                       ),
+  //                       items: _weekdays
+  //                           .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+  //                           .toList(),
+  //                       onChanged: (val) => day.day = val!,
+  //                     ),
+  //                   ),
+  //                   IconButton(
+  //                     icon: const Icon(Icons.delete_outline, color: Colors.red),
+  //                     onPressed: () => onRemoveDay(dayIndex),
+  //                   ),
+  //                 ],
+  //               ),
+  //               const SizedBox(height: 8),
+  //               ...day.periods.asMap().entries.map((periodEntry) {
+  //                 final pIndex = periodEntry.key;
+  //                 final period = periodEntry.value;
+  //                 return Padding(
+  //                   padding: const EdgeInsets.only(bottom: 8),
+  //                   child: Row(
+  //                     children: [
+  //                       Expanded(
+  //                         flex: 2,
+  //                         child: TextFormField(
+  //                           initialValue: period.subject,
+  //                           decoration: const InputDecoration(
+  //                             labelText: 'Subject',
+  //                             border: OutlineInputBorder(),
+  //                             isDense: true,
+  //                           ),
+  //                           onChanged: (v) => period.subject = v,
+  //                         ),
+  //                       ),
+  //                       const SizedBox(width: 8),
+  //                       Expanded(
+  //                         flex: 1,
+  //                         child: TextFormField(
+  //                           initialValue: period.startTime,
+  //                           decoration: const InputDecoration(
+  //                             labelText: 'Start',
+  //                             border: OutlineInputBorder(),
+  //                             isDense: true,
+  //                           ),
+  //                           onChanged: (v) => period.startTime = v,
+  //                         ),
+  //                       ),
+  //                       const SizedBox(width: 8),
+  //                       Expanded(
+  //                         flex: 1,
+  //                         child: TextFormField(
+  //                           initialValue: period.endTime,
+  //                           decoration: const InputDecoration(
+  //                             labelText: 'End',
+  //                             border: OutlineInputBorder(),
+  //                             isDense: true,
+  //                           ),
+  //                           onChanged: (v) => period.endTime = v,
+  //                         ),
+  //                       ),
+  //                       Column(
+  //                         children: [
+  //                           Checkbox(
+  //                             value: period.isLunchBreak,
+  //                             onChanged: (val) {
+  //                               setState(() => period.isLunchBreak = val ?? false);
+  //                             },
+  //                           ),
+  //                           const Text('Lunch', style: TextStyle(fontSize: 10)),
+  //                         ],
+  //                       ),
+  //                       IconButton(
+  //                         icon: const Icon(Icons.remove_circle, color: Colors.red, size: 20),
+  //                         onPressed: () => onRemovePeriod(dayIndex, pIndex),
+  //                       ),
+  //                     ],
+  //                   ),
+  //                 );
+  //               }),
+  //               TextButton.icon(
+  //                 onPressed: () => onAddPeriod(dayIndex),
+  //                 icon: const Icon(Icons.add, size: 18),
+  //                 label: const Text('Add Period'),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       );
+  //     }).toList(),
+  //   );
+  // }
 
   // ---------- Subjects chips ----------
   Widget _buildSubjectsChips(List<String> subjects, Function(int) onDelete) {
