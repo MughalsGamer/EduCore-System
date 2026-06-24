@@ -4,7 +4,8 @@ import '../../models/teacher.dart';
 
 class StaffProfileScreen extends StatelessWidget {
   final StaffMember staff;
-  const StaffProfileScreen({super.key, required this.staff});
+  final Map<String, String> classIdToName;
+  const StaffProfileScreen({super.key, required this.staff,this.classIdToName = const {},});
 
   static const _purple = Color(0xFF534AB7);
   static const _purpleLight = Color(0xFFEEECFA);
@@ -442,7 +443,8 @@ class StaffProfileScreen extends StatelessWidget {
                   color: const Color(0xFFE8F5E9),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(
+                child:
+                Text(
                   '${staff.assignedClasses.length}',
                   style: const TextStyle(
                     fontSize: 12,
@@ -586,3 +588,5 @@ class _QuickStat extends StatelessWidget {
     );
   }
 }
+
+
