@@ -4,6 +4,7 @@ import 'dart:io' show File;
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_picker_web/image_picker_web.dart' as web;
 import 'package:provider/provider.dart';
@@ -14,6 +15,34 @@ import '../../providers/class_provider.dart';
 import '../../providers/subject_provider.dart';
 import '../../providers/teacher_provider.dart';
 import '../../services/firestore_service.dart';
+
+class _CnicFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue,
+      TextEditingValue newValue,
+      ) {
+    // Sirf digits rakhein
+    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    // Max 13 digits (5+7+1)
+    final limited = digits.length > 13 ? digits.substring(0, 13) : digits;
+
+    // Format: XXXXX-XXXXXXX-X
+    final buffer = StringBuffer();
+    for (int i = 0; i < limited.length; i++) {
+      if (i == 5 || i == 12) buffer.write('-');
+      buffer.write(limited[i]);
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
 
 // ───── Subject multi‑select (unchanged) ─────
 class _SubjectMultiSelect extends StatelessWidget {
@@ -447,14 +476,49 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
                   validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
+                // TextFormField(
+                //   controller: _cnicCtrl,
+                //   decoration: const InputDecoration(
+                //     labelText: 'CNIC * (e.g., 12345-1234567-1)',
+                //     border: OutlineInputBorder(),
+                //   ),
+                //   keyboardType: TextInputType.number,
+                //   maxLength: 15,
+                //   validator: (v) {
+                //     if (v == null || v.trim().isEmpty) return 'Required';
+                //     final regex = RegExp(r'^\d{5}-\d{7}-\d{1}$');
+                //     if (!regex.hasMatch(v.trim())) return 'Invalid CNIC format';
+                //     return null;
+                //   },
+                // ),
+                // OLD:
+                // TextFormField(
+                //   controller: _cnicCtrl,
+                //   decoration: const InputDecoration(
+                //     labelText: 'CNIC * (e.g., 12345-1234567-1)',
+                //     border: OutlineInputBorder(),
+                //   ),
+                //   keyboardType: TextInputType.number,
+                //   maxLength: 15,
+                //   validator: (v) {
+                //     if (v == null || v.trim().isEmpty) return 'Required';
+                //     final regex = RegExp(r'^\d{5}-\d{7}-\d{1}$');
+                //     if (!regex.hasMatch(v.trim())) return 'Invalid CNIC format';
+                //     return null;
+                //   },
+                // ),
+
+// NEW:
                 TextFormField(
                   controller: _cnicCtrl,
                   decoration: const InputDecoration(
-                    labelText: 'CNIC * (e.g., 12345-1234567-1)',
+                    labelText: 'CNIC * (e.g., 34101-1234567-8)',
                     border: OutlineInputBorder(),
+                    counterText: '',          // maxLength counter hide karo
                   ),
                   keyboardType: TextInputType.number,
-                  maxLength: 15,
+                  maxLength: 15,              // 13 digits + 2 dashes
+                  inputFormatters: [_CnicFormatter()],
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return 'Required';
                     final regex = RegExp(r'^\d{5}-\d{7}-\d{1}$');
