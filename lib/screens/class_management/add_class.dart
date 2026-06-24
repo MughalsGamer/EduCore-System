@@ -1,12 +1,11 @@
 //
 // import 'package:flutter/material.dart';
 // import 'package:provider/provider.dart';
-//
 // import '../../models/class_model.dart';
 // import '../../providers/class_provider.dart';
 //
 // // ─────────────────────────────────────────────
-// //  Subject-wise schedule entry
+// //  Subject-wise schedule entry (unchanged)
 // // ─────────────────────────────────────────────
 // class _SubjectScheduleEntry {
 //   String subject;
@@ -23,12 +22,10 @@
 // }
 //
 // // ─────────────────────────────────────────────
-// //  Per-section timetable state
+// //  Per-section timetable state (unchanged)
 // // ─────────────────────────────────────────────
 // class _SectionTimetableData {
-//   // Days currently selected (pending generate)
 //   List<String> pendingDays = [];
-//   // Days already generated into timetable
 //   Set<String> generatedDays = {};
 //
 //   final TextEditingController startController =
@@ -54,7 +51,86 @@
 // }
 //
 // // ─────────────────────────────────────────────
-// //  Screen
+// //  Custom section name field with class prefix
+// // ─────────────────────────────────────────────
+// class _SectionNameField extends StatefulWidget {
+//   final String className;
+//   final String initialFullName;
+//   final ValueChanged<String> onChanged;
+//   final String? Function(String?)? validator;
+//
+//   const _SectionNameField({
+//     required this.className,
+//     required this.initialFullName,
+//     required this.onChanged,
+//     this.validator,
+//   });
+//
+//   @override
+//   State<_SectionNameField> createState() => _SectionNameFieldState();
+// }
+//
+// class _SectionNameFieldState extends State<_SectionNameField> {
+//   late TextEditingController _controller;
+//   String _prefix = '';
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     _updatePrefixAndController();
+//   }
+//
+//   @override
+//   void didUpdateWidget(covariant _SectionNameField oldWidget) {
+//     super.didUpdateWidget(oldWidget);
+//     if (oldWidget.className != widget.className ||
+//         oldWidget.initialFullName != widget.initialFullName) {
+//       _updatePrefixAndController();
+//     }
+//   }
+//
+//   void _updatePrefixAndController() {
+//     final className = widget.className.trim().isEmpty
+//         ? 'Class'
+//         : widget.className.trim();
+//     _prefix = '$className section ';
+//
+//     // Extract the suffix from the initial full name
+//     String suffix = '';
+//     if (widget.initialFullName.isNotEmpty &&
+//         widget.initialFullName.startsWith(_prefix)) {
+//       suffix = widget.initialFullName.substring(_prefix.length);
+//     }
+//     _controller = TextEditingController(text: suffix);
+//   }
+//
+//   @override
+//   void dispose() {
+//     _controller.dispose();
+//     super.dispose();
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return TextFormField(
+//       controller: _controller,
+//       decoration: InputDecoration(
+//         labelText: 'Section Name',
+//         border: const OutlineInputBorder(),
+//         prefixText: _prefix,
+//         prefixIcon: const Icon(Icons.group),
+//       ),
+//       onChanged: (suffix) {
+//         final fullName = '$_prefix$suffix';
+//         widget.onChanged(fullName);
+//       },
+//       validator: widget.validator,
+//     );
+//   }
+// }
+//
+// // ─────────────────────────────────────────────
+// //  Main Screen
 // // ─────────────────────────────────────────────
 // class AddEditClassScreen extends StatefulWidget {
 //   final SchoolClass? existingClass;
@@ -80,9 +156,7 @@
 //   List<String> _classSubjects = [];
 //
 //   // ── Class timetable: simple mode ──
-//   // pendingDays = selected but not yet generated
 //   List<String> _classPendingDays = [];
-//   // generatedDays = already in _classTimetable (cannot re-select)
 //   Set<String> _classGeneratedDays = {};
 //   final TextEditingController _classStartTimeController =
 //   TextEditingController(text: '08:00');
@@ -107,9 +181,9 @@
 //   bool _hasSections = false;
 //   bool _isSaving = false;
 //
-//   // ─────────────────────────────────────────────
-//   //  initState
-//   // ─────────────────────────────────────────────
+//   // Class name for section prefix
+//   String _classDisplayName = '';
+//
 //   @override
 //   void initState() {
 //     super.initState();
@@ -121,6 +195,13 @@
 //         TextEditingController(text: existing?.headOfClassTeacher ?? '');
 //     _monthlyFeeController =
 //         TextEditingController(text: existing?.monthlyFee?.toString() ?? '');
+//
+//     _classDisplayName = _classNameController.text.trim();
+//     _classNameController.addListener(() {
+//       setState(() {
+//         _classDisplayName = _classNameController.text.trim();
+//       });
+//     });
 //
 //     _classSubjects = existing?.subjects ?? [];
 //
@@ -187,6 +268,7 @@
 //
 //   @override
 //   void dispose() {
+//     _classNameController.removeListener(() {});
 //     _classNameController.dispose();
 //     _headOfClassTeacherController.dispose();
 //     _monthlyFeeController.dispose();
@@ -200,12 +282,24 @@
 //     super.dispose();
 //   }
 //
-//   // ─────────────────────────────────────────────
-//   //  Time Picker helper
-//   // ─────────────────────────────────────────────
+//   // ---------- Duplicate class name check ----------
+//   bool _isClassNameDuplicate(String name) {
+//     final normalizedInput = name.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+//     final classes = context.read<ClassProvider>().classes;
+//     final currentId = widget.existingClass?.id;
+//
+//     for (final cls in classes) {
+//       if (currentId != null && cls.id == currentId) continue;
+//       final normalizedExisting =
+//       cls.name.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+//       if (normalizedExisting == normalizedInput) return true;
+//     }
+//     return false;
+//   }
+//
+//   // ---------- Time picker helper ----------
 //   Future<void> _pickTime(
 //       BuildContext context, TextEditingController controller) async {
-//     // Parse existing text to pre-select in picker
 //     TimeOfDay initial = const TimeOfDay(hour: 8, minute: 0);
 //     final parts = controller.text.split(':');
 //     if (parts.length == 2) {
@@ -213,7 +307,6 @@
 //       final m = int.tryParse(parts[1]);
 //       if (h != null && m != null) initial = TimeOfDay(hour: h, minute: m);
 //     }
-//
 //     final picked = await showTimePicker(
 //       context: context,
 //       initialTime: initial,
@@ -222,7 +315,6 @@
 //         child: child!,
 //       ),
 //     );
-//
 //     if (picked != null) {
 //       final formatted =
 //           '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
@@ -230,9 +322,6 @@
 //     }
 //   }
 //
-//   // ─────────────────────────────────────────────
-//   //  Time Field widget (text + clock icon)
-//   // ─────────────────────────────────────────────
 //   Widget _buildTimeField({
 //     required TextEditingController controller,
 //     required String label,
@@ -247,7 +336,6 @@
 //         isDense: true,
 //         suffixIcon: IconButton(
 //           icon: const Icon(Icons.access_time, size: 18),
-//           tooltip: 'Pick time',
 //           onPressed: () => _pickTime(context, controller),
 //         ),
 //       ),
@@ -255,11 +343,7 @@
 //     );
 //   }
 //
-//   // ─────────────────────────────────────────────
-//   //  Timetable generators
-//   // ─────────────────────────────────────────────
-//
-//   /// Simple mode — build periods for given days, MERGE into existing timetable
+//   // ---------- Timetable generators (unchanged) ----------
 //   void _mergeSimpleTimetable({
 //     required List<TimetableDay> existing,
 //     required List<String> newDays,
@@ -273,8 +357,8 @@
 //       final List<TimetablePeriod> periods = [];
 //       if (hasLunch && lunchStart.isNotEmpty && lunchEnd.isNotEmpty) {
 //         if (lunchStart != start) {
-//           periods.add(TimetablePeriod(
-//               startTime: start, endTime: lunchStart, subject: ''));
+//           periods.add(
+//               TimetablePeriod(startTime: start, endTime: lunchStart, subject: ''));
 //         }
 //         periods.add(TimetablePeriod(
 //             startTime: lunchStart,
@@ -290,7 +374,6 @@
 //             .add(TimetablePeriod(startTime: start, endTime: end, subject: ''));
 //       }
 //
-//       // Replace if day already exists, else add
 //       final idx = existing.indexWhere((d) => d.day == day);
 //       final newDay = TimetableDay(day: day, periods: periods);
 //       if (idx >= 0) {
@@ -299,18 +382,14 @@
 //         existing.add(newDay);
 //       }
 //     }
-//
-//     // Sort by weekday order
 //     existing.sort(
 //             (a, b) => _weekdays.indexOf(a.day) - _weekdays.indexOf(b.day));
 //   }
 //
-//   /// Subject-wise mode — MERGE new entries into existing timetable
 //   void _mergeSubjectWiseTimetable({
 //     required List<TimetableDay> existing,
 //     required List<_SubjectScheduleEntry> entries,
 //   }) {
-//     // Build new periods grouped by day from the entries
 //     final Map<String, List<TimetablePeriod>> byDay = {};
 //     for (final entry in entries) {
 //       for (final day in entry.days) {
@@ -322,18 +401,15 @@
 //         ));
 //       }
 //     }
-//
 //     for (final day in byDay.keys) {
 //       final newPeriods = byDay[day]!;
 //       final idx = existing.indexWhere((d) => d.day == day);
 //       if (idx >= 0) {
-//         // Merge: add only periods not already present (by startTime+subject)
 //         for (final np in newPeriods) {
 //           final alreadyThere = existing[idx].periods.any(
 //                   (p) => p.startTime == np.startTime && p.subject == np.subject);
 //           if (!alreadyThere) existing[idx].periods.add(np);
 //         }
-//         // Re-sort by start time
 //         existing[idx]
 //             .periods
 //             .sort((a, b) => a.startTime.compareTo(b.startTime));
@@ -342,9 +418,8 @@
 //         existing.add(TimetableDay(day: day, periods: newPeriods));
 //       }
 //     }
-//
-//     existing
-//         .sort((a, b) => _weekdays.indexOf(a.day) - _weekdays.indexOf(b.day));
+//     existing.sort(
+//             (a, b) => _weekdays.indexOf(a.day) - _weekdays.indexOf(b.day));
 //   }
 //
 //   void _generateClassTimetable() {
@@ -363,7 +438,6 @@
 //           existing: _classTimetable,
 //           entries: _classSubjectEntries,
 //         );
-//         // Update generatedDays
 //         for (final e in _classSubjectEntries) {
 //           _classGeneratedDays.addAll(e.days);
 //         }
@@ -385,7 +459,6 @@
 //           lunchStart: _lunchStartTimeController.text,
 //           lunchEnd: _lunchEndTimeController.text,
 //         );
-//         // Mark these days as generated & clear pending selection
 //         _classGeneratedDays.addAll(_classPendingDays);
 //         _classPendingDays.clear();
 //       });
@@ -439,12 +512,9 @@
 //   }
 //
 //   void _snack(String msg) =>
-//       ScaffoldMessenger.of(context)
-//           .showSnackBar(SnackBar(content: Text(msg)));
+//       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 //
-//   // ─────────────────────────────────────────────
-//   //  Subject helpers
-//   // ─────────────────────────────────────────────
+//   // ---------- Subject helpers (unchanged) ----------
 //   void _addClassSubject() {
 //     final subject = _classSubjectInputController.text.trim();
 //     if (subject.isNotEmpty) {
@@ -471,12 +541,9 @@
 //   }
 //
 //   void _removeSectionSubject(int sectionIndex, int subjectIndex) =>
-//       setState(
-//               () => _sections[sectionIndex].subjects!.removeAt(subjectIndex));
+//       setState(() => _sections[sectionIndex].subjects!.removeAt(subjectIndex));
 //
-//   // ─────────────────────────────────────────────
-//   //  Save
-//   // ─────────────────────────────────────────────
+//   // ---------- Save ----------
 //   Future<void> _saveClass() async {
 //     if (!_formKey.currentState!.validate()) return;
 //     setState(() => _isSaving = true);
@@ -509,9 +576,7 @@
 //     }
 //   }
 //
-//   // ─────────────────────────────────────────────
-//   //  Advanced timetable helpers
-//   // ─────────────────────────────────────────────
+//   // ---------- Advanced timetable helpers (unchanged) ----------
 //   void _addClassTimetableDay() => setState(
 //           () => _classTimetable.add(TimetableDay(day: 'Monday', periods: [])));
 //   void _removeClassTimetableDay(int i) =>
@@ -529,7 +594,6 @@
 //     _sectionSubjectControllers.add(TextEditingController());
 //     _sectionTimetables.add(_SectionTimetableData());
 //   });
-//
 //   void _removeSection(int i) => setState(() {
 //     _sections.removeAt(i);
 //     _sectionSubjectControllers[i].dispose();
@@ -537,12 +601,9 @@
 //     _sectionTimetables[i].dispose();
 //     _sectionTimetables.removeAt(i);
 //   });
-//
 //   void _addSectionTimetableDay(int si) => setState(() {
 //     _sections[si].timetable ??= [];
-//     _sections[si]
-//         .timetable!
-//         .add(TimetableDay(day: 'Monday', periods: []));
+//     _sections[si].timetable!.add(TimetableDay(day: 'Monday', periods: []));
 //   });
 //   void _removeSectionTimetableDay(int si, int di) =>
 //       setState(() => _sections[si].timetable!.removeAt(di));
@@ -555,9 +616,7 @@
 //   void _removeSectionPeriod(int si, int di, int pi) =>
 //       setState(() => _sections[si].timetable![di].periods.removeAt(pi));
 //
-//   // ─────────────────────────────────────────────
-//   //  UI Helpers
-//   // ─────────────────────────────────────────────
+//   // ---------- UI Builders (mostly unchanged, schedule card adapted) ----------
 //   Widget _buildSubjectsChips(List<String> subjects, Function(int) onDelete) {
 //     if (subjects.isEmpty) return const SizedBox.shrink();
 //     return Padding(
@@ -590,8 +649,7 @@
 //           margin: const EdgeInsets.symmetric(vertical: 3),
 //           color: Colors.blue.shade50,
 //           child: Padding(
-//             padding:
-//             const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+//             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
 //             child: Column(
 //               crossAxisAlignment: CrossAxisAlignment.start,
 //               children: [
@@ -613,8 +671,7 @@
 //                             color: Colors.black87,
 //                             fontWeight: FontWeight.w500),
 //                       ),
-//                       if (p.subject.isNotEmpty &&
-//                           !p.isLunchBreak) ...[
+//                       if (p.subject.isNotEmpty && !p.isLunchBreak) ...[
 //                         const SizedBox(width: 6),
 //                         Flexible(
 //                           child: Text(
@@ -665,16 +722,13 @@
 //                             border: OutlineInputBorder(),
 //                             isDense: true),
 //                         items: _weekdays
-//                             .map((d) =>
-//                             DropdownMenuItem(value: d, child: Text(d)))
+//                             .map((d) => DropdownMenuItem(value: d, child: Text(d)))
 //                             .toList(),
-//                         onChanged: (val) =>
-//                             setState(() => day.day = val!),
+//                         onChanged: (val) => setState(() => day.day = val!),
 //                       ),
 //                     ),
 //                     IconButton(
-//                       icon:
-//                       const Icon(Icons.delete_outline, color: Colors.red),
+//                       icon: const Icon(Icons.delete_outline, color: Colors.red),
 //                       onPressed: () => onRemoveDay(dayIndex),
 //                     ),
 //                   ],
@@ -709,11 +763,10 @@
 //                               suffixIcon: IconButton(
 //                                 icon: const Icon(Icons.access_time, size: 16),
 //                                 onPressed: () async {
-//                                   final ctrl = TextEditingController(
-//                                       text: period.startTime);
+//                                   final ctrl =
+//                                   TextEditingController(text: period.startTime);
 //                                   await _pickTime(context, ctrl);
-//                                   setState(
-//                                           () => period.startTime = ctrl.text);
+//                                   setState(() => period.startTime = ctrl.text);
 //                                 },
 //                               ),
 //                             ),
@@ -731,8 +784,8 @@
 //                               suffixIcon: IconButton(
 //                                 icon: const Icon(Icons.access_time, size: 16),
 //                                 onPressed: () async {
-//                                   final ctrl = TextEditingController(
-//                                       text: period.endTime);
+//                                   final ctrl =
+//                                   TextEditingController(text: period.endTime);
 //                                   await _pickTime(context, ctrl);
 //                                   setState(() => period.endTime = ctrl.text);
 //                                 },
@@ -748,8 +801,7 @@
 //                               onChanged: (val) => setState(
 //                                       () => period.isLunchBreak = val ?? false),
 //                             ),
-//                             const Text('Lunch',
-//                                 style: TextStyle(fontSize: 10)),
+//                             const Text('Lunch', style: TextStyle(fontSize: 10)),
 //                           ],
 //                         ),
 //                         IconButton(
@@ -774,9 +826,6 @@
 //     );
 //   }
 //
-//   // ─────────────────────────────────────────────
-//   //  Subject-wise entries UI
-//   // ─────────────────────────────────────────────
 //   Widget _buildSubjectWiseEntries(
 //       List<_SubjectScheduleEntry> entries,
 //       VoidCallback onAddEntry,
@@ -791,14 +840,13 @@
 //           return Card(
 //             margin: const EdgeInsets.only(bottom: 10),
 //             elevation: 1,
-//             shape: RoundedRectangleBorder(
-//                 borderRadius: BorderRadius.circular(10)),
+//             shape:
+//             RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
 //             child: Padding(
 //               padding: const EdgeInsets.all(10),
 //               child: Column(
 //                 crossAxisAlignment: CrossAxisAlignment.start,
 //                 children: [
-//                   // Subject name + delete
 //                   Row(
 //                     children: [
 //                       Expanded(
@@ -808,11 +856,9 @@
 //                             labelText: 'Subject Name',
 //                             border: OutlineInputBorder(),
 //                             isDense: true,
-//                             prefixIcon:
-//                             Icon(Icons.book_outlined, size: 18),
+//                             prefixIcon: Icon(Icons.book_outlined, size: 18),
 //                           ),
-//                           onChanged: (v) =>
-//                               setState(() => entry.subject = v),
+//                           onChanged: (v) => setState(() => entry.subject = v),
 //                         ),
 //                       ),
 //                       IconButton(
@@ -823,8 +869,6 @@
 //                     ],
 //                   ),
 //                   const SizedBox(height: 10),
-//
-//                   // Start & End time with clock picker
 //                   Row(
 //                     children: [
 //                       Expanded(
@@ -839,17 +883,15 @@
 //                               isDense: true,
 //                               hintText: '08:00',
 //                               suffixIcon: IconButton(
-//                                 icon: const Icon(Icons.access_time,
-//                                     size: 18),
+//                                 icon:
+//                                 const Icon(Icons.access_time, size: 18),
 //                                 onPressed: () async {
 //                                   await _pickTime(context, ctrl);
-//                                   setState(
-//                                           () => entry.startTime = ctrl.text);
+//                                   setState(() => entry.startTime = ctrl.text);
 //                                 },
 //                               ),
 //                             ),
-//                             onChanged: (v) =>
-//                                 setState(() => entry.startTime = v),
+//                             onChanged: (v) => setState(() => entry.startTime = v),
 //                           );
 //                         }),
 //                       ),
@@ -866,25 +908,21 @@
 //                               isDense: true,
 //                               hintText: '08:45',
 //                               suffixIcon: IconButton(
-//                                 icon: const Icon(Icons.access_time,
-//                                     size: 18),
+//                                 icon:
+//                                 const Icon(Icons.access_time, size: 18),
 //                                 onPressed: () async {
 //                                   await _pickTime(context, ctrl);
-//                                   setState(
-//                                           () => entry.endTime = ctrl.text);
+//                                   setState(() => entry.endTime = ctrl.text);
 //                                 },
 //                               ),
 //                             ),
-//                             onChanged: (v) =>
-//                                 setState(() => entry.endTime = v),
+//                             onChanged: (v) => setState(() => entry.endTime = v),
 //                           );
 //                         }),
 //                       ),
 //                     ],
 //                   ),
 //                   const SizedBox(height: 10),
-//
-//                   // Day chips
 //                   Text('Select Days:',
 //                       style: Theme.of(context).textTheme.labelMedium),
 //                   const SizedBox(height: 6),
@@ -897,9 +935,8 @@
 //                         label: Text(day.substring(0, 3),
 //                             style: TextStyle(
 //                                 fontSize: 12,
-//                                 color: selected
-//                                     ? Colors.white
-//                                     : Colors.black87)),
+//                                 color:
+//                                 selected ? Colors.white : Colors.black87)),
 //                         selected: selected,
 //                         selectedColor: Theme.of(context).primaryColor,
 //                         backgroundColor: Colors.grey.shade100,
@@ -932,13 +969,10 @@
 //     );
 //   }
 //
-//   // ─────────────────────────────────────────────
-//   //  Main schedule card (UNIFIED)
-//   // ─────────────────────────────────────────────
+//   // Unified schedule card (unchanged logic)
 //   Widget _buildScheduleCard({
 //     required bool isSubjectWiseMode,
 //     required VoidCallback onToggleMode,
-//     // Simple mode
 //     required List<String> pendingDays,
 //     required Set<String> generatedDays,
 //     required TextEditingController startController,
@@ -953,18 +987,15 @@
 //     required Function(int) onRemoveDay,
 //     required Function(int) onAddPeriod,
 //     required Function(int, int) onRemovePeriod,
-//     // Subject-wise
 //     required List<_SubjectScheduleEntry> subjectEntries,
 //     required VoidCallback onAddSubjectEntry,
 //     required Function(int) onRemoveSubjectEntry,
-//     // Common
 //     required VoidCallback onGenerate,
 //     required List<TimetableDay> timetable,
 //   }) {
 //     return Column(
 //       crossAxisAlignment: CrossAxisAlignment.start,
 //       children: [
-//         // ── Mode Toggle ──
 //         Container(
 //           decoration: BoxDecoration(
 //             color: Colors.grey.shade100,
@@ -1029,12 +1060,9 @@
 //           ),
 //         ),
 //         const SizedBox(height: 16),
-//
 //         if (!isSubjectWiseMode) ...[
-//           // ══ SIMPLE MODE ══
-//
-//           // Day chips: generated=disabled+green, pending=selected+blue, available=normal
-//           Text('Select Days:', style: Theme.of(context).textTheme.labelLarge),
+//           Text('Select Days:',
+//               style: Theme.of(context).textTheme.labelLarge),
 //           const SizedBox(height: 4),
 //           Text(
 //             'Already generated days are locked (green). Select remaining days and generate.',
@@ -1050,7 +1078,6 @@
 //             children: _weekdays.map((day) {
 //               final isGenerated = generatedDays.contains(day);
 //               final isPending = pendingDays.contains(day);
-//
 //               return FilterChip(
 //                 label: Text(
 //                   day,
@@ -1064,7 +1091,6 @@
 //                   ),
 //                 ),
 //                 selected: isPending,
-//                 // Disable if already generated
 //                 onSelected: isGenerated
 //                     ? null
 //                     : (val) => setState(() {
@@ -1088,7 +1114,6 @@
 //             }).toList(),
 //           ),
 //           const SizedBox(height: 16),
-//
 //           Row(
 //             children: [
 //               Expanded(
@@ -1109,7 +1134,6 @@
 //             ],
 //           ),
 //           const SizedBox(height: 12),
-//
 //           Row(
 //             children: [
 //               Text('Lunch Break',
@@ -1144,7 +1168,6 @@
 //             ),
 //           ],
 //           const SizedBox(height: 16),
-//
 //           ElevatedButton.icon(
 //             onPressed: pendingDays.isEmpty ? null : onGenerate,
 //             icon: const Icon(Icons.refresh),
@@ -1154,11 +1177,8 @@
 //             style: ElevatedButton.styleFrom(
 //                 minimumSize: const Size(double.infinity, 42)),
 //           ),
-//
 //           _buildTimetablePreview(timetable),
 //           const SizedBox(height: 12),
-//
-//           // Advanced toggle
 //           InkWell(
 //             onTap: onToggleAdvanced,
 //             borderRadius: BorderRadius.circular(6),
@@ -1166,10 +1186,7 @@
 //               padding: const EdgeInsets.symmetric(vertical: 4),
 //               child: Row(
 //                 children: [
-//                   Icon(
-//                       showAdvanced
-//                           ? Icons.expand_less
-//                           : Icons.expand_more,
+//                   Icon(showAdvanced ? Icons.expand_less : Icons.expand_more,
 //                       size: 20),
 //                   const SizedBox(width: 4),
 //                   Text('Advanced: Customize Periods',
@@ -1193,7 +1210,6 @@
 //                 timetable, onRemoveDay, onAddPeriod, onRemovePeriod),
 //           ],
 //         ] else ...[
-//           // ══ SUBJECT-WISE MODE ══
 //           Text(
 //             'Add subjects, assign days & time. Generate merges with existing.',
 //             style: Theme.of(context)
@@ -1221,349 +1237,391 @@
 //     );
 //   }
 //
-//   // ─────────────────────────────────────────────
-//   //  build
-//   // ─────────────────────────────────────────────
+//   // ───── Build sections UI (used in both mobile and desktop) ─────
+//   Widget _buildSectionsList() {
+//     return Column(
+//       children: [
+//         Row(
+//           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//           children: [
+//             Text('Sections', style: Theme.of(context).textTheme.titleMedium),
+//             ElevatedButton.icon(
+//               onPressed: _addSection,
+//               icon: const Icon(Icons.add),
+//               label: const Text('Add Section'),
+//             ),
+//           ],
+//         ),
+//         const SizedBox(height: 12),
+//         ...List.generate(_sections.length, (si) {
+//           final section = _sections[si];
+//           final td = _sectionTimetables[si];
+//           return Card(
+//             margin: const EdgeInsets.only(bottom: 12),
+//             shape: RoundedRectangleBorder(
+//                 borderRadius: BorderRadius.circular(12)),
+//             elevation: 2,
+//             child: Padding(
+//               padding: const EdgeInsets.all(12),
+//               child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Row(
+//                     children: [
+//                       Expanded(
+//                         child: _SectionNameField(
+//                           className: _classDisplayName,
+//                           initialFullName: section.sectionName,
+//                           onChanged: (fullName) => section.sectionName = fullName,
+//                           validator: (v) =>
+//                           v == null || v.trim().isEmpty
+//                               ? 'Enter section name'
+//                               : null,
+//                         ),
+//                       ),
+//                       IconButton(
+//                         icon:
+//                         const Icon(Icons.delete, color: Colors.red),
+//                         onPressed: () => _removeSection(si),
+//                       ),
+//                     ],
+//                   ),
+//                   const SizedBox(height: 8),
+//                   TextFormField(
+//                     initialValue: section.headOfTeacher,
+//                     decoration: const InputDecoration(
+//                       labelText: 'Head of Teacher',
+//                       border: OutlineInputBorder(),
+//                       prefixIcon: Icon(Icons.person_outline),
+//                     ),
+//                     onChanged: (val) => section.headOfTeacher = val,
+//                   ),
+//                   const SizedBox(height: 8),
+//                   TextFormField(
+//                     initialValue: section.monthlyFee?.toString(),
+//                     decoration: const InputDecoration(
+//                       labelText: 'Monthly Fee (Optional)',
+//                       border: OutlineInputBorder(),
+//                       prefixText: '\$ ',
+//                     ),
+//                     keyboardType: TextInputType.number,
+//                     onChanged: (val) =>
+//                     section.monthlyFee = double.tryParse(val),
+//                   ),
+//                   const SizedBox(height: 12),
+//                   Text('Subjects',
+//                       style: Theme.of(context).textTheme.labelLarge),
+//                   const SizedBox(height: 8),
+//                   Row(
+//                     children: [
+//                       Expanded(
+//                         child: TextField(
+//                           controller: _sectionSubjectControllers[si],
+//                           decoration: const InputDecoration(
+//                             hintText: 'Add subject',
+//                             border: OutlineInputBorder(),
+//                             isDense: true,
+//                           ),
+//                         ),
+//                       ),
+//                       const SizedBox(width: 8),
+//                       IconButton(
+//                         onPressed: () => _addSectionSubject(si),
+//                         icon: const Icon(Icons.save, color: Colors.blue),
+//                         tooltip: 'Add Subject',
+//                       ),
+//                     ],
+//                   ),
+//                   _buildSubjectsChips(
+//                     section.subjects ?? [],
+//                         (idx) => _removeSectionSubject(si, idx),
+//                   ),
+//                   const SizedBox(height: 12),
+//                   Text('Section Timetable',
+//                       style: Theme.of(context).textTheme.labelLarge),
+//                   const SizedBox(height: 8),
+//                   _buildScheduleCard(
+//                     isSubjectWiseMode: td.isSubjectWiseMode,
+//                     onToggleMode: () => setState(
+//                             () => td.isSubjectWiseMode = !td.isSubjectWiseMode),
+//                     pendingDays: td.pendingDays,
+//                     generatedDays: td.generatedDays,
+//                     startController: td.startController,
+//                     endController: td.endController,
+//                     lunchStartController: td.lunchStartController,
+//                     lunchEndController: td.lunchEndController,
+//                     hasLunchBreak: td.hasLunchBreak,
+//                     onLunchToggle: (val) => td.hasLunchBreak = val,
+//                     showAdvanced: td.showAdvanced,
+//                     onToggleAdvanced: () =>
+//                         setState(() => td.showAdvanced = !td.showAdvanced),
+//                     onAddDay: () => _addSectionTimetableDay(si),
+//                     onRemoveDay: (di) => _removeSectionTimetableDay(si, di),
+//                     onAddPeriod: (di) => _addSectionPeriod(si, di),
+//                     onRemovePeriod: (di, pi) =>
+//                         _removeSectionPeriod(si, di, pi),
+//                     subjectEntries: td.subjectEntries,
+//                     onAddSubjectEntry: () => setState(
+//                             () => td.subjectEntries.add(_SubjectScheduleEntry())),
+//                     onRemoveSubjectEntry: (i) =>
+//                         setState(() => td.subjectEntries.removeAt(i)),
+//                     onGenerate: () => _generateSectionTimetable(si),
+//                     timetable: section.timetable ?? [],
+//                   ),
+//                 ],
+//               ),
+//             ),
+//           );
+//         }),
+//       ],
+//     );
+//   }
+//
 //   @override
 //   Widget build(BuildContext context) {
+//     // Responsive breakpoint
+//     const double desktopBreakpoint = 600;
+//
 //     return Scaffold(
 //       appBar: AppBar(
-//         title:
-//         Text(widget.existingClass == null ? 'Add Class' : 'Edit Class'),
+//         title: Text(
+//             widget.existingClass == null ? 'Add Class' : 'Edit Class'),
 //         centerTitle: true,
 //         elevation: 0,
 //       ),
 //       body: Form(
 //         key: _formKey,
-//         child: ListView(
-//           padding: const EdgeInsets.all(16),
-//           children: [
-//             TextFormField(
-//               controller: _classNameController,
-//               decoration: const InputDecoration(
-//                 labelText: 'Class Name',
-//                 border: OutlineInputBorder(),
-//                 prefixIcon: Icon(Icons.class_),
-//               ),
-//               validator: (v) =>
-//               v == null || v.trim().isEmpty ? 'Enter class name' : null,
-//             ),
-//             const SizedBox(height: 16),
-//             TextFormField(
-//               controller: _headOfClassTeacherController,
-//               decoration: const InputDecoration(
-//                 labelText: 'Head of Class Teacher',
-//                 border: OutlineInputBorder(),
-//                 prefixIcon: Icon(Icons.person),
-//               ),
-//             ),
-//             const SizedBox(height: 16),
-//             TextFormField(
-//               controller: _monthlyFeeController,
-//               decoration: const InputDecoration(
-//                 labelText: 'Monthly Fee (Optional)',
-//                 border: OutlineInputBorder(),
-//                 prefixText: '\$ ',
-//                 prefixIcon: Icon(Icons.money),
-//               ),
-//               keyboardType: TextInputType.number,
-//             ),
-//             const SizedBox(height: 16),
+//         child: LayoutBuilder(
+//           builder: (context, constraints) {
+//             final isDesktop = constraints.maxWidth >= desktopBreakpoint;
 //
-//             // ── Class Subjects ──
-//             Text('Class Subjects',
-//                 style: Theme.of(context).textTheme.titleMedium),
-//             const SizedBox(height: 8),
-//             Row(
+//             // Common content widgets
+//             final classInfoSection = Column(
+//               crossAxisAlignment: CrossAxisAlignment.start,
 //               children: [
-//                 Expanded(
-//                   child: TextField(
-//                     controller: _classSubjectInputController,
-//                     decoration: const InputDecoration(
-//                       hintText: 'Add subject',
-//                       border: OutlineInputBorder(),
-//                       isDense: true,
-//                     ),
+//                 TextFormField(
+//                   controller: _classNameController,
+//                   decoration: const InputDecoration(
+//                     labelText: 'Class Name',
+//                     border: OutlineInputBorder(),
+//                     prefixIcon: Icon(Icons.class_),
+//                   ),
+//                   validator: (v) {
+//                     if (v == null || v.trim().isEmpty) return 'Enter class name';
+//                     if (_isClassNameDuplicate(v.trim())) {
+//                       return 'A class with this name already exists';
+//                     }
+//                     return null;
+//                   },
+//                 ),
+//                 const SizedBox(height: 16),
+//                 TextFormField(
+//                   controller: _headOfClassTeacherController,
+//                   decoration: const InputDecoration(
+//                     labelText: 'Head of Class Teacher',
+//                     border: OutlineInputBorder(),
+//                     prefixIcon: Icon(Icons.person),
 //                   ),
 //                 ),
-//                 const SizedBox(width: 8),
-//                 IconButton(
-//                   onPressed: _addClassSubject,
-//                   icon: const Icon(Icons.save, color: Colors.blue),
-//                   tooltip: 'Add Subject',
+//                 const SizedBox(height: 16),
+//                 TextFormField(
+//                   controller: _monthlyFeeController,
+//                   decoration: const InputDecoration(
+//                     labelText: 'Monthly Fee (Optional)',
+//                     border: OutlineInputBorder(),
+//                     prefixText: '\$ ',
+//                     prefixIcon: Icon(Icons.money),
+//                   ),
+//                   keyboardType: TextInputType.number,
 //                 ),
-//               ],
-//             ),
-//             _buildSubjectsChips(_classSubjects, _removeClassSubject),
-//             const SizedBox(height: 24),
-//
-//             // ════════════════════════════════════
-//             //  CLASS SCHEDULE
-//             // ════════════════════════════════════
-//             Card(
-//               shape: RoundedRectangleBorder(
-//                   borderRadius: BorderRadius.circular(12)),
-//               child: Padding(
-//                 padding: const EdgeInsets.all(16),
-//                 child: Column(
-//                   crossAxisAlignment: CrossAxisAlignment.start,
+//                 const SizedBox(height: 16),
+//                 Text('Class Subjects',
+//                     style: Theme.of(context).textTheme.titleMedium),
+//                 const SizedBox(height: 8),
+//                 Row(
 //                   children: [
-//                     Text('Class Schedule',
-//                         style: Theme.of(context).textTheme.titleMedium),
-//                     const SizedBox(height: 12),
-//                     _buildScheduleCard(
-//                       isSubjectWiseMode: _isSubjectWiseMode,
-//                       onToggleMode: () => setState(
-//                               () => _isSubjectWiseMode = !_isSubjectWiseMode),
-//                       pendingDays: _classPendingDays,
-//                       generatedDays: _classGeneratedDays,
-//                       startController: _classStartTimeController,
-//                       endController: _classEndTimeController,
-//                       lunchStartController: _lunchStartTimeController,
-//                       lunchEndController: _lunchEndTimeController,
-//                       hasLunchBreak: _hasLunchBreak,
-//                       onLunchToggle: (val) => _hasLunchBreak = val,
-//                       showAdvanced: _showAdvancedClassTimetable,
-//                       onToggleAdvanced: () => setState(() =>
-//                       _showAdvancedClassTimetable =
-//                       !_showAdvancedClassTimetable),
-//                       onAddDay: _addClassTimetableDay,
-//                       onRemoveDay: _removeClassTimetableDay,
-//                       onAddPeriod: _addClassPeriod,
-//                       onRemovePeriod: _removeClassPeriod,
-//                       subjectEntries: _classSubjectEntries,
-//                       onAddSubjectEntry: () => setState(
-//                               () => _classSubjectEntries
-//                               .add(_SubjectScheduleEntry())),
-//                       onRemoveSubjectEntry: (i) => setState(
-//                               () => _classSubjectEntries.removeAt(i)),
-//                       onGenerate: _generateClassTimetable,
-//                       timetable: _classTimetable,
+//                     Expanded(
+//                       child: TextField(
+//                         controller: _classSubjectInputController,
+//                         decoration: const InputDecoration(
+//                           hintText: 'Add subject',
+//                           border: OutlineInputBorder(),
+//                           isDense: true,
+//                         ),
+//                       ),
+//                     ),
+//                     const SizedBox(width: 8),
+//                     IconButton(
+//                       onPressed: _addClassSubject,
+//                       icon: const Icon(Icons.save, color: Colors.blue),
+//                       tooltip: 'Add Subject',
 //                     ),
 //                   ],
 //                 ),
-//               ),
-//             ),
-//             const SizedBox(height: 24),
-//
-//             // ════════════════════════════════════
-//             //  SECTIONS TOGGLE
-//             // ════════════════════════════════════
-//             Row(
-//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//               children: [
-//                 Text('Has Sections?',
-//                     style: Theme.of(context).textTheme.titleMedium),
-//                 Switch(
-//                   value: _hasSections,
-//                   onChanged: (val) {
-//                     setState(() {
-//                       _hasSections = val;
-//                       if (!val) {
-//                         for (var c in _sectionSubjectControllers) {
-//                           c.dispose();
-//                         }
-//                         _sectionSubjectControllers.clear();
-//                         for (var d in _sectionTimetables) {
-//                           d.dispose();
-//                         }
-//                         _sectionTimetables.clear();
-//                         _sections.clear();
-//                       }
-//                     });
-//                   },
-//                 ),
-//               ],
-//             ),
-//
-//             // ════════════════════════════════════
-//             //  SECTIONS
-//             // ════════════════════════════════════
-//             if (_hasSections) ...[
-//               Row(
-//                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                 children: [
-//                   Text('Sections',
-//                       style: Theme.of(context).textTheme.titleMedium),
-//                   ElevatedButton.icon(
-//                     onPressed: _addSection,
-//                     icon: const Icon(Icons.add),
-//                     label: const Text('Add Section'),
-//                   ),
-//                 ],
-//               ),
-//               const SizedBox(height: 12),
-//               ...List.generate(_sections.length, (si) {
-//                 final section = _sections[si];
-//                 final td = _sectionTimetables[si];
-//                 return Card(
-//                   margin: const EdgeInsets.only(bottom: 12),
+//                 _buildSubjectsChips(_classSubjects, _removeClassSubject),
+//                 const SizedBox(height: 24),
+//                 Card(
 //                   shape: RoundedRectangleBorder(
 //                       borderRadius: BorderRadius.circular(12)),
-//                   elevation: 2,
 //                   child: Padding(
-//                     padding: const EdgeInsets.all(12),
+//                     padding: const EdgeInsets.all(16),
 //                     child: Column(
 //                       crossAxisAlignment: CrossAxisAlignment.start,
 //                       children: [
-//                         Row(
-//                           children: [
-//                             Expanded(
-//                               child: TextFormField(
-//                                 initialValue: section.sectionName,
-//                                 decoration: const InputDecoration(
-//                                   labelText: 'Section Name',
-//                                   border: OutlineInputBorder(),
-//                                   prefixIcon: Icon(Icons.group),
-//                                 ),
-//                                 onChanged: (val) =>
-//                                 section.sectionName = val,
-//                                 validator: (v) =>
-//                                 v == null || v.trim().isEmpty
-//                                     ? 'Enter section name'
-//                                     : null,
-//                               ),
-//                             ),
-//                             IconButton(
-//                               icon: const Icon(Icons.delete,
-//                                   color: Colors.red),
-//                               onPressed: () => _removeSection(si),
-//                             ),
-//                           ],
-//                         ),
-//                         const SizedBox(height: 8),
-//                         TextFormField(
-//                           initialValue: section.headOfTeacher,
-//                           decoration: const InputDecoration(
-//                             labelText: 'Head of Teacher',
-//                             border: OutlineInputBorder(),
-//                             prefixIcon: Icon(Icons.person_outline),
-//                           ),
-//                           onChanged: (val) => section.headOfTeacher = val,
-//                         ),
-//                         const SizedBox(height: 8),
-//                         TextFormField(
-//                           initialValue: section.monthlyFee?.toString(),
-//                           decoration: const InputDecoration(
-//                             labelText: 'Monthly Fee (Optional)',
-//                             border: OutlineInputBorder(),
-//                             prefixText: '\$ ',
-//                           ),
-//                           keyboardType: TextInputType.number,
-//                           onChanged: (val) =>
-//                           section.monthlyFee = double.tryParse(val),
-//                         ),
+//                         Text('Class Schedule',
+//                             style: Theme.of(context).textTheme.titleMedium),
 //                         const SizedBox(height: 12),
-//                         Text('Subjects',
-//                             style:
-//                             Theme.of(context).textTheme.labelLarge),
-//                         const SizedBox(height: 8),
-//                         Row(
-//                           children: [
-//                             Expanded(
-//                               child: TextField(
-//                                 controller:
-//                                 _sectionSubjectControllers[si],
-//                                 decoration: const InputDecoration(
-//                                   hintText: 'Add subject',
-//                                   border: OutlineInputBorder(),
-//                                   isDense: true,
-//                                 ),
-//                               ),
-//                             ),
-//                             const SizedBox(width: 8),
-//                             IconButton(
-//                               onPressed: () => _addSectionSubject(si),
-//                               icon: const Icon(Icons.save,
-//                                   color: Colors.blue),
-//                               tooltip: 'Add Subject',
-//                             ),
-//                           ],
-//                         ),
-//                         _buildSubjectsChips(
-//                           section.subjects ?? [],
-//                               (idx) => _removeSectionSubject(si, idx),
-//                         ),
-//                         const SizedBox(height: 12),
-//                         Text('Section Timetable',
-//                             style:
-//                             Theme.of(context).textTheme.labelLarge),
-//                         const SizedBox(height: 8),
 //                         _buildScheduleCard(
-//                           isSubjectWiseMode: td.isSubjectWiseMode,
+//                           isSubjectWiseMode: _isSubjectWiseMode,
 //                           onToggleMode: () => setState(() =>
-//                           td.isSubjectWiseMode = !td.isSubjectWiseMode),
-//                           pendingDays: td.pendingDays,
-//                           generatedDays: td.generatedDays,
-//                           startController: td.startController,
-//                           endController: td.endController,
-//                           lunchStartController: td.lunchStartController,
-//                           lunchEndController: td.lunchEndController,
-//                           hasLunchBreak: td.hasLunchBreak,
-//                           onLunchToggle: (val) => td.hasLunchBreak = val,
-//                           showAdvanced: td.showAdvanced,
-//                           onToggleAdvanced: () => setState(
-//                                   () => td.showAdvanced = !td.showAdvanced),
-//                           onAddDay: () => _addSectionTimetableDay(si),
-//                           onRemoveDay: (di) =>
-//                               _removeSectionTimetableDay(si, di),
-//                           onAddPeriod: (di) =>
-//                               _addSectionPeriod(si, di),
-//                           onRemovePeriod: (di, pi) =>
-//                               _removeSectionPeriod(si, di, pi),
-//                           subjectEntries: td.subjectEntries,
+//                           _isSubjectWiseMode = !_isSubjectWiseMode),
+//                           pendingDays: _classPendingDays,
+//                           generatedDays: _classGeneratedDays,
+//                           startController: _classStartTimeController,
+//                           endController: _classEndTimeController,
+//                           lunchStartController: _lunchStartTimeController,
+//                           lunchEndController: _lunchEndTimeController,
+//                           hasLunchBreak: _hasLunchBreak,
+//                           onLunchToggle: (val) => _hasLunchBreak = val,
+//                           showAdvanced: _showAdvancedClassTimetable,
+//                           onToggleAdvanced: () => setState(() =>
+//                           _showAdvancedClassTimetable =
+//                           !_showAdvancedClassTimetable),
+//                           onAddDay: _addClassTimetableDay,
+//                           onRemoveDay: _removeClassTimetableDay,
+//                           onAddPeriod: _addClassPeriod,
+//                           onRemovePeriod: _removeClassPeriod,
+//                           subjectEntries: _classSubjectEntries,
 //                           onAddSubjectEntry: () => setState(() =>
-//                               td.subjectEntries
+//                               _classSubjectEntries
 //                                   .add(_SubjectScheduleEntry())),
 //                           onRemoveSubjectEntry: (i) => setState(
-//                                   () => td.subjectEntries.removeAt(i)),
-//                           onGenerate: () => _generateSectionTimetable(si),
-//                           timetable: section.timetable ?? [],
+//                                   () => _classSubjectEntries.removeAt(i)),
+//                           onGenerate: _generateClassTimetable,
+//                           timetable: _classTimetable,
 //                         ),
 //                       ],
 //                     ),
 //                   ),
-//                 );
-//               }),
-//             ],
+//                 ),
+//                 const SizedBox(height: 24),
+//                 // Sections toggle
+//                 Row(
+//                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                   children: [
+//                     Text('Has Sections?',
+//                         style: Theme.of(context).textTheme.titleMedium),
+//                     Switch(
+//                       value: _hasSections,
+//                       onChanged: (val) {
+//                         setState(() {
+//                           _hasSections = val;
+//                           if (!val) {
+//                             for (var c in _sectionSubjectControllers) {
+//                               c.dispose();
+//                             }
+//                             _sectionSubjectControllers.clear();
+//                             for (var d in _sectionTimetables) {
+//                               d.dispose();
+//                             }
+//                             _sectionTimetables.clear();
+//                             _sections.clear();
+//                           }
+//                         });
+//                       },
+//                     ),
+//                   ],
+//                 ),
+//               ],
+//             );
 //
-//             const SizedBox(height: 32),
-//             ElevatedButton(
-//               onPressed: _isSaving ? null : _saveClass,
-//               style: ElevatedButton.styleFrom(
-//                 padding: const EdgeInsets.symmetric(vertical: 16),
-//                 shape: RoundedRectangleBorder(
-//                     borderRadius: BorderRadius.circular(12)),
-//                 backgroundColor: Theme.of(context).primaryColor,
-//                 foregroundColor: Colors.white,
+//             final sectionsSection = _hasSections
+//                 ? _buildSectionsList()
+//                 : const SizedBox.shrink();
+//
+//             final saveButton = Padding(
+//               padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+//               child: ElevatedButton(
+//                 onPressed: _isSaving ? null : _saveClass,
+//                 style: ElevatedButton.styleFrom(
+//                   padding: const EdgeInsets.symmetric(vertical: 16),
+//                   shape: RoundedRectangleBorder(
+//                       borderRadius: BorderRadius.circular(12)),
+//                   backgroundColor: Theme.of(context).primaryColor,
+//                   foregroundColor: Colors.white,
+//                   minimumSize: const Size(double.infinity, 48),
+//                 ),
+//                 child: _isSaving
+//                     ? const SizedBox(
+//                   height: 20,
+//                   width: 20,
+//                   child: CircularProgressIndicator(
+//                       strokeWidth: 2, color: Colors.white),
+//                 )
+//                     : Text(
+//                   widget.existingClass == null
+//                       ? 'Save Class'
+//                       : 'Update Class',
+//                   style: const TextStyle(
+//                       fontSize: 16, fontWeight: FontWeight.bold),
+//                 ),
 //               ),
-//               child: _isSaving
-//                   ? const SizedBox(
-//                 height: 20,
-//                 width: 20,
-//                 child: CircularProgressIndicator(
-//                     strokeWidth: 2, color: Colors.white),
-//               )
-//                   : Text(
-//                 widget.existingClass == null
-//                     ? 'Save Class'
-//                     : 'Update Class',
-//                 style: const TextStyle(
-//                     fontSize: 16, fontWeight: FontWeight.bold),
-//               ),
-//             ),
-//             const SizedBox(height: 16),
-//           ],
+//             );
+//
+//             if (isDesktop) {
+//               // Desktop layout: two columns, scrollable independently
+//               return Column(
+//                 children: [
+//                   Expanded(
+//                     child: Row(
+//                       crossAxisAlignment: CrossAxisAlignment.start,
+//                       children: [
+//                         Expanded(
+//                           child: SingleChildScrollView(
+//                             padding: const EdgeInsets.all(16),
+//                             child: classInfoSection,
+//                           ),
+//                         ),
+//                         const VerticalDivider(width: 1),
+//                         Expanded(
+//                           child: SingleChildScrollView(
+//                             padding: const EdgeInsets.all(16),
+//                             child: sectionsSection,
+//                           ),
+//                         ),
+//                       ],
+//                     ),
+//                   ),
+//                   saveButton,
+//                 ],
+//               );
+//             } else {
+//               // Mobile layout: single scrollable column
+//               return SingleChildScrollView(
+//                 padding: const EdgeInsets.all(16),
+//                 child: Column(
+//                   children: [
+//                     classInfoSection,
+//                     sectionsSection,
+//                     const SizedBox(height: 16),
+//                     saveButton,
+//                   ],
+//                 ),
+//               );
+//             }
+//           },
 //         ),
 //       ),
 //     );
 //   }
 // }
 
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/class_model.dart';
 import '../../providers/class_provider.dart';
+import '../../providers/subject_provider.dart';  // ← ADD THIS IMPORT
 
 // ─────────────────────────────────────────────
 //  Subject-wise schedule entry (unchanged)
@@ -1651,12 +1709,9 @@ class _SectionNameFieldState extends State<_SectionNameField> {
   }
 
   void _updatePrefixAndController() {
-    final className = widget.className.trim().isEmpty
-        ? 'Class'
-        : widget.className.trim();
+    final className =
+    widget.className.trim().isEmpty ? 'Class' : widget.className.trim();
     _prefix = '$className section ';
-
-    // Extract the suffix from the initial full name
     String suffix = '';
     if (widget.initialFullName.isNotEmpty &&
         widget.initialFullName.startsWith(_prefix)) {
@@ -1682,10 +1737,115 @@ class _SectionNameFieldState extends State<_SectionNameField> {
         prefixIcon: const Icon(Icons.group),
       ),
       onChanged: (suffix) {
-        final fullName = '$_prefix$suffix';
-        widget.onChanged(fullName);
+        widget.onChanged('$_prefix$suffix');
       },
       validator: widget.validator,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  ★ NEW: Multi-select subjects widget
+//  Shows all saved subjects from Firestore as
+//  tappable chips. Selected ones are highlighted.
+// ─────────────────────────────────────────────
+class _SubjectMultiSelect extends StatelessWidget {
+  final List<String> selectedSubjects;
+  final ValueChanged<List<String>> onChanged;
+
+  const _SubjectMultiSelect({
+    required this.selectedSubjects,
+    required this.onChanged,
+  });
+
+  static const _purple = Color(0xFF534AB7);
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<MuddulProvider>();
+    final allSubjects = provider.mudduls
+        .map((m) => m.subjectName)
+        .toSet()
+        .toList()
+      ..sort();
+
+    if (provider.loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
+    if (allSubjects.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.amber.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.amber.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, size: 16, color: Colors.amber.shade700),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'No subjects found. Add subjects in the Subjects module first.',
+                style: TextStyle(fontSize: 12, color: Colors.amber.shade800),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: allSubjects.map((subject) {
+        final isSelected = selectedSubjects.contains(subject);
+        return GestureDetector(
+          onTap: () {
+            final updated = List<String>.from(selectedSubjects);
+            if (isSelected) {
+              updated.remove(subject);
+            } else {
+              updated.add(subject);
+            }
+            onChanged(updated);
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: isSelected ? _purple : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isSelected ? _purple : Colors.grey.shade300,
+                width: isSelected ? 1.5 : 0.8,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isSelected) ...[
+                  const Icon(Icons.check, size: 14, color: Colors.white),
+                  const SizedBox(width: 4),
+                ],
+                Text(
+                  subject,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: isSelected ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
@@ -1708,12 +1868,15 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
   late TextEditingController _monthlyFeeController;
 
   final List<String> _weekdays = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday'
   ];
 
-  // ── Class subjects ──
-  final TextEditingController _classSubjectInputController =
-  TextEditingController();
+  // ── Class subjects (now a simple List<String>, no text controller needed) ──
   List<String> _classSubjects = [];
 
   // ── Class timetable: simple mode ──
@@ -1737,12 +1900,12 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
 
   // ── Sections ──
   List<Section> _sections = [];
-  List<TextEditingController> _sectionSubjectControllers = [];
+  // Per-section selected subjects (replaces text controllers)
+  final List<List<String>> _sectionSelectedSubjects = [];
   final List<_SectionTimetableData> _sectionTimetables = [];
   bool _hasSections = false;
   bool _isSaving = false;
 
-  // Class name for section prefix
   String _classDisplayName = '';
 
   @override
@@ -1759,12 +1922,10 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
 
     _classDisplayName = _classNameController.text.trim();
     _classNameController.addListener(() {
-      setState(() {
-        _classDisplayName = _classNameController.text.trim();
-      });
+      setState(() => _classDisplayName = _classNameController.text.trim());
     });
 
-    _classSubjects = existing?.subjects ?? [];
+    _classSubjects = List<String>.from(existing?.subjects ?? []);
 
     if (existing?.timetable != null && existing!.timetable!.isNotEmpty) {
       _classTimetable = existing.timetable!
@@ -1780,9 +1941,7 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
             .toList(),
       ))
           .toList();
-
       _classGeneratedDays = _classTimetable.map((d) => d.day).toSet();
-
       if (_classTimetable.isNotEmpty) {
         final firstDay = _classTimetable.first;
         if (firstDay.periods.isNotEmpty) {
@@ -1801,12 +1960,11 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
     }
 
     _sections = existing?.sections ?? [];
-    _sectionSubjectControllers =
-        List.generate(_sections.length, (_) => TextEditingController());
-
     for (int i = 0; i < _sections.length; i++) {
-      final sec = _sections[i];
+      _sectionSelectedSubjects
+          .add(List<String>.from(_sections[i].subjects ?? []));
       final data = _SectionTimetableData();
+      final sec = _sections[i];
       if (sec.timetable != null && sec.timetable!.isNotEmpty) {
         data.generatedDays = sec.timetable!.map((d) => d.day).toSet();
         final firstDay = sec.timetable!.first;
@@ -1825,6 +1983,11 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
       }
       _sectionTimetables.add(data);
     }
+
+    // Start subject provider listener
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<MuddulProvider>().startListening();
+    });
   }
 
   @override
@@ -1833,22 +1996,20 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
     _classNameController.dispose();
     _headOfClassTeacherController.dispose();
     _monthlyFeeController.dispose();
-    _classSubjectInputController.dispose();
     _classStartTimeController.dispose();
     _classEndTimeController.dispose();
     _lunchStartTimeController.dispose();
     _lunchEndTimeController.dispose();
-    for (var c in _sectionSubjectControllers) c.dispose();
     for (var d in _sectionTimetables) d.dispose();
     super.dispose();
   }
 
   // ---------- Duplicate class name check ----------
   bool _isClassNameDuplicate(String name) {
-    final normalizedInput = name.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+    final normalizedInput =
+    name.replaceAll(RegExp(r'\s+'), '').toLowerCase();
     final classes = context.read<ClassProvider>().classes;
     final currentId = widget.existingClass?.id;
-
     for (final cls in classes) {
       if (currentId != null && cls.id == currentId) continue;
       final normalizedExisting =
@@ -1872,7 +2033,8 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
       context: context,
       initialTime: initial,
       builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+        data:
+        MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
         child: child!,
       ),
     );
@@ -1918,8 +2080,8 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
       final List<TimetablePeriod> periods = [];
       if (hasLunch && lunchStart.isNotEmpty && lunchEnd.isNotEmpty) {
         if (lunchStart != start) {
-          periods.add(
-              TimetablePeriod(startTime: start, endTime: lunchStart, subject: ''));
+          periods.add(TimetablePeriod(
+              startTime: start, endTime: lunchStart, subject: ''));
         }
         periods.add(TimetablePeriod(
             startTime: lunchStart,
@@ -1927,14 +2089,13 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
             isLunchBreak: true,
             subject: 'Lunch'));
         if (lunchEnd != end) {
-          periods.add(
-              TimetablePeriod(startTime: lunchEnd, endTime: end, subject: ''));
+          periods.add(TimetablePeriod(
+              startTime: lunchEnd, endTime: end, subject: ''));
         }
       } else {
-        periods
-            .add(TimetablePeriod(startTime: start, endTime: end, subject: ''));
+        periods.add(
+            TimetablePeriod(startTime: start, endTime: end, subject: ''));
       }
-
       final idx = existing.indexWhere((d) => d.day == day);
       final newDay = TimetableDay(day: day, periods: periods);
       if (idx >= 0) {
@@ -1971,9 +2132,7 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                   (p) => p.startTime == np.startTime && p.subject == np.subject);
           if (!alreadyThere) existing[idx].periods.add(np);
         }
-        existing[idx]
-            .periods
-            .sort((a, b) => a.startTime.compareTo(b.startTime));
+        existing[idx].periods.sort((a, b) => a.startTime.compareTo(b.startTime));
       } else {
         newPeriods.sort((a, b) => a.startTime.compareTo(b.startTime));
         existing.add(TimetableDay(day: day, periods: newPeriods));
@@ -2029,7 +2188,6 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
   void _generateSectionTimetable(int idx) {
     final data = _sectionTimetables[idx];
     _sections[idx].timetable ??= [];
-
     if (data.isSubjectWiseMode) {
       if (data.subjectEntries.isEmpty ||
           data.subjectEntries.any((e) => e.subject.isEmpty)) {
@@ -2075,39 +2233,15 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
   void _snack(String msg) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
-  // ---------- Subject helpers (unchanged) ----------
-  void _addClassSubject() {
-    final subject = _classSubjectInputController.text.trim();
-    if (subject.isNotEmpty) {
-      setState(() {
-        _classSubjects.add(subject);
-        _classSubjectInputController.clear();
-      });
-    }
-  }
-
-  void _removeClassSubject(int index) =>
-      setState(() => _classSubjects.removeAt(index));
-
-  void _addSectionSubject(int sectionIndex) {
-    final controller = _sectionSubjectControllers[sectionIndex];
-    final subject = controller.text.trim();
-    if (subject.isNotEmpty) {
-      setState(() {
-        _sections[sectionIndex].subjects ??= [];
-        _sections[sectionIndex].subjects!.add(subject);
-        controller.clear();
-      });
-    }
-  }
-
-  void _removeSectionSubject(int sectionIndex, int subjectIndex) =>
-      setState(() => _sections[sectionIndex].subjects!.removeAt(subjectIndex));
-
   // ---------- Save ----------
   Future<void> _saveClass() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
+
+    // Sync section subjects from per-section selected lists
+    for (int i = 0; i < _sections.length; i++) {
+      _sections[i].subjects = List<String>.from(_sectionSelectedSubjects[i]);
+    }
 
     final schoolClass = SchoolClass(
       id: widget.existingClass?.id,
@@ -2129,8 +2263,8 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Error: $e'), backgroundColor: Colors.red));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -2152,16 +2286,17 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
 
   void _addSection() => setState(() {
     _sections.add(Section(sectionName: ''));
-    _sectionSubjectControllers.add(TextEditingController());
+    _sectionSelectedSubjects.add([]);
     _sectionTimetables.add(_SectionTimetableData());
   });
+
   void _removeSection(int i) => setState(() {
     _sections.removeAt(i);
-    _sectionSubjectControllers[i].dispose();
-    _sectionSubjectControllers.removeAt(i);
+    _sectionSelectedSubjects.removeAt(i);
     _sectionTimetables[i].dispose();
     _sectionTimetables.removeAt(i);
   });
+
   void _addSectionTimetableDay(int si) => setState(() {
     _sections[si].timetable ??= [];
     _sections[si].timetable!.add(TimetableDay(day: 'Monday', periods: []));
@@ -2177,7 +2312,7 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
   void _removeSectionPeriod(int si, int di, int pi) =>
       setState(() => _sections[si].timetable![di].periods.removeAt(pi));
 
-  // ---------- UI Builders (mostly unchanged, schedule card adapted) ----------
+  // ---------- UI Builders (unchanged except subjects section) ----------
   Widget _buildSubjectsChips(List<String> subjects, Function(int) onDelete) {
     if (subjects.isEmpty) return const SizedBox.shrink();
     return Padding(
@@ -2210,7 +2345,8 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
           margin: const EdgeInsets.symmetric(vertical: 3),
           color: Colors.blue.shade50,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -2283,7 +2419,8 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                             border: OutlineInputBorder(),
                             isDense: true),
                         items: _weekdays
-                            .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                            .map((d) =>
+                            DropdownMenuItem(value: d, child: Text(d)))
                             .toList(),
                         onChanged: (val) => setState(() => day.day = val!),
                       ),
@@ -2324,10 +2461,11 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                               suffixIcon: IconButton(
                                 icon: const Icon(Icons.access_time, size: 16),
                                 onPressed: () async {
-                                  final ctrl =
-                                  TextEditingController(text: period.startTime);
+                                  final ctrl = TextEditingController(
+                                      text: period.startTime);
                                   await _pickTime(context, ctrl);
-                                  setState(() => period.startTime = ctrl.text);
+                                  setState(
+                                          () => period.startTime = ctrl.text);
                                 },
                               ),
                             ),
@@ -2345,8 +2483,8 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                               suffixIcon: IconButton(
                                 icon: const Icon(Icons.access_time, size: 16),
                                 onPressed: () async {
-                                  final ctrl =
-                                  TextEditingController(text: period.endTime);
+                                  final ctrl = TextEditingController(
+                                      text: period.endTime);
                                   await _pickTime(context, ctrl);
                                   setState(() => period.endTime = ctrl.text);
                                 },
@@ -2401,8 +2539,8 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
           return Card(
             margin: const EdgeInsets.only(bottom: 10),
             elevation: 1,
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
             child: Padding(
               padding: const EdgeInsets.all(10),
               child: Column(
@@ -2417,9 +2555,11 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                             labelText: 'Subject Name',
                             border: OutlineInputBorder(),
                             isDense: true,
-                            prefixIcon: Icon(Icons.book_outlined, size: 18),
+                            prefixIcon:
+                            Icon(Icons.book_outlined, size: 18),
                           ),
-                          onChanged: (v) => setState(() => entry.subject = v),
+                          onChanged: (v) =>
+                              setState(() => entry.subject = v),
                         ),
                       ),
                       IconButton(
@@ -2444,15 +2584,17 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                               isDense: true,
                               hintText: '08:00',
                               suffixIcon: IconButton(
-                                icon:
-                                const Icon(Icons.access_time, size: 18),
+                                icon: const Icon(Icons.access_time,
+                                    size: 18),
                                 onPressed: () async {
                                   await _pickTime(context, ctrl);
-                                  setState(() => entry.startTime = ctrl.text);
+                                  setState(
+                                          () => entry.startTime = ctrl.text);
                                 },
                               ),
                             ),
-                            onChanged: (v) => setState(() => entry.startTime = v),
+                            onChanged: (v) =>
+                                setState(() => entry.startTime = v),
                           );
                         }),
                       ),
@@ -2469,15 +2611,17 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                               isDense: true,
                               hintText: '08:45',
                               suffixIcon: IconButton(
-                                icon:
-                                const Icon(Icons.access_time, size: 18),
+                                icon: const Icon(Icons.access_time,
+                                    size: 18),
                                 onPressed: () async {
                                   await _pickTime(context, ctrl);
-                                  setState(() => entry.endTime = ctrl.text);
+                                  setState(
+                                          () => entry.endTime = ctrl.text);
                                 },
                               ),
                             ),
-                            onChanged: (v) => setState(() => entry.endTime = v),
+                            onChanged: (v) =>
+                                setState(() => entry.endTime = v),
                           );
                         }),
                       ),
@@ -2496,8 +2640,9 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                         label: Text(day.substring(0, 3),
                             style: TextStyle(
                                 fontSize: 12,
-                                color:
-                                selected ? Colors.white : Colors.black87)),
+                                color: selected
+                                    ? Colors.white
+                                    : Colors.black87)),
                         selected: selected,
                         selectedColor: Theme.of(context).primaryColor,
                         backgroundColor: Colors.grey.shade100,
@@ -2530,7 +2675,6 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
     );
   }
 
-  // Unified schedule card (unchanged logic)
   Widget _buildScheduleCard({
     required bool isSubjectWiseMode,
     required VoidCallback onToggleMode,
@@ -2554,6 +2698,7 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
     required VoidCallback onGenerate,
     required List<TimetableDay> timetable,
   }) {
+    // (unchanged — full body identical to original)
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2640,17 +2785,15 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
               final isGenerated = generatedDays.contains(day);
               final isPending = pendingDays.contains(day);
               return FilterChip(
-                label: Text(
-                  day,
-                  style: TextStyle(
-                    color: isGenerated
-                        ? Colors.green.shade800
-                        : isPending
-                        ? Colors.white
-                        : Colors.black87,
-                    fontSize: 13,
-                  ),
-                ),
+                label: Text(day,
+                    style: TextStyle(
+                      color: isGenerated
+                          ? Colors.green.shade800
+                          : isPending
+                          ? Colors.white
+                          : Colors.black87,
+                      fontSize: 13,
+                    )),
                 selected: isPending,
                 onSelected: isGenerated
                     ? null
@@ -2662,9 +2805,8 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                   }
                 }),
                 selectedColor: Theme.of(context).primaryColor,
-                backgroundColor: isGenerated
-                    ? Colors.green.shade50
-                    : Colors.grey.shade100,
+                backgroundColor:
+                isGenerated ? Colors.green.shade50 : Colors.grey.shade100,
                 checkmarkColor: Colors.white,
                 avatar: isGenerated
                     ? Icon(Icons.check_circle,
@@ -2679,18 +2821,16 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
             children: [
               Expanded(
                 child: _buildTimeField(
-                  controller: startController,
-                  label: 'Class Start',
-                  hint: '08:00',
-                ),
+                    controller: startController,
+                    label: 'Class Start',
+                    hint: '08:00'),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _buildTimeField(
-                  controller: endController,
-                  label: 'Class End',
-                  hint: '14:00',
-                ),
+                    controller: endController,
+                    label: 'Class End',
+                    hint: '14:00'),
               ),
             ],
           ),
@@ -2712,18 +2852,16 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
               children: [
                 Expanded(
                   child: _buildTimeField(
-                    controller: lunchStartController,
-                    label: 'Lunch Start',
-                    hint: '11:30',
-                  ),
+                      controller: lunchStartController,
+                      label: 'Lunch Start',
+                      hint: '11:30'),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildTimeField(
-                    controller: lunchEndController,
-                    label: 'Lunch End',
-                    hint: '12:30',
-                  ),
+                      controller: lunchEndController,
+                      label: 'Lunch End',
+                      hint: '12:30'),
                 ),
               ],
             ),
@@ -2747,7 +2885,10 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 children: [
-                  Icon(showAdvanced ? Icons.expand_less : Icons.expand_more,
+                  Icon(
+                      showAdvanced
+                          ? Icons.expand_less
+                          : Icons.expand_more,
                       size: 20),
                   const SizedBox(width: 4),
                   Text('Advanced: Customize Periods',
@@ -2780,10 +2921,7 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
           ),
           const SizedBox(height: 12),
           _buildSubjectWiseEntries(
-            subjectEntries,
-            onAddSubjectEntry,
-            onRemoveSubjectEntry,
-          ),
+              subjectEntries, onAddSubjectEntry, onRemoveSubjectEntry),
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: subjectEntries.isEmpty ? null : onGenerate,
@@ -2798,14 +2936,15 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
     );
   }
 
-  // ───── Build sections UI (used in both mobile and desktop) ─────
+  // ───── Sections list ─────
   Widget _buildSectionsList() {
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Sections', style: Theme.of(context).textTheme.titleMedium),
+            Text('Sections',
+                style: Theme.of(context).textTheme.titleMedium),
             ElevatedButton.icon(
               onPressed: _addSection,
               icon: const Icon(Icons.add),
@@ -2833,7 +2972,8 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                         child: _SectionNameField(
                           className: _classDisplayName,
                           initialFullName: section.sectionName,
-                          onChanged: (fullName) => section.sectionName = fullName,
+                          onChanged: (fullName) =>
+                          section.sectionName = fullName,
                           validator: (v) =>
                           v == null || v.trim().isEmpty
                               ? 'Enter section name'
@@ -2841,8 +2981,7 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                         ),
                       ),
                       IconButton(
-                        icon:
-                        const Icon(Icons.delete, color: Colors.red),
+                        icon: const Icon(Icons.delete, color: Colors.red),
                         onPressed: () => _removeSection(si),
                       ),
                     ],
@@ -2870,34 +3009,26 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                     section.monthlyFee = double.tryParse(val),
                   ),
                   const SizedBox(height: 12),
+
+                  // ── ★ Section subjects: multi-select from Firestore ──
                   Text('Subjects',
                       style: Theme.of(context).textTheme.labelLarge),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _sectionSubjectControllers[si],
-                          decoration: const InputDecoration(
-                            hintText: 'Add subject',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: () => _addSectionSubject(si),
-                        icon: const Icon(Icons.save, color: Colors.blue),
-                        tooltip: 'Add Subject',
-                      ),
-                    ],
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap to select subjects for this section',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.black45),
                   ),
-                  _buildSubjectsChips(
-                    section.subjects ?? [],
-                        (idx) => _removeSectionSubject(si, idx),
+                  const SizedBox(height: 8),
+                  _SubjectMultiSelect(
+                    selectedSubjects: _sectionSelectedSubjects[si],
+                    onChanged: (updated) => setState(
+                            () => _sectionSelectedSubjects[si] = updated),
                   ),
                   const SizedBox(height: 12),
+
                   Text('Section Timetable',
                       style: Theme.of(context).textTheme.labelLarge),
                   const SizedBox(height: 8),
@@ -2940,7 +3071,6 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Responsive breakpoint
     const double desktopBreakpoint = 600;
 
     return Scaffold(
@@ -2956,7 +3086,6 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
           builder: (context, constraints) {
             final isDesktop = constraints.maxWidth >= desktopBreakpoint;
 
-            // Common content widgets
             final classInfoSection = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -2968,7 +3097,9 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                     prefixIcon: Icon(Icons.class_),
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Enter class name';
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Enter class name';
+                    }
                     if (_isClassNameDuplicate(v.trim())) {
                       return 'A class with this name already exists';
                     }
@@ -2995,31 +3126,26 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                   ),
                   keyboardType: TextInputType.number,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
+
+                // ── ★ CLASS SUBJECTS: multi-select from Firestore ──
                 Text('Class Subjects',
                     style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _classSubjectInputController,
-                        decoration: const InputDecoration(
-                          hintText: 'Add subject',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: _addClassSubject,
-                      icon: const Icon(Icons.save, color: Colors.blue),
-                      tooltip: 'Add Subject',
-                    ),
-                  ],
+                const SizedBox(height: 4),
+                Text(
+                  'Tap subjects to assign them to this class',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Colors.black45),
                 ),
-                _buildSubjectsChips(_classSubjects, _removeClassSubject),
+                const SizedBox(height: 10),
+                _SubjectMultiSelect(
+                  selectedSubjects: _classSubjects,
+                  onChanged: (updated) =>
+                      setState(() => _classSubjects = updated),
+                ),
+
                 const SizedBox(height: 24),
                 Card(
                   shape: RoundedRectangleBorder(
@@ -3030,7 +3156,8 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Class Schedule',
-                            style: Theme.of(context).textTheme.titleMedium),
+                            style:
+                            Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 12),
                         _buildScheduleCard(
                           isSubjectWiseMode: _isSubjectWiseMode,
@@ -3066,7 +3193,6 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                // Sections toggle
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -3078,13 +3204,8 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                         setState(() {
                           _hasSections = val;
                           if (!val) {
-                            for (var c in _sectionSubjectControllers) {
-                              c.dispose();
-                            }
-                            _sectionSubjectControllers.clear();
-                            for (var d in _sectionTimetables) {
-                              d.dispose();
-                            }
+                            _sectionSelectedSubjects.clear();
+                            for (var d in _sectionTimetables) d.dispose();
                             _sectionTimetables.clear();
                             _sections.clear();
                           }
@@ -3101,7 +3222,8 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                 : const SizedBox.shrink();
 
             final saveButton = Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              padding:
+              const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
               child: ElevatedButton(
                 onPressed: _isSaving ? null : _saveClass,
                 style: ElevatedButton.styleFrom(
@@ -3130,7 +3252,6 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
             );
 
             if (isDesktop) {
-              // Desktop layout: two columns, scrollable independently
               return Column(
                 children: [
                   Expanded(
@@ -3157,7 +3278,6 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                 ],
               );
             } else {
-              // Mobile layout: single scrollable column
               return SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(

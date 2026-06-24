@@ -1,3 +1,4 @@
+import 'package:educoresystem/providers/subject_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
@@ -22,6 +23,7 @@ class SchoolApp extends StatelessWidget {
         ChangeNotifierProvider<TeacherProvider>(create: (_) => TeacherProvider()),
         ChangeNotifierProvider<FeeProvider>(create: (_) => FeeProvider()),
         ChangeNotifierProvider<ExpenseProvider>(create: (_) => ExpenseProvider()),
+        ChangeNotifierProvider(create: (_) => MuddulProvider()..startListening()),
       ],
       child: MaterialApp(
         title: 'School Management',

@@ -1,4 +1,5 @@
 import 'package:educoresystem/screens/register_user.dart';
+import 'package:educoresystem/screens/subject_management/subject%20list.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -57,6 +58,9 @@ class _DashboardScreenState extends State<DashboardScreen>
         cards = [
           DashboardCard('Register User', Icons.person_add, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterUserScreen()));
+          }),
+          DashboardCard('Modules', Icons.view_module, () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const MuddulListScreen()));
           }),
           DashboardCard('Classes', Icons.class_, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const ClassesListScreen()));
