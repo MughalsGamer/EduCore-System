@@ -6,6 +6,7 @@ import 'dart:typed_data';   // if not already present, add it
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../models/class_model.dart';
 import '../models/student.dart';
@@ -175,15 +176,32 @@ class StaffFirestoreService {
 
 
   // ── NEW: Compress Uint8List and return base64 ──
+  // ── Compress Uint8List and return base64 (web-safe) ──
   Future<String> compressAndEncodeBytes(Uint8List bytes) async {
+    if (kIsWeb) {
+      // flutter_image_compress does NOT support web (Pica.js fails)
+      // Just encode raw bytes directly — no compression on web
+      return base64Encode(bytes);
+    }
+
+    // Mobile/desktop: compress normally
     final compressed = await FlutterImageCompress.compressWithList(
-      bytes as Uint8List,
+      bytes,
       minWidth: 600,
       minHeight: 600,
       quality: 70,
     );
     return base64Encode(compressed);
   }
+  // Future<String> compressAndEncodeBytes(Uint8List bytes) async {
+  //   final compressed = await FlutterImageCompress.compressWithList(
+  //     bytes as Uint8List,
+  //     minWidth: 600,
+  //     minHeight: 600,
+  //     quality: 70,
+  //   );
+  //   return base64Encode(compressed);
+  // }
 
   // ── Keep the old File‑based method for compatibility ──
   Future<String?> compressAndEncode(File imageFile) async {
