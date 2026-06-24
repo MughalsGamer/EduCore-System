@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/teacher_provider.dart';
+import 'Staff Profile.dart';
 import 'add_teacher.dart';
 
 
@@ -48,6 +49,23 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
         itemBuilder: (ctx, i) {
           final t = provider.teachers[i];
           return ListTile(
+            onTap: () async {                    // ← YE ADD KARO
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => StaffProfileScreen(staff: t), // teacher list mein 't', staff list mein 's'
+                ),
+              );
+              if (result == 'edit') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AddEditStaffScreen(existingStaff: t),
+                  ),
+                );
+              }
+            },
+
             leading: CircleAvatar(
               backgroundImage: t.imageBase64 != null
                   ? MemoryImage(base64Decode(t.imageBase64!))

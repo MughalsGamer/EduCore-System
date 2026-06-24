@@ -3,6 +3,7 @@ import 'dart:convert';   // needed for base64Decode
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/teacher_provider.dart';
+import 'Staff Profile.dart';
 import 'add_teacher.dart';
 
 class StaffListScreen extends StatefulWidget {
@@ -49,6 +50,22 @@ class _StaffListScreenState extends State<StaffListScreen> {
         itemBuilder: (ctx, i) {
           final s = provider.staffOnly[i];
           return ListTile(
+            onTap: () async {                    // ← YE ADD KARO
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => StaffProfileScreen(staff: s), // teacher list mein 't', staff list mein 's'
+                ),
+              );
+              if (result == 'edit') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AddEditStaffScreen(existingStaff: s),
+                  ),
+                );
+              }
+            },
             leading: CircleAvatar(
               backgroundImage: s.imageBase64 != null
                   ? MemoryImage(base64Decode(s.imageBase64!))
