@@ -1,4 +1,12 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';   // if not already present, add it
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../models/class_model.dart';
 import '../models/student.dart';
 import '../models/teacher.dart';
@@ -34,22 +42,22 @@ class FirestoreService {
   CollectionReference get teachersCollection =>
       _db.collection('schools').doc('school1').collection('teachers');
 
-  Future<List<Teacher>> getTeachers() async {
-    final snapshot = await teachersCollection.get();
-    return snapshot.docs
-        .map((doc) =>
-        Teacher.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-        .toList();
-  }
-
-  Future<void> addTeacher(Teacher teacher) =>
-      teachersCollection.add(teacher.toMap());
-
-  Future<void> updateTeacher(String id, Teacher teacher) =>
-      teachersCollection.doc(id).update(teacher.toMap());
-
-  Future<void> deleteTeacher(String id) =>
-      teachersCollection.doc(id).delete();
+  // Future<List<Teacher>> getTeachers() async {
+  //   final snapshot = await teachersCollection.get();
+  //   return snapshot.docs
+  //       .map((doc) =>
+  //       Teacher.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+  //       .toList();
+  // }
+  //
+  // Future<void> addTeacher(Teacher teacher) =>
+  //     teachersCollection.add(teacher.toMap());
+  //
+  // Future<void> updateTeacher(String id, Teacher teacher) =>
+  //     teachersCollection.doc(id).update(teacher.toMap());
+  //
+  // Future<void> deleteTeacher(String id) =>
+  //     teachersCollection.doc(id).delete();
 
   // ---------- Classes (SchoolClass) ----------
   CollectionReference get classesCollection =>
@@ -147,4 +155,128 @@ class FirestoreService {
         Expense.fromMap(doc.data() as Map<String, dynamic>, doc.id))
         .toList();
   }
+}
+
+
+
+
+
+class StaffFirestoreService {
+  // 🔽 Add this line
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  CollectionReference<Map<String, dynamic>> _teacherCollection() =>
+      _firestore.collection('teachers');
+
+  CollectionReference<Map<String, dynamic>> _staffCollection() =>
+      _firestore.collection('staff');
+
+
+
+  // ── NEW: Compress Uint8List and return base64 ──
+  Future<String> compressAndEncodeBytes(Uint8List bytes) async {
+    final compressed = await FlutterImageCompress.compressWithList(
+      bytes as Uint8List,
+      minWidth: 600,
+      minHeight: 600,
+      quality: 70,
+    );
+    return base64Encode(compressed);
+  }
+
+  // ── Keep the old File‑based method for compatibility ──
+  Future<String?> compressAndEncode(File imageFile) async {
+    final bytes = await imageFile.readAsBytes();   // already Uint8List
+    return compressAndEncodeBytes(bytes);          // no cast needed
+  }
+
+  // ── CRUD methods ──
+  Future<void> addStaff(StaffMember staff) async {
+    final data = staff.toMap();
+    if (staff.type == 'teacher') {
+      await _teacherCollection().add(data);
+    } else {
+      await _staffCollection().add(data);
+    }
+  }
+
+  Future<void> updateStaff(String id, StaffMember updatedStaff) async {
+    // 1. Find where the document currently lives
+    final teacherDoc = await _teacherCollection().doc(id).get();
+    final staffDoc = await _staffCollection().doc(id).get();
+
+    String? currentCollection;
+    if (teacherDoc.exists) {
+      currentCollection = 'teachers';
+    } else if (staffDoc.exists) {
+      currentCollection = 'staff';
+    } else {
+      // Document not found – fallback: just add (shouldn't happen normally)
+      await addStaff(updatedStaff);
+      return;
+    }
+
+    final data = updatedStaff.toMap();
+
+    // 2. If type hasn’t changed → normal update
+    if (currentCollection == updatedStaff.type) {
+      if (currentCollection == 'teachers') {
+        await _teacherCollection().doc(id).update(data);
+      } else {
+        await _staffCollection().doc(id).update(data);
+      }
+    }
+    // 3. Type changed → delete from old collection and add to new with the SAME id
+    else {
+      // delete from old
+      if (currentCollection == 'teachers') {
+        await _teacherCollection().doc(id).delete();
+      } else {
+        await _staffCollection().doc(id).delete();
+      }
+
+      // add to new using set (so we keep the same document ID)
+      if (updatedStaff.type == 'teacher') {
+        await _teacherCollection().doc(id).set(data);
+      } else {
+        await _staffCollection().doc(id).set(data);
+      }
+    }
+  }
+
+
+  Future<void> deleteStaff(String id) async {
+    final batch = _firestore.batch();
+    batch.delete(_teacherCollection().doc(id));
+    batch.delete(_staffCollection().doc(id));
+    await batch.commit();
+  }
+
+  Future<List<StaffMember>> getAllStaff() async {
+    final teacherSnap = await _teacherCollection().get();
+    final staffSnap = await _staffCollection().get();
+
+    final teachers = teacherSnap.docs
+        .map((doc) => StaffMember.fromMap(doc.data(), doc.id))
+        .toList();
+    final staff = staffSnap.docs
+        .map((doc) => StaffMember.fromMap(doc.data(), doc.id))
+        .toList();
+
+    return [...teachers, ...staff];
+  }
+
+  Future<List<StaffMember>> getTeachers() async {
+    final snap = await _teacherCollection().get();
+    return snap.docs.map((doc) => StaffMember.fromMap(doc.data(), doc.id)).toList();
+  }
+
+  Future<List<StaffMember>> getStaffOnly() async {
+    final snap = await _staffCollection().get();
+    return snap.docs.map((doc) => StaffMember.fromMap(doc.data(), doc.id)).toList();
+  }
+
+
+
 }

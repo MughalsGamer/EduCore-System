@@ -1,42 +1,98 @@
-class Teacher {
+class StaffMember {
   String? id;
+  String type; // 'teacher' or 'staff'
   String name;
-  String email;
+  String fatherOrHusbandName;
+  String cnic;
+  String dob;
+  String gender;
+  String maritalStatus;
+  String? bloodGroup;
+  String religion;
+  String nationality;
+  String address;
   String phone;
-  String subject;
-  String assignedClass;
+  String emergencyPhone;
+  String employmentType;
   double salary;
+  String? reference;
+  String? note;
+  String? imageBase64;
+  String? assignedClass;          // ★ NEW
+  List<String> subjects;          // ★ NEW
 
-  Teacher({
+  StaffMember({
     this.id,
+    required this.type,
     required this.name,
-    required this.email,
+    required this.fatherOrHusbandName,
+    required this.cnic,
+    required this.dob,
+    required this.gender,
+    required this.maritalStatus,
+    this.bloodGroup,
+    required this.religion,
+    required this.nationality,
+    required this.address,
     required this.phone,
-    required this.subject,
-    required this.assignedClass,
+    required this.emergencyPhone,
+    required this.employmentType,
     required this.salary,
+    this.reference,
+    this.note,
+    this.imageBase64,
+    this.assignedClass,
+    this.subjects = const [],
   });
 
   Map<String, dynamic> toMap() {
     return {
+      'type': type,
       'name': name,
-      'email': email,
+      'fatherOrHusbandName': fatherOrHusbandName,
+      'cnic': cnic,
+      'dob': dob,
+      'gender': gender,
+      'maritalStatus': maritalStatus,
+      'bloodGroup': bloodGroup,
+      'religion': religion,
+      'nationality': nationality,
+      'address': address,
       'phone': phone,
-      'subject': subject,
-      'assignedClass': assignedClass,
+      'emergencyPhone': emergencyPhone,
+      'employmentType': employmentType,
       'salary': salary,
+      'reference': reference,
+      'note': note,
+      'imageBase64': imageBase64,
+      'assignedClass': assignedClass,
+      'subjects': subjects,
     };
   }
 
-  factory Teacher.fromMap(Map<String, dynamic> map, String id) {
-    return Teacher(
+  factory StaffMember.fromMap(Map<String, dynamic> map, String id) {
+    return StaffMember(
       id: id,
+      type: map['type'] ?? 'staff',
       name: map['name'] ?? '',
-      email: map['email'] ?? '',
+      fatherOrHusbandName: map['fatherOrHusbandName'] ?? '',
+      cnic: map['cnic'] ?? '',
+      dob: map['dob'] ?? '',
+      gender: map['gender'] ?? 'Male',
+      maritalStatus: map['maritalStatus'] ?? 'Single',
+      bloodGroup: map['bloodGroup'],
+      religion: map['religion'] ?? '',
+      nationality: map['nationality'] ?? '',
+      address: map['address'] ?? '',
       phone: map['phone'] ?? '',
-      subject: map['subject'] ?? '',
-      assignedClass: map['assignedClass'] ?? '',
+      emergencyPhone: map['emergencyPhone'] ?? '',
+      employmentType: map['employmentType'] ?? 'Regular',
       salary: (map['salary'] ?? 0).toDouble(),
+      reference: map['reference'],
+      note: map['note'],
+      imageBase64: map['imageBase64'],
+      assignedClass: map['assignedClass'],
+      subjects: List<String>.from(map['subjects'] ?? []),
     );
   }
 }

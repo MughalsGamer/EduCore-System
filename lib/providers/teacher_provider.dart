@@ -1,35 +1,65 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+
 import '../models/teacher.dart';
 import '../services/firestore_service.dart';
 
-class TeacherProvider extends ChangeNotifier {
-  final FirestoreService _firestoreService = FirestoreService();
-  List<Teacher> _teachers = [];
+
+class StaffProvider extends ChangeNotifier {
+  final StaffFirestoreService _service = StaffFirestoreService();
+  List<StaffMember> _allStaff = [];
+  List<StaffMember> _teachers = [];
+  List<StaffMember> _staffOnly = [];
   bool _loading = false;
 
-  List<Teacher> get teachers => _teachers;
+  List<StaffMember> get allStaff => _allStaff;
+  List<StaffMember> get teachers => _teachers;
+  List<StaffMember> get staffOnly => _staffOnly;
   bool get loading => _loading;
 
-  Future<void> fetchTeachers() async {
+  Future<void> fetchAll() async {
     _loading = true;
     notifyListeners();
-    _teachers = await _firestoreService.getTeachers();
+    _allStaff = await _service.getAllStaff();
     _loading = false;
     notifyListeners();
   }
 
-  Future<void> addTeacher(Teacher teacher) async {
-    await _firestoreService.addTeacher(teacher);
-    await fetchTeachers();
+  Future<void> fetchTeachers() async {
+    _loading = true;
+    notifyListeners();
+    _teachers = await _service.getTeachers();
+    _loading = false;
+    notifyListeners();
   }
 
-  Future<void> updateTeacher(String id, Teacher teacher) async {
-    await _firestoreService.updateTeacher(id, teacher);
-    await fetchTeachers();
+  Future<void> fetchStaffOnly() async {
+    _loading = true;
+    notifyListeners();
+    _staffOnly = await _service.getStaffOnly();
+    _loading = false;
+    notifyListeners();
   }
 
-  Future<void> deleteTeacher(String id) async {
-    await _firestoreService.deleteTeacher(id);
-    await fetchTeachers();
+  Future<void> addStaff(StaffMember staff) async {
+    await _service.addStaff(staff);
+    await fetchAll(); // refresh main list
+  }
+
+  Future<void> updateStaff(String id, StaffMember staff) async {
+    await _service.updateStaff(id, staff);
+    await fetchAll();
+  }
+
+  Future<void> deleteStaff(String id) async {
+    await _service.deleteStaff(id);
+    await fetchAll();
+  }
+
+  // Optionally, clear and reload specific lists
+  void clear() {
+    _allStaff = [];
+    _teachers = [];
+    _staffOnly = [];
+    notifyListeners();
   }
 }

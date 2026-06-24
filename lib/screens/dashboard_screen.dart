@@ -1,5 +1,6 @@
 import 'package:educoresystem/screens/register_user.dart';
 import 'package:educoresystem/screens/subject_management/subject%20list.dart';
+import 'package:educoresystem/screens/teacher_management/staff_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -59,7 +60,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           DashboardCard('Register User', Icons.person_add, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterUserScreen()));
           }),
-          DashboardCard('Modules', Icons.view_module, () {
+          DashboardCard('Subject', Icons.view_module, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const MuddulListScreen()));
           }),
           DashboardCard('Classes', Icons.class_, () {
@@ -70,6 +71,9 @@ class _DashboardScreenState extends State<DashboardScreen>
           }),
           DashboardCard('Teachers', Icons.person, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherListScreen()));
+          }),
+          DashboardCard('Staff', Icons.personal_injury, () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffListScreen()));
           }),
           DashboardCard('Fee Structure', Icons.money, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const FeeStructureScreen()));

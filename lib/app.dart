@@ -20,7 +20,7 @@ class SchoolApp extends StatelessWidget {
         ChangeNotifierProvider<AuthProvider>(create: (_) => AuthProvider()),
         ChangeNotifierProvider<ClassProvider>(create: (_) => ClassProvider()),
         ChangeNotifierProvider<StudentProvider>(create: (_) => StudentProvider()),
-        ChangeNotifierProvider<TeacherProvider>(create: (_) => TeacherProvider()),
+        ChangeNotifierProvider<StaffProvider>(create: (_) => StaffProvider()),
         ChangeNotifierProvider<FeeProvider>(create: (_) => FeeProvider()),
         ChangeNotifierProvider<ExpenseProvider>(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => MuddulProvider()..startListening()),

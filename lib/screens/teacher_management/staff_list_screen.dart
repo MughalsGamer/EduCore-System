@@ -1,32 +1,31 @@
-import 'dart:convert';
+import 'dart:convert';   // needed for base64Decode
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../../providers/teacher_provider.dart';
 import 'add_teacher.dart';
 
-
-class TeacherListScreen extends StatefulWidget {
-  const TeacherListScreen({super.key});
+class StaffListScreen extends StatefulWidget {
+  const StaffListScreen({super.key});
 
   @override
-  State<TeacherListScreen> createState() => _TeacherListScreenState();
+  State<StaffListScreen> createState() => _StaffListScreenState();
 }
 
-class _TeacherListScreenState extends State<TeacherListScreen> {
+class _StaffListScreenState extends State<StaffListScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() =>
-        context.read<StaffProvider>().fetchTeachers());
+    // Fetch only staff when screen opens
+    Future.microtask(() => context.read<StaffProvider>().fetchStaffOnly());
   }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<StaffProvider>();
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Teachers')),
+      appBar: AppBar(title: const Text('Staff')),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final result = await Navigator.push(
@@ -36,28 +35,30 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
             ),
           );
           if (result == true) {
-            provider.fetchTeachers();
+            provider.fetchStaffOnly();
           }
         },
         child: const Icon(Icons.add),
       ),
       body: provider.loading
           ? const Center(child: CircularProgressIndicator())
+          : provider.staffOnly.isEmpty
+          ? const Center(child: Text('No staff members found.'))
           : ListView.builder(
-        itemCount: provider.teachers.length,
+        itemCount: provider.staffOnly.length,
         itemBuilder: (ctx, i) {
-          final t = provider.teachers[i];
+          final s = provider.staffOnly[i];
           return ListTile(
             leading: CircleAvatar(
-              backgroundImage: t.imageBase64 != null
-                  ? MemoryImage(base64Decode(t.imageBase64!))
+              backgroundImage: s.imageBase64 != null
+                  ? MemoryImage(base64Decode(s.imageBase64!))
                   : null,
-              child: t.imageBase64 == null
+              child: s.imageBase64 == null
                   ? const Icon(Icons.person)
                   : null,
             ),
-            title: Text(t.name),
-            subtitle: Text('${t.employmentType} · ${t.phone}'),
+            title: Text(s.name),
+            subtitle: Text('${s.employmentType} · ${s.phone}'),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -67,19 +68,17 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                     final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            AddEditStaffScreen(existingStaff: t),
+                        builder: (_) => AddEditStaffScreen(existingStaff: s),
                       ),
                     );
                     if (result == true) {
-                      provider.fetchTeachers();
+                      provider.fetchStaffOnly();
                     }
                   },
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () => _confirmDelete(
-                      context, t.id!, provider),
+                  onPressed: () => _confirmDelete(context, s.id!, provider),
                 ),
               ],
             ),
@@ -89,12 +88,11 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
     );
   }
 
-  void _confirmDelete(
-      BuildContext context, String id, StaffProvider provider) {
+  void _confirmDelete(BuildContext context, String id, StaffProvider provider) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Teacher?'),
+        title: const Text('Delete Staff?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
