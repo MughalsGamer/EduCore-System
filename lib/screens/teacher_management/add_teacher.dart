@@ -133,7 +133,7 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
   String? _bloodGroup;
   String _employmentType = 'Regular';
   String _dob = '';
-  String? _assignedClass;
+  List<String> _assignedClasses = [];
   List<String> _subjects = [];
 
   // Image: store as bytes (cross‑platform)
@@ -170,7 +170,7 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
       _referenceCtrl.text = s.reference ?? '';
       _noteCtrl.text = s.note ?? '';
       _existingImageBase64 = s.imageBase64;
-      _assignedClass = s.assignedClass;
+      _assignedClasses = List<String>.from(s.assignedClasses);
       _subjects = List<String>.from(s.subjects);
     }
   }
@@ -262,7 +262,7 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
       reference: _referenceCtrl.text.trim().isEmpty ? null : _referenceCtrl.text.trim(),
       note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
       imageBase64: base64Image,
-      assignedClass: _assignedClass,
+      assignedClasses: _assignedClasses,
       subjects: _subjects,
     );
 
@@ -307,22 +307,65 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
     return Consumer<ClassProvider>(
       builder: (context, classProvider, child) {
         final classes = classProvider.classes;
-        return DropdownButtonFormField<String>(
-          value: _assignedClass,
-          isExpanded: true,
-          hint: const Text('Select Class (optional)'),
-          items: classes.map((cls) {
-            return DropdownMenuItem<String>(
-              value: cls.id,
-              child: Text(cls.name, overflow: TextOverflow.ellipsis),
-            );
-          }).toList(),
-          onChanged: (val) => setState(() => _assignedClass = val),
-          decoration: const InputDecoration(
-            labelText: 'Assigned Class',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.class_),
-          ),
+        if (classes.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Assigned Classes',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black54),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: classes.map((cls) {
+                final isSelected = _assignedClasses.contains(cls.id);
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (isSelected) {
+                        _assignedClasses.remove(cls.id);
+                      } else {
+                        _assignedClasses.add(cls.id!);
+                      }
+                    });
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: isSelected ? const Color(0xFF534AB7) : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected ? const Color(0xFF534AB7) : Colors.grey.shade300,
+                        width: isSelected ? 1.5 : 0.8,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isSelected) ...[
+                          const Icon(Icons.check, size: 14, color: Colors.white),
+                          const SizedBox(width: 4),
+                        ],
+                        Text(
+                          cls.name,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: isSelected ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
         );
       },
     );
@@ -377,7 +420,14 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
               const SizedBox(height: 12),
 
               // ── Assigned Class ──
-              _buildClassDropdown(),
+              _buildSectionCard('Assigned Classes (Optional)', [
+                Text(
+                  'Tap to assign one or more classes.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                _buildClassDropdown(),
+              ]),
               const SizedBox(height: 12),
 
               // ── Personal Information ──

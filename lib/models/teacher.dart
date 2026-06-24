@@ -18,7 +18,7 @@ class StaffMember {
   String? reference;
   String? note;
   String? imageBase64;
-  String? assignedClass;          // ★ NEW
+  List<String> assignedClasses;         // ★ NEW
   List<String> subjects;          // ★ NEW
 
   StaffMember({
@@ -41,7 +41,7 @@ class StaffMember {
     this.reference,
     this.note,
     this.imageBase64,
-    this.assignedClass,
+    this.assignedClasses = const [],
     this.subjects = const [],
   });
 
@@ -65,7 +65,7 @@ class StaffMember {
       'reference': reference,
       'note': note,
       'imageBase64': imageBase64,
-      'assignedClass': assignedClass,
+      'assignedClasses': assignedClasses,
       'subjects': subjects,
     };
   }
@@ -91,7 +91,7 @@ class StaffMember {
       reference: map['reference'],
       note: map['note'],
       imageBase64: map['imageBase64'],
-      assignedClass: map['assignedClass'],
+      assignedClasses: List<String>.from(map['assignedClasses'] ?? []),
       subjects: List<String>.from(map['subjects'] ?? []),
     );
   }
