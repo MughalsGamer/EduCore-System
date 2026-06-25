@@ -1,3 +1,4 @@
+import 'package:educoresystem/providers/admission_provider.dart';
 import 'package:educoresystem/providers/subject_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +18,7 @@ class SchoolApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => AdmissionProvider()),
         ChangeNotifierProvider<AuthProvider>(create: (_) => AuthProvider()),
         ChangeNotifierProvider<ClassProvider>(create: (_) => ClassProvider()),
         ChangeNotifierProvider<StudentProvider>(create: (_) => StudentProvider()),

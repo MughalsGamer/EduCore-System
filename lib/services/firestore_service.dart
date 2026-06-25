@@ -6,6 +6,7 @@ import 'dart:typed_data';   // if not already present, add it
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:educoresystem/models/admission_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../models/class_model.dart';
@@ -156,6 +157,8 @@ class FirestoreService {
         Expense.fromMap(doc.data() as Map<String, dynamic>, doc.id))
         .toList();
   }
+
+
 }
 
 
