@@ -473,7 +473,7 @@ class StaffProfileScreen extends StatelessWidget {
                     const Icon(Icons.class_, size: 12, color: Color(0xFF2E7D32)),
                     const SizedBox(width: 4),
                     Text(
-                      cls,
+                      classIdToName[cls] ?? cls,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
