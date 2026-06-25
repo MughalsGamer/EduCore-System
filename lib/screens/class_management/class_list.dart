@@ -1,10 +1,10 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/class_model.dart';
 import '../../providers/class_provider.dart';
-import 'add_class.dart';  // AddEditClassScreen
+import '../../providers/teacher_provider.dart'; // ← ADDED
+import 'add_class.dart';
 
 class ClassesListScreen extends StatefulWidget {
   const ClassesListScreen({super.key});
@@ -27,9 +27,7 @@ class _ClassesListScreenState extends State<ClassesListScreen> {
             context,
             MaterialPageRoute(builder: (_) => const AddEditClassScreen()),
           );
-          if (result == true) {
-            // refresh handled by Provider stream
-          }
+          if (result == true) {}
         },
         child: const Icon(Icons.add),
       ),
@@ -38,7 +36,6 @@ class _ClassesListScreenState extends State<ClassesListScreen> {
           if (provider.isLoading && provider.classes.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
-
           if (provider.error != null) {
             return Center(
               child: Column(
@@ -53,11 +50,9 @@ class _ClassesListScreenState extends State<ClassesListScreen> {
               ),
             );
           }
-
           if (provider.classes.isEmpty) {
             return const Center(child: Text('No classes found'));
           }
-
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: provider.classes.length,
@@ -72,7 +67,6 @@ class _ClassesListScreenState extends State<ClassesListScreen> {
   }
 }
 
-// ---------- Expandable Class Card ----------
 class _ExpandableClassCard extends StatefulWidget {
   final SchoolClass schoolClass;
   const _ExpandableClassCard({required this.schoolClass});
@@ -91,7 +85,6 @@ class _ExpandableClassCardState extends State<_ExpandableClassCard> {
       margin: const EdgeInsets.only(bottom: 12),
       child: Column(
         children: [
-          // Header – always visible, toggles expansion
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
             borderRadius: BorderRadius.circular(12),
@@ -118,14 +111,14 @@ class _ExpandableClassCardState extends State<_ExpandableClassCard> {
                       ],
                     ),
                   ),
-                  // Edit & Delete buttons
                   IconButton(
                     icon: const Icon(Icons.edit, size: 20),
                     onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => AddEditClassScreen(existingClass: cls),
+                          builder: (_) =>
+                              AddEditClassScreen(existingClass: cls),
                         ),
                       );
                     },
@@ -134,14 +127,11 @@ class _ExpandableClassCardState extends State<_ExpandableClassCard> {
                     icon: const Icon(Icons.delete, size: 20, color: Colors.red),
                     onPressed: () => _confirmDelete(context, cls),
                   ),
-                  Icon(
-                    _expanded ? Icons.expand_less : Icons.expand_more,
-                  ),
+                  Icon(_expanded ? Icons.expand_less : Icons.expand_more),
                 ],
               ),
             ),
           ),
-          // Expanded details
           AnimatedCrossFade(
             firstChild: const SizedBox.shrink(),
             secondChild: _buildDetails(cls),
@@ -161,26 +151,21 @@ class _ExpandableClassCardState extends State<_ExpandableClassCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Divider(),
-          // Head of class teacher
-          if (cls.headOfClassTeacher != null && cls.headOfClassTeacher!.isNotEmpty)
+          if (cls.headOfClassTeacher != null &&
+              cls.headOfClassTeacher!.isNotEmpty)
             _detailRow(Icons.person, 'Head Teacher: ${cls.headOfClassTeacher}'),
-          // Monthly fee
           if (cls.monthlyFee != null)
-            _detailRow(Icons.money, 'Monthly Fee: \$${cls.monthlyFee!.toStringAsFixed(2)}'),
-          // Subjects
-          if (cls.subjects != null && cls.subjects!.isNotEmpty) ...[
+            _detailRow(Icons.money,
+                'Monthly Fee: \$${cls.monthlyFee!.toStringAsFixed(2)}'),
+          if (cls.subjects != null && cls.subjects!.isNotEmpty)
             _detailRow(Icons.book, 'Subjects: ${cls.subjects!.join(", ")}'),
-          ],
           const SizedBox(height: 8),
-
-          // Class Timetable (compact preview)
           if (cls.timetable != null && cls.timetable!.isNotEmpty) ...[
-            Text('Class Timetable:', style: Theme.of(context).textTheme.titleSmall),
+            Text('Class Timetable:',
+                style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             _buildTimetablePreview(cls.timetable!),
           ],
-
-          // Sections
           if (cls.sections != null && cls.sections!.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text('Sections:', style: Theme.of(context).textTheme.titleSmall),
@@ -195,16 +180,22 @@ class _ExpandableClassCardState extends State<_ExpandableClassCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(section.sectionName,
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                    if (section.headOfTeacher != null && section.headOfTeacher!.isNotEmpty)
+                        style:
+                        const TextStyle(fontWeight: FontWeight.bold)),
+                    if (section.headOfTeacher != null &&
+                        section.headOfTeacher!.isNotEmpty)
                       Text('Head: ${section.headOfTeacher}'),
                     if (section.monthlyFee != null)
-                      Text('Fee: \$${section.monthlyFee!.toStringAsFixed(2)}'),
-                    if (section.subjects != null && section.subjects!.isNotEmpty)
+                      Text(
+                          'Fee: \$${section.monthlyFee!.toStringAsFixed(2)}'),
+                    if (section.subjects != null &&
+                        section.subjects!.isNotEmpty)
                       Text('Subjects: ${section.subjects!.join(", ")}'),
-                    if (section.timetable != null && section.timetable!.isNotEmpty) ...[
+                    if (section.timetable != null &&
+                        section.timetable!.isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Text('Timetable:', style: const TextStyle(fontWeight: FontWeight.w600)),
+                      const Text('Timetable:',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
                       _buildTimetablePreview(section.timetable!),
                     ],
                   ],
@@ -217,22 +208,25 @@ class _ExpandableClassCardState extends State<_ExpandableClassCard> {
     );
   }
 
-  // Compact timetable preview – same style as add/edit "Timetable Preview"
   Widget _buildTimetablePreview(List<TimetableDay> timetable) {
     return Column(
-      children: timetable.map((day) => ListTile(
+      children: timetable
+          .map((day) => ListTile(
         dense: true,
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.today, size: 20),
-        title: Text(day.day, style: const TextStyle(fontWeight: FontWeight.w500)),
+        title: Text(day.day,
+            style: const TextStyle(fontWeight: FontWeight.w500)),
         subtitle: Text(
           day.periods.map((p) {
-            if (p.isLunchBreak) return '🍽 ${p.startTime} - ${p.endTime} (Lunch)';
+            if (p.isLunchBreak)
+              return '🍽 ${p.startTime} - ${p.endTime} (Lunch)';
             return '📚 ${p.startTime} - ${p.endTime}${p.subject != null && p.subject!.isNotEmpty ? " (${p.subject})" : ""}';
           }).join(' | '),
           style: const TextStyle(fontSize: 13),
         ),
-      )).toList(),
+      ))
+          .toList(),
     );
   }
 
@@ -249,7 +243,92 @@ class _ExpandableClassCardState extends State<_ExpandableClassCard> {
     );
   }
 
+  // ── Updated _confirmDelete ──
   void _confirmDelete(BuildContext context, SchoolClass cls) async {
+    if (cls.id == null) return;
+
+    final staffProvider = context.read<StaffProvider>();
+    final allStaff = [
+      ...staffProvider.teachers,
+      ...staffProvider.staffOnly,
+    ];
+    final assignedTo = allStaff
+        .where((s) => s.assignedClasses.contains(cls.id))
+        .map((s) => s.name)
+        .toList();
+
+    if (assignedTo.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.warning_amber_rounded,
+                    color: Colors.orange.shade700, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text('Cannot Delete', style: TextStyle(fontSize: 15)),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              RichText(
+                text: TextSpan(
+                  style: const TextStyle(
+                      fontSize: 13, color: Color(0xFF333333), height: 1.5),
+                  children: [
+                    const TextSpan(text: '"'),
+                    TextSpan(
+                      text: cls.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const TextSpan(
+                        text:
+                        '" is assigned to the following staff/teachers. Remove the class from them first:'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...assignedTo.map(
+                    (name) => Padding(
+                  padding: const EdgeInsets.only(left: 8, bottom: 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.person_outline,
+                          size: 14, color: Color(0xFF534AB7)),
+                      const SizedBox(width: 6),
+                      Text(name, style: const TextStyle(fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF534AB7)),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -272,7 +351,9 @@ class _ExpandableClassCardState extends State<_ExpandableClassCard> {
         await context.read<ClassProvider>().deleteClass(cls.id!, cls.name);
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Delete failed: $e'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text('Delete failed: $e'),
+              backgroundColor: Colors.red),
         );
       }
     }
