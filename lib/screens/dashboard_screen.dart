@@ -83,9 +83,9 @@ class _DashboardScreenState extends State<DashboardScreen>
           DashboardCard('Fee Structure', Icons.money, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const FeeStructureScreen()));
           }),
-          DashboardCard('Collect Fee', Icons.payment, () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const CollectFeeScreen()));
-          }),
+          // DashboardCard('Collect Fee', Icons.payment, () {
+          //   Navigator.push(context, MaterialPageRoute(builder: (_) => const CollectFeeScreen()));
+          // }),
           DashboardCard('Fee Receipts', Icons.receipt_long, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const FeeReceiptsScreen()));
           }),
@@ -114,9 +114,9 @@ class _DashboardScreenState extends State<DashboardScreen>
           DashboardCard('Fee Structure', Icons.money, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const FeeStructureScreen()));
           }),
-          DashboardCard('Collect Fee', Icons.payment, () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const CollectFeeScreen()));
-          }),
+          // DashboardCard('Collect Fee', Icons.payment, () {
+          //   Navigator.push(context, MaterialPageRoute(builder: (_) => const CollectFeeScreen()));
+          // }),
           DashboardCard('Fee Receipts', Icons.receipt_long, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const FeeReceiptsScreen()));
           }),

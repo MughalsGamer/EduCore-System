@@ -1,8 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../models/admission_model.dart';
 import '../../providers/student_provider.dart';
-import '../../models/student.dart';
-import 'add_student.dart';
 
 class StudentListScreen extends StatefulWidget {
   const StudentListScreen({super.key});
@@ -12,38 +12,420 @@ class StudentListScreen extends StatefulWidget {
 }
 
 class _StudentListScreenState extends State<StudentListScreen> {
+  static const _purple = Color(0xFF534AB7);
+  final _searchCtrl = TextEditingController();
+
   @override
-  void initState() {
-    super.initState();
-    Future.microtask(() => Provider.of<StudentProvider>(context, listen: false).fetchStudents());
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<StudentProvider>(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Students')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddStudentScreen())),
-        child: const Icon(Icons.add),
-      ),
-      body: provider.loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-        itemCount: provider.students.length,
-        itemBuilder: (ctx, i) {
-          Student s = provider.students[i];
-          return ListTile(
-            title: Text(s.name),
-            subtitle: Text('${s.className} ${s.section} - Roll: ${s.rollNumber}'),
-            trailing: IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: () async {
-                await provider.deleteStudent(s.id!);
-              },
+      appBar: AppBar(
+        title: const Text('Students'),
+        centerTitle: true,
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (v) => context.read<StudentProvider>().setSearch(v),
+              decoration: InputDecoration(
+                hintText: 'Search by name, ID, class, father...',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _searchCtrl.text.isNotEmpty
+                    ? IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  onPressed: () {
+                    _searchCtrl.clear();
+                    context.read<StudentProvider>().setSearch('');
+                  },
+                )
+                    : null,
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
+                ),
+              ),
             ),
+          ),
+        ),
+      ),
+      body: Consumer<StudentProvider>(
+        builder: (context, provider, _) {
+          // ✅ Web-safe: directly read bool field, no == true comparison needed
+          final bool loading = provider.isLoading;
+          final String? err = provider.error;
+          final List<StudentWithContext> list = provider.students;
+
+          if (loading && list.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (err != null) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Error: $err'),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: provider.clearError,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (list.isEmpty) {
+            return _buildEmpty(provider.searchQuery.isNotEmpty);
+          }
+
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                child: Row(
+                  children: [
+                    Text(
+                      '${list.length} student(s)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
+                  itemCount: list.length,
+                  itemBuilder: (ctx, i) => _StudentCard(
+                    key: ValueKey('${list[i].student.studentId}_$i'),
+                    data: list[i],
+                  ),
+                ),
+              ),
+            ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildEmpty(bool isSearch) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            isSearch ? Icons.search_off : Icons.school_outlined,
+            size: 64,
+            color: Colors.grey.shade300,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            isSearch ? 'No students match' : 'No students yet',
+            style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
+          ),
+          if (!isSearch) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Add Regular Admissions to see students here',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Student Card
+// ─────────────────────────────────────────────
+class _StudentCard extends StatefulWidget {
+  final StudentWithContext data;
+  const _StudentCard({required this.data, Key? key}) : super(key: key);
+
+  @override
+  State<_StudentCard> createState() => _StudentCardState();
+}
+
+class _StudentCardState extends State<_StudentCard> {
+  bool _expanded = false;
+  static const _purple = Color(0xFF534AB7);
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.data.student;
+    final d = widget.data;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      elevation: 2,
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  _avatar(s.picBase64),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          s.name.isNotEmpty ? s.name : '—',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        const SizedBox(height: 2),
+                        if (s.className != null && s.className!.isNotEmpty)
+                          Text(
+                            (s.sectionName != null && s.sectionName!.isNotEmpty)
+                                ? '${s.className} — ${s.sectionName}'
+                                : s.className!,
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                        if (s.studentId.isNotEmpty)
+                          Text(
+                            'ID: ${s.studentId}',
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey.shade500),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.green),
+                    ),
+                    child: Text(
+                      d.inquiryOrRegId,
+                      style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 250),
+                    child: const Icon(Icons.expand_more),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            child: _expanded
+                ? _buildDetails(s, d)
+                : const SizedBox(width: double.infinity, height: 0),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetails(AdmissionStudent s, StudentWithContext d) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(),
+          _sectionLabel('Student Info'),
+          if (s.studentId.isNotEmpty)
+            _row(Icons.fingerprint, 'Student ID', s.studentId, Colors.purple),
+          if (s.className != null && s.className!.isNotEmpty)
+            _row(
+              Icons.class_,
+              'Class',
+              (s.sectionName != null && s.sectionName!.isNotEmpty)
+                  ? '${s.className} — ${s.sectionName}'
+                  : s.className!,
+              Colors.blue,
+            ),
+          if (s.classRollNo != null && s.classRollNo!.isNotEmpty)
+            _row(Icons.format_list_numbered, 'Roll No', s.classRollNo!,
+                Colors.teal),
+          if (s.bFormCnic != null && s.bFormCnic!.isNotEmpty)
+            _row(Icons.credit_card_outlined, 'B-Form / CNIC', s.bFormCnic!,
+                Colors.indigo),
+          if (s.dob != null)
+            _row(
+              Icons.cake_outlined,
+              'Date of Birth',
+              '${s.dob!.day.toString().padLeft(2, '0')}/'
+                  '${s.dob!.month.toString().padLeft(2, '0')}/'
+                  '${s.dob!.year}',
+              Colors.pink,
+            ),
+          if (s.monthlyFee != null ||
+              s.annualFee != null ||
+              s.registrationFee != null) ...[
+            const SizedBox(height: 8),
+            _sectionLabel('Fee Structure'),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                if (s.monthlyFee != null)
+                  _feeBadge('Monthly', s.monthlyFee!, Colors.green),
+                if (s.annualFee != null)
+                  _feeBadge('Annual', s.annualFee!, Colors.orange),
+                if (s.registrationFee != null)
+                  _feeBadge('Reg.', s.registrationFee!, Colors.purple),
+              ],
+            ),
+          ],
+          const SizedBox(height: 8),
+          _sectionLabel('Family'),
+          if (d.familyId.isNotEmpty)
+            _row(Icons.tag, 'Family ID', d.familyId, _purple),
+          if (d.familyName.isNotEmpty)
+            _row(Icons.family_restroom, 'Family Name', d.familyName,
+                Colors.brown),
+          const SizedBox(height: 8),
+          _sectionLabel('Father'),
+          _row(Icons.person, 'Name', d.fatherName, Colors.blueGrey),
+          _row(Icons.phone, 'Phone', d.fatherPhone, Colors.blueGrey),
+          if (d.fatherCnic != null && d.fatherCnic!.isNotEmpty)
+            _row(Icons.credit_card, 'CNIC', d.fatherCnic!, Colors.blueGrey),
+          if (d.fatherOccupation != null && d.fatherOccupation!.isNotEmpty)
+            _row(Icons.work_outline, 'Occupation', d.fatherOccupation!,
+                Colors.blueGrey),
+          const SizedBox(height: 8),
+          _sectionLabel('Mother'),
+          _row(Icons.person_outline, 'Name', d.motherName, Colors.pinkAccent),
+          if (d.motherPhone != null && d.motherPhone!.isNotEmpty)
+            _row(Icons.phone_outlined, 'Phone', d.motherPhone!,
+                Colors.pinkAccent),
+          if (d.motherCnic != null && d.motherCnic!.isNotEmpty)
+            _row(Icons.credit_card_outlined, 'CNIC', d.motherCnic!,
+                Colors.pinkAccent),
+          if (d.caste != null && d.caste!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _row(Icons.diversity_3_outlined, 'Caste', d.caste!, Colors.grey),
+          ],
+          if (d.address != null && d.address!.isNotEmpty)
+            _row(Icons.home_outlined, 'Address', d.address!, Colors.grey),
+          const SizedBox(height: 8),
+          _sectionLabel('Admission'),
+          _row(Icons.confirmation_number_outlined, 'Reg ID',
+              d.inquiryOrRegId, Colors.green),
+          _row(
+            Icons.calendar_today_outlined,
+            'Date',
+            '${d.admissionDate.day.toString().padLeft(2, '0')}/'
+                '${d.admissionDate.month.toString().padLeft(2, '0')}/'
+                '${d.admissionDate.year}',
+            Colors.green,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _avatar(String? picBase64) {
+    if (picBase64 != null && picBase64.isNotEmpty) {
+      try {
+        return CircleAvatar(
+          radius: 28,
+          backgroundImage: MemoryImage(base64Decode(picBase64)),
+        );
+      } catch (_) {}
+    }
+    return CircleAvatar(
+      radius: 28,
+      backgroundColor: Colors.purple.shade50,
+      child: const Icon(Icons.person, size: 26, color: _purple),
+    );
+  }
+
+  Widget _sectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6, top: 2),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: _purple,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+
+  Widget _row(IconData icon, String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 14, color: color.withOpacity(0.7)),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 12, color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _feeBadge(String label, double amount, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        '$label: Rs ${amount.toStringAsFixed(0)}',
+        style: TextStyle(
+          fontSize: 11,
+          color: color.withOpacity(0.8),
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
