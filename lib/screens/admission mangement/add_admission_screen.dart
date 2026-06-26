@@ -245,6 +245,7 @@ class _AdmissionFormScreenState extends State<AdmissionFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
   // ── Save ──
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_admissionId.isEmpty) {
@@ -296,7 +297,7 @@ class _AdmissionFormScreenState extends State<AdmissionFormScreen> {
       await context.read<AdmissionProvider>().saveAdmission(admission);
       if (mounted) {
         _snack('Admission saved successfully!');
-        Navigator.pop(context, true);
+        Navigator.pop(context, _type);   // ← CHANGED: return admission type
       }
     } catch (e) {
       if (mounted) {
@@ -307,6 +308,68 @@ class _AdmissionFormScreenState extends State<AdmissionFormScreen> {
       if (mounted) setState(() => _isSaving = false);
     }
   }
+  // Future<void> _save() async {
+  //   if (!_formKey.currentState!.validate()) return;
+  //   if (_admissionId.isEmpty) {
+  //     _snack('Please wait for ID generation');
+  //     return;
+  //   }
+  //
+  //   setState(() => _isSaving = true);
+  //
+  //   // Sync all student form data
+  //   for (final f in _studentForms) {
+  //     f.data.name = f.nameCtrl.text.trim();
+  //     f.syncFees();
+  //   }
+  //
+  //   final admission = AdmissionModel(
+  //     id: widget.existing?.id,
+  //     type: _type,
+  //     inquiryOrRegId: _admissionId,
+  //     admissionDate: _admissionDate,
+  //     previousSchoolName:
+  //     _prevSchoolCtrl.text.trim().isEmpty ? null : _prevSchoolCtrl.text.trim(),
+  //     previousClassName:
+  //     _prevClassCtrl.text.trim().isEmpty ? null : _prevClassCtrl.text.trim(),
+  //     previousClassMarks:
+  //     _prevMarksCtrl.text.trim().isEmpty ? null : _prevMarksCtrl.text.trim(),
+  //     familyId: _familyId,
+  //     familyName: _familyNameCtrl.text.trim(),
+  //     fatherName: _fatherNameCtrl.text.trim(),
+  //     fatherOccupation: _fatherOccCtrl.text.trim().isEmpty
+  //         ? null
+  //         : _fatherOccCtrl.text.trim(),
+  //     fatherCnic: _fatherCnicCtrl.text.trim().isEmpty
+  //         ? null
+  //         : _fatherCnicCtrl.text.trim(),
+  //     fatherPhone: _fatherPhoneCtrl.text.trim(),
+  //     motherName: _motherNameCtrl.text.trim(),
+  //     motherCnic:
+  //     _motherCnicCtrl.text.trim().isEmpty ? null : _motherCnicCtrl.text.trim(),
+  //     motherPhone:
+  //     _motherPhoneCtrl.text.trim().isEmpty ? null : _motherPhoneCtrl.text.trim(),
+  //     caste: _casteCtrl.text.trim().isEmpty ? null : _casteCtrl.text.trim(),
+  //     address:
+  //     _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
+  //     students: _studentForms.map((f) => f.data).toList(),
+  //   );
+  //
+  //   try {
+  //     await context.read<AdmissionProvider>().saveAdmission(admission);
+  //     if (mounted) {
+  //       _snack('Admission saved successfully!');
+  //       Navigator.pop(context, true);
+  //     }
+  //   } catch (e) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+  //           content: Text('Error: $e'), backgroundColor: Colors.red));
+  //     }
+  //   } finally {
+  //     if (mounted) setState(() => _isSaving = false);
+  //   }
+  // }
 
   // ────────────────────────────────────────────
   //  BUILD

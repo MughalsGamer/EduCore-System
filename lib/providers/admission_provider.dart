@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -62,6 +61,10 @@ class AdmissionProvider extends ChangeNotifier {
     super.dispose();
   }
 
+  void refresh() {
+    _listen(); // re‑subscribe to the stream, triggers a fresh fetch + notifyListeners()
+  }
+
   // ── ID Generators ──────────────────────────────
   Future<String> generateAdmissionId(AdmissionType type) =>
       _service.generateAdmissionId(type);
@@ -87,7 +90,7 @@ class AdmissionProvider extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
       if (admission.id == null) {
-        await _service.addAdmission(admission);
+        await _service.addAdmission(admission); // ID return ho rahi hai, idhar ignore kar rahe
       } else {
         await _service.updateAdmission(admission);
       }
@@ -110,9 +113,9 @@ class AdmissionProvider extends ChangeNotifier {
     }
   }
 
-  // ── Convert to Regular (FIXED) ──────────────────
+  // ── Convert to Regular (Fixed) ──────────────────
   Future<void> convertToRegular(AdmissionModel preAdmission, {DateTime? customDate}) async {
-    // ✅ Guard: agar pehle se koi operation chal raha hai ya id nahi hai to ignore
+    // Guard: agar already loading ho ya ID na ho to ignore
     if (_isLoading || preAdmission.id == null) return;
 
     try {
@@ -122,12 +125,12 @@ class AdmissionProvider extends ChangeNotifier {
       // 1. Generate new Registration ID
       final newRegId = await generateAdmissionId(AdmissionType.regular);
 
-      // 2. Admission date (user selected ya aaj ki)
+      // 2. Admission date
       final regDate = customDate ?? DateTime.now();
 
       // 3. Create a copy with required changes
       final converted = AdmissionModel(
-        id: null,
+        id: null, // will be set after Firestore add
         type: AdmissionType.regular,
         inquiryOrRegId: newRegId,
         admissionDate: regDate,
@@ -162,13 +165,14 @@ class AdmissionProvider extends ChangeNotifier {
         ),
       );
 
-      // 4. Add new regular admission to Firestore
-      await _service.addAdmission(converted);
+      // 4. Add new regular admission and get the real Firestore ID
+      final newDocId = await _service.addAdmission(converted);
+      converted.id = newDocId; // ✅ Real ID set kar do
 
-      // 5. Delete old pre-admission from Firestore
+      // 5. Delete old pre-admission
       await _service.deleteAdmission(preAdmission.id!);
 
-      // ✅ Immediate local update for instant UI refresh
+      // 6. Immediate local update (ab ID valid hai, duplicate nahi hoga)
       _admissions.removeWhere((a) => a.id == preAdmission.id);
       _admissions.insert(0, converted);
       _admissions.sort((a, b) => b.admissionDate.compareTo(a.admissionDate));

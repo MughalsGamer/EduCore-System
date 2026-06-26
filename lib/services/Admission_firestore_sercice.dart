@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/admission_model.dart';
 
@@ -82,8 +81,10 @@ class AdmissionFirestoreService {
   // ─────────────────────────────────────
   //  CRUD
   // ─────────────────────────────────────
-  Future<void> addAdmission(AdmissionModel admission) async {
-    await _admissionsCol.add(admission.toMap());
+  // ✅ Returns the new document ID
+  Future<String> addAdmission(AdmissionModel admission) async {
+    final docRef = await _admissionsCol.add(admission.toMap());
+    return docRef.id;
   }
 
   Future<void> updateAdmission(AdmissionModel admission) async {
@@ -96,11 +97,8 @@ class AdmissionFirestoreService {
     await _admissionsCol.doc(id).delete();
   }
 
-  // ✅ FIX: orderBy hata diya — provider mein client-side sort ho raha hai
-  // where + orderBy on different fields = composite index required (error)
-  // Solution: Firestore se sirf data lo, sorting Dart mein karo
   Stream<List<AdmissionModel>> getAdmissionsStream({AdmissionType? filterType}) {
-    Query query = _admissionsCol; // ← no orderBy here
+    Query query = _admissionsCol;
 
     if (filterType != null) {
       query = query.where('type', isEqualTo: filterType.value);
