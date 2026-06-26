@@ -1,177 +1,190 @@
-import 'dart:convert';
-import 'dart:io';
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+
 import '../models/admission_model.dart';
-import '../services/firestore_service.dart'; // ✅ Only one service file
+import '../services/Admission_firestore_sercice.dart';
 
 class AdmissionProvider extends ChangeNotifier {
-  final FirestoreService _firestoreService = FirestoreService();
+  final AdmissionFirestoreService _service = AdmissionFirestoreService();
 
-  // --- Form fields ---
-  String admissionType = 'family';
-  DateTime? admissionDate;
-  String previousClass = '';
-  String previousSchool = '';
+  List<AdmissionModel> _admissions = [];
+  bool _isLoading = false;
+  String? _error;
+  AdmissionType? _activeFilter;
 
-  // Parent fields
-  String fatherName = '';
-  String fatherCNIC = '';
-  String occupation = '';
-  String phone = '';
-  String motherName = '';
-  String motherCNIC = '';
-  String address = '';
-  String city = '';
+  StreamSubscription<List<AdmissionModel>>? _subscription;
 
-  // Family fields
-  String familyName = '';
+  List<AdmissionModel> get admissions => _admissions;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+  AdmissionType? get activeFilter => _activeFilter;
 
-  // Children list (always at least one)
-  List<ChildFormData> children = [ChildFormData()];
-
-  // Loading state
-  bool isLoading = false;
-
-  // Picked images map (index -> File)
-  final Map<int, File> _childImages = {};
-
-  File? getChildImage(int index) => _childImages[index];
-
-  void setAdmissionType(String type) {
-    admissionType = type;
-    if (type == 'individual') {
-      children = [ChildFormData()];
-    } else {
-      if (children.isEmpty) children = [ChildFormData()];
-    }
-    notifyListeners();
+  AdmissionProvider() {
+    _listen();
   }
 
-  void addChild() {
-    if (admissionType == 'family') {
-      children.add(ChildFormData());
-      notifyListeners();
-    }
-  }
+  void _listen() {
+    _subscription?.cancel();
+    _subscription = null;
 
-  void removeChild(int index) {
-    if (admissionType == 'family' && children.length > 1) {
-      children.removeAt(index);
-      final updated = <int, File>{};
-      _childImages.forEach((k, v) {
-        if (k < index) updated[k] = v;
-        if (k > index) updated[k - 1] = v;
-      });
-      _childImages
-        ..clear()
-        ..addAll(updated);
-      notifyListeners();
-    }
-  }
-
-  Future<void> pickImage(int childIndex) async {
-    final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      _childImages[childIndex] = File(image.path);
-      notifyListeners();
-    }
-  }
-
-  Future<void> submit() async {
-    isLoading = true;
+    _isLoading = true;
+    _error = null;
     notifyListeners();
 
+    _subscription = _service
+        .getAdmissionsStream(filterType: _activeFilter)
+        .listen(
+          (list) {
+        list.sort((a, b) => b.admissionDate.compareTo(a.admissionDate));
+        _admissions = list;
+        _isLoading = false;
+        notifyListeners();
+      },
+      onError: (e) {
+        _error = e.toString();
+        _isLoading = false;
+        notifyListeners();
+      },
+    );
+  }
+
+  void setFilter(AdmissionType? type) {
+    if (_activeFilter == type) return;
+    _activeFilter = type;
+    _listen();
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  // ── ID Generators ──────────────────────────────
+  Future<String> generateAdmissionId(AdmissionType type) =>
+      _service.generateAdmissionId(type);
+
+  Future<String> generateFamilyId(String familyName) =>
+      _service.generateFamilyId(familyName);
+
+  Future<String> generateStudentId(String name) =>
+      _service.generateStudentId(name);
+
+  // ── Class/Section Fees ─────────────────────────
+  Future<Map<String, double?>> fetchFees(
+      String classId, String? sectionName) async {
+    if (sectionName != null && sectionName.isNotEmpty) {
+      return _service.getSectionFees(classId, sectionName);
+    }
+    return _service.getClassFees(classId);
+  }
+
+  // ── Save ───────────────────────────────────────
+  Future<void> saveAdmission(AdmissionModel admission) async {
     try {
-      final List<StudentModel> students = [];
-      for (int i = 0; i < children.length; i++) {
-        final child = children[i];
-        String? base64Image;
-        if (_childImages.containsKey(i)) {
-          final bytes = await _childImages[i]!.readAsBytes();
-          base64Image = base64Encode(bytes);
-        }
-
-        students.add(StudentModel(
-          rollNo: child.rollNo,
-          studentName: child.studentName,
-          bFormCNIC: child.bFormCNIC,
-          dob: child.dob,
-          studentClass: child.studentClass,
-          section: child.section,
-          monthlyFee: child.monthlyFee,
-          booksCharges: child.booksCharges,
-          uniformCharges: child.uniformCharges,
-          stationeryCharges: child.stationeryCharges,
-          transportFee: child.transportFee,
-          securityFee: child.securityFee,
-          studentPictureBase64: base64Image,
-        ));
+      _isLoading = true;
+      notifyListeners();
+      if (admission.id == null) {
+        await _service.addAdmission(admission);
+      } else {
+        await _service.updateAdmission(admission);
       }
-
-      final admission = AdmissionModel(
-        type: admissionType,
-        admissionDate: admissionDate,
-        previousClass: previousClass,
-        previousSchool: previousSchool,
-        familyName: admissionType == 'family' ? familyName : null,
-        parent: ParentModel(
-          fatherName: fatherName,
-          fatherCNIC: fatherCNIC,
-          occupation: occupation,
-          phone: phone,
-          motherName: motherName,
-          motherCNIC: motherCNIC,
-          address: address,
-          city: city,
-        ),
-        children: students,
-      );
-
-      // ✅ Correct method name — addAdmission, not add
-      // await _firestoreService.addAdmission(admission);
-      _resetForm();
     } catch (e) {
-      debugPrint('Error submitting: $e');
+      _error = e.toString();
       rethrow;
     } finally {
-      isLoading = false;
+      _isLoading = false;
       notifyListeners();
     }
   }
 
-  void _resetForm() {
-    admissionType = 'family';
-    admissionDate = null;
-    previousClass = '';
-    previousSchool = '';
-    fatherName = '';
-    fatherCNIC = '';
-    occupation = '';
-    phone = '';
-    motherName = '';
-    motherCNIC = '';
-    address = '';
-    city = '';
-    familyName = '';
-    children = [ChildFormData()];
-    _childImages.clear();
+  Future<void> deleteAdmission(String id) async {
+    try {
+      await _service.deleteAdmission(id);
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
   }
-}
 
-class ChildFormData {
-  String rollNo = '';
-  String studentName = '';
-  String bFormCNIC = '';
-  DateTime? dob;
-  String studentClass = '';
-  String section = '';
-  double monthlyFee = 0;
-  double booksCharges = 0;
-  double uniformCharges = 0;
-  double stationeryCharges = 0;
-  double transportFee = 0;
-  double securityFee = 0;
-  String? studentPictureBase64;
+  // ── Convert to Regular (FIXED) ──────────────────
+  Future<void> convertToRegular(AdmissionModel preAdmission, {DateTime? customDate}) async {
+    // ✅ Guard: agar pehle se koi operation chal raha hai ya id nahi hai to ignore
+    if (_isLoading || preAdmission.id == null) return;
+
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      // 1. Generate new Registration ID
+      final newRegId = await generateAdmissionId(AdmissionType.regular);
+
+      // 2. Admission date (user selected ya aaj ki)
+      final regDate = customDate ?? DateTime.now();
+
+      // 3. Create a copy with required changes
+      final converted = AdmissionModel(
+        id: null,
+        type: AdmissionType.regular,
+        inquiryOrRegId: newRegId,
+        admissionDate: regDate,
+        fatherName: preAdmission.fatherName,
+        fatherPhone: preAdmission.fatherPhone,
+        fatherCnic: preAdmission.fatherCnic,
+        fatherOccupation: preAdmission.fatherOccupation,
+        motherName: preAdmission.motherName,
+        motherPhone: preAdmission.motherPhone,
+        motherCnic: preAdmission.motherCnic,
+        caste: preAdmission.caste,
+        address: preAdmission.address,
+        familyId: preAdmission.familyId,
+        familyName: preAdmission.familyName,
+        previousSchoolName: preAdmission.previousSchoolName,
+        previousClassName: preAdmission.previousClassName,
+        previousClassMarks: preAdmission.previousClassMarks,
+        students: List<AdmissionStudent>.from(
+          preAdmission.students.map((s) => AdmissionStudent(
+            name: s.name,
+            className: s.className,
+            sectionName: s.sectionName,
+            classRollNo: s.classRollNo,
+            bFormCnic: s.bFormCnic,
+            dob: s.dob,
+            monthlyFee: s.monthlyFee,
+            annualFee: s.annualFee,
+            registrationFee: s.registrationFee,
+            picBase64: s.picBase64,
+            studentId: s.studentId,
+          )),
+        ),
+      );
+
+      // 4. Add new regular admission to Firestore
+      await _service.addAdmission(converted);
+
+      // 5. Delete old pre-admission from Firestore
+      await _service.deleteAdmission(preAdmission.id!);
+
+      // ✅ Immediate local update for instant UI refresh
+      _admissions.removeWhere((a) => a.id == preAdmission.id);
+      _admissions.insert(0, converted);
+      _admissions.sort((a, b) => b.admissionDate.compareTo(a.admissionDate));
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
 }
