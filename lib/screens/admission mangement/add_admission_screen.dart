@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -219,15 +220,63 @@ class _AdmissionFormScreenState extends State<AdmissionFormScreen> {
   }
 
   // ── Pick image ──
+  // ── Pick & compress image (mobile + web) ──
   Future<void> _pickImage(int idx) async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(
-        source: ImageSource.gallery, maxWidth: 600, imageQuality: 70);
+
+    // Pick without pre-compression — we handle it ourselves
+    final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;
-    final bytes = await picked.readAsBytes();
-    final base64Str = base64Encode(bytes);
-    setState(() => _studentForms[idx].data.picBase64 = base64Str);
+
+    final rawBytes = await picked.readAsBytes();
+    final compressed = await _compressToBase64(rawBytes);
+
+    if (compressed != null && mounted) {
+      setState(() => _studentForms[idx].data.picBase64 = compressed);
+    }
   }
+
+  /// Resize to max 120 × 120 px, JPEG quality 35.
+  /// Result: ~3–8 KB base64 — safe for Firestore on every platform.
+  Future<String?> _compressToBase64(Uint8List rawBytes) async {
+    try {
+      // Decode — works on mobile, web, desktop (pure Dart)
+      final original = img.decodeImage(rawBytes);
+      if (original == null) return null;
+
+      // Resize: keep aspect ratio, longest side ≤ 120 px
+      final img.Image thumbnail;
+      if (original.width >= original.height) {
+        thumbnail = img.copyResize(original, width: 120);
+      } else {
+        thumbnail = img.copyResize(original, height: 120);
+      }
+
+      // Encode to JPEG at quality 35 (tiny file, acceptable for avatars)
+      final jpegBytes = img.encodeJpg(thumbnail, quality: 35);
+
+      // Safety check — should never fail after resize but just in case
+      if (jpegBytes.length > 50 * 1024) {          // still > 50 KB?
+        final jpegBytes2 = img.encodeJpg(thumbnail, quality: 15);
+        return base64Encode(jpegBytes2);
+      }
+
+      return base64Encode(jpegBytes);
+    } catch (e) {
+      debugPrint('Image compression failed: $e');
+      return null;
+    }
+  }
+
+  // Future<void> _pickImage(int idx) async {
+  //   final picker = ImagePicker();
+  //   final picked = await picker.pickImage(
+  //       source: ImageSource.gallery, maxWidth: 600, imageQuality: 70);
+  //   if (picked == null) return;
+  //   final bytes = await picked.readAsBytes();
+  //   final base64Str = base64Encode(bytes);
+  //   setState(() => _studentForms[idx].data.picBase64 = base64Str);
+  // }
 
   // ── Date picker ──
   Future<void> _pickDate(

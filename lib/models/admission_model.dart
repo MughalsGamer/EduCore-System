@@ -221,4 +221,18 @@ class AdmissionModel {
           [AdmissionStudent()],
     );
   }
+  static List<AdmissionStudent> _parseStudents(dynamic raw) {
+    if (raw == null) return [AdmissionStudent()];
+    if (raw is List) {
+      return raw
+          .map((s) => AdmissionStudent.fromMap(Map<String, dynamic>.from(s as Map)))
+          .toList();
+    }
+    if (raw is Map) {
+      return raw.values
+          .map((s) => AdmissionStudent.fromMap(Map<String, dynamic>.from(s as Map)))
+          .toList();
+    }
+    return [AdmissionStudent()];
+  }
 }

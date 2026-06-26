@@ -161,6 +161,8 @@ class AdmissionProvider extends ChangeNotifier {
             registrationFee: s.registrationFee,
             picBase64: s.picBase64,
             studentId: s.studentId,
+            sectionId: s.sectionId,
+            classId: s.classId,
           )),
         ),
       );
