@@ -130,7 +130,7 @@ class AdmissionProvider extends ChangeNotifier {
       );
 
       // ✅ Correct method name — addAdmission, not add
-      await _firestoreService.addAdmission(admission);
+      // await _firestoreService.addAdmission(admission);
       _resetForm();
     } catch (e) {
       debugPrint('Error submitting: $e');

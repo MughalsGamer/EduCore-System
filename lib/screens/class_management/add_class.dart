@@ -248,6 +248,8 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _classNameController;
   late TextEditingController _headOfClassTeacherController;
+  late TextEditingController _annualFeeController;
+  late TextEditingController _registrationFeeController;
   late TextEditingController _monthlyFeeController;
 
   final List<String> _weekdays = [
@@ -301,6 +303,10 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
         TextEditingController(text: existing?.name ?? '');
     _headOfClassTeacherController =
         TextEditingController(text: existing?.headOfClassTeacher ?? '');
+    _annualFeeController =
+        TextEditingController(text: existing?.annualFee?.toString() ?? '');
+    _registrationFeeController =
+        TextEditingController(text: existing?.registrationFee?.toString() ?? '');
     _monthlyFeeController =
         TextEditingController(text: existing?.monthlyFee?.toString() ?? '');
 
@@ -343,7 +349,10 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
       }
     }
 
-    _sections = existing?.sections ?? [];
+    _sections = existing?.sections != null
+        ? List<Section>.from(existing!.sections)
+        : [];
+    _hasSections = _sections.isNotEmpty;
     for (int i = 0; i < _sections.length; i++) {
       _sectionSelectedSubjects
           .add(List<String>.from(_sections[i].subjects ?? []));
@@ -392,6 +401,8 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
     _classNameController.removeListener(() {});
     _classNameController.dispose();
     _headOfClassTeacherController.dispose();
+    _annualFeeController.dispose();
+    _registrationFeeController.dispose();
     _monthlyFeeController.dispose();
     _classStartTimeController.dispose();
     _classEndTimeController.dispose();
@@ -644,7 +655,9 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
       id: widget.existingClass?.id,
       name: _classNameController.text.trim(),
       headOfClassTeacher: _headOfClassTeacherController.text.trim(),
-      monthlyFee: double.tryParse(_monthlyFeeController.text),
+      annualFee: double.tryParse(_annualFeeController.text),          // ← NEW
+      registrationFee: double.tryParse(_registrationFeeController.text), // ← NEW
+      monthlyFee: double.tryParse(_monthlyFeeController.text),        // ← NEW
       subjects: _classSubjects,
       timetable: _classTimetable,
       sections: _sections,
@@ -687,12 +700,18 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
     _sectionTimetables.add(_SectionTimetableData());
   });
 
-  void _removeSection(int i) => setState(() {
-    _sections.removeAt(i);
-    _sectionSelectedSubjects.removeAt(i);
-    _sectionTimetables[i].dispose();
-    _sectionTimetables.removeAt(i);
-  });
+  void _removeSection(int i) {
+    if (_sections.length <= 1) {
+      _snack('At least one section is required');
+      return;
+    }
+    setState(() {
+      _sections.removeAt(i);
+      _sectionSelectedSubjects.removeAt(i);
+      _sectionTimetables[i].dispose();
+      _sectionTimetables.removeAt(i);
+    });
+  }
 
   void _addSectionTimetableDay(int si) => setState(() {
     _sections[si].timetable ??= [];
@@ -1394,16 +1413,63 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                     onChanged: (val) => section.headOfTeacher = val,
                   ),
                   const SizedBox(height: 8),
-                  TextFormField(
-                    initialValue: section.monthlyFee?.toString(),
-                    decoration: const InputDecoration(
-                      labelText: 'Monthly Fee (Optional)',
-                      border: OutlineInputBorder(),
-                      prefixText: '\$ ',
+                  // ── Section Fee Structure ──
+                  Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    color: Colors.grey.shade50,
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.payments_outlined, size: 16, color: Color(0xFF534AB7)),
+                              const SizedBox(width: 6),
+                              Text('Fee Structure (Optional)',
+                                  style: Theme.of(context).textTheme.labelLarge),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          TextFormField(
+                            initialValue: section.annualFee?.toString(),
+                            decoration: const InputDecoration(
+                              labelText: 'Annual Fee',
+                              border: OutlineInputBorder(),
+                              prefixText: 'Rs ',
+                              isDense: true,
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (val) => section.annualFee = double.tryParse(val),
+                          ),
+                          const SizedBox(height: 10),
+                          TextFormField(
+                            initialValue: section.registrationFee?.toString(),
+                            decoration: const InputDecoration(
+                              labelText: 'Registration Fee',
+                              border: OutlineInputBorder(),
+                              prefixText: 'Rs ',
+                              isDense: true,
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (val) => section.registrationFee = double.tryParse(val),
+                          ),
+                          const SizedBox(height: 10),
+                          TextFormField(
+                            initialValue: section.monthlyFee?.toString(),
+                            decoration: const InputDecoration(
+                              labelText: 'Monthly Fee',
+                              border: OutlineInputBorder(),
+                              prefixText: 'Rs ',
+                              isDense: true,
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (val) => section.monthlyFee = double.tryParse(val),
+                          ),
+                        ],
+                      ),
                     ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (val) =>
-                    section.monthlyFee = double.tryParse(val),
                   ),
                   const SizedBox(height: 12),
 
@@ -1561,15 +1627,62 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _monthlyFeeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Monthly Fee (Optional)',
-                    border: OutlineInputBorder(),
-                    prefixText: '\$ ',
-                    prefixIcon: Icon(Icons.money),
+                // ── Fee Structure Card ──
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 1,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.payments_outlined, size: 18, color: Color(0xFF534AB7)),
+                            const SizedBox(width: 8),
+                            Text('Fee Structure (Optional)',
+                                style: Theme.of(context).textTheme.titleSmall),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: _annualFeeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Annual Fee',
+                            border: OutlineInputBorder(),
+                            prefixText: 'Rs ',
+                            prefixIcon: Icon(Icons.calendar_today_outlined),
+                            isDense: true,
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _registrationFeeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Registration Fee',
+                            border: OutlineInputBorder(),
+                            prefixText: 'Rs ',
+                            prefixIcon: Icon(Icons.app_registration_outlined),
+                            isDense: true,
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _monthlyFeeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Monthly Fee',
+                            border: OutlineInputBorder(),
+                            prefixText: 'Rs ',
+                            prefixIcon: Icon(Icons.date_range_outlined),
+                            isDense: true,
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ],
+                    ),
                   ),
-                  keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: 24),
 

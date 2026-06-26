@@ -53,13 +53,17 @@ class TimetableDay {
 class Section {
   String sectionName;
   String headOfTeacher;
-  double? monthlyFee;
+  double? annualFee;        // ← NEW
+  double? registrationFee;  // ← NEW
+  double? monthlyFee;       // ← NEW (replaced old single monthlyFee)
   List<String>? subjects;
   List<TimetableDay>? timetable;
 
   Section({
     this.sectionName = '',
     this.headOfTeacher = '',
+    this.annualFee,
+    this.registrationFee,
     this.monthlyFee,
     this.subjects,
     this.timetable,
@@ -68,6 +72,8 @@ class Section {
   Map<String, dynamic> toMap() => {
     'sectionName': sectionName,
     'headOfTeacher': headOfTeacher,
+    'annualFee': annualFee,
+    'registrationFee': registrationFee,
     'monthlyFee': monthlyFee,
     'subjects': subjects,
     'timetable': timetable?.map((t) => t.toMap()).toList(),
@@ -76,6 +82,8 @@ class Section {
   factory Section.fromMap(Map<String, dynamic> map) => Section(
     sectionName: map['sectionName'] ?? '',
     headOfTeacher: map['headOfTeacher'] ?? '',
+    annualFee: map['annualFee']?.toDouble(),
+    registrationFee: map['registrationFee']?.toDouble(),
     monthlyFee: map['monthlyFee']?.toDouble(),
     subjects:
     map['subjects'] != null ? List<String>.from(map['subjects']) : null,
@@ -89,7 +97,9 @@ class SchoolClass {
   String? id;
   String name;
   String headOfClassTeacher;
-  double? monthlyFee;
+  double? annualFee;        // ← NEW
+  double? registrationFee;  // ← NEW
+  double? monthlyFee;       // ← NEW
   List<String>? subjects;
   List<TimetableDay>? timetable;
   List<Section> sections;
@@ -98,6 +108,8 @@ class SchoolClass {
     this.id,
     this.name = '',
     this.headOfClassTeacher = '',
+    this.annualFee,
+    this.registrationFee,
     this.monthlyFee,
     this.subjects,
     this.timetable,
@@ -107,6 +119,8 @@ class SchoolClass {
   Map<String, dynamic> toMap() => {
     'name': name,
     'headOfClassTeacher': headOfClassTeacher,
+    'annualFee': annualFee,
+    'registrationFee': registrationFee,
     'monthlyFee': monthlyFee,
     'subjects': subjects,
     'timetable': timetable?.map((t) => t.toMap()).toList(),
@@ -118,6 +132,8 @@ class SchoolClass {
         id: id,
         name: map['name'] ?? '',
         headOfClassTeacher: map['headOfClassTeacher'] ?? '',
+        annualFee: map['annualFee']?.toDouble(),
+        registrationFee: map['registrationFee']?.toDouble(),
         monthlyFee: map['monthlyFee']?.toDouble(),
         subjects:
         map['subjects'] != null ? List<String>.from(map['subjects']) : null,
@@ -130,7 +146,6 @@ class SchoolClass {
             [],
       );
 
-  // Firebase Document ke liye additional factory
   factory SchoolClass.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return SchoolClass.fromMap(data, doc.id);

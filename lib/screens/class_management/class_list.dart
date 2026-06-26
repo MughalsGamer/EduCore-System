@@ -154,9 +154,15 @@ class _ExpandableClassCardState extends State<_ExpandableClassCard> {
           if (cls.headOfClassTeacher != null &&
               cls.headOfClassTeacher!.isNotEmpty)
             _detailRow(Icons.person, 'Head Teacher: ${cls.headOfClassTeacher}'),
+          if (cls.annualFee != null)
+            _detailRow(Icons.calendar_today_outlined,
+                'Annual Fee: Rs ${cls.annualFee!.toStringAsFixed(0)}'),
+          if (cls.registrationFee != null)
+            _detailRow(Icons.app_registration_outlined,
+                'Registration Fee: Rs ${cls.registrationFee!.toStringAsFixed(0)}'),
           if (cls.monthlyFee != null)
-            _detailRow(Icons.money,
-                'Monthly Fee: \$${cls.monthlyFee!.toStringAsFixed(2)}'),
+            _detailRow(Icons.date_range_outlined,
+                'Monthly Fee: Rs ${cls.monthlyFee!.toStringAsFixed(0)}'),
           if (cls.subjects != null && cls.subjects!.isNotEmpty)
             _detailRow(Icons.book, 'Subjects: ${cls.subjects!.join(", ")}'),
           const SizedBox(height: 8),
@@ -185,9 +191,12 @@ class _ExpandableClassCardState extends State<_ExpandableClassCard> {
                     if (section.headOfTeacher != null &&
                         section.headOfTeacher!.isNotEmpty)
                       Text('Head: ${section.headOfTeacher}'),
+                    if (section.annualFee != null)
+                      Text('Annual: Rs ${section.annualFee!.toStringAsFixed(0)}'),
+                    if (section.registrationFee != null)
+                      Text('Reg: Rs ${section.registrationFee!.toStringAsFixed(0)}'),
                     if (section.monthlyFee != null)
-                      Text(
-                          'Fee: \$${section.monthlyFee!.toStringAsFixed(2)}'),
+                      Text('Monthly: Rs ${section.monthlyFee!.toStringAsFixed(0)}'),
                     if (section.subjects != null &&
                         section.subjects!.isNotEmpty)
                       Text('Subjects: ${section.subjects!.join(", ")}'),
