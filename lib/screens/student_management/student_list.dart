@@ -748,8 +748,14 @@ class _StudentListScreenState extends State<StudentListScreen> {
           builder: (ctx, setSheetState) {
             final families = provider.allFamilies;
             final classes  = provider.allClassNames;
-            String? selFamily = provider.selectedFamilyId;
-            String? selClass  = provider.selectedClassName;
+            String? selFamily  = provider.selectedFamilyId;
+            String? selClass   = provider.selectedClassName;
+            String? selSection = provider.selectedSectionName;   // NEW
+
+            // Sections for the currently selected class (if any)
+            final sections = selClass != null
+                ? provider.sectionsForClass(selClass!)
+                : <String>[];
 
             return Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
@@ -760,8 +766,7 @@ class _StudentListScreenState extends State<StudentListScreen> {
                   // Handle
                   Center(
                     child: Container(
-                      width: 40,
-                      height: 4,
+                      width: 40, height: 4,
                       decoration: BoxDecoration(
                         color: Colors.grey.shade300,
                         borderRadius: BorderRadius.circular(2),
@@ -772,8 +777,7 @@ class _StudentListScreenState extends State<StudentListScreen> {
                   Row(
                     children: [
                       const Text('Filters',
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const Spacer(),
                       if (provider.hasActiveFilters)
                         TextButton(
@@ -791,17 +795,13 @@ class _StudentListScreenState extends State<StudentListScreen> {
 
                   // ── Family Filter ──
                   const Text('Family',
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600)),
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   if (families.isEmpty)
-                    Text('No families found',
-                        style: TextStyle(
-                            color: Colors.grey.shade500, fontSize: 13))
+                    Text('No families found', style: TextStyle(color: Colors.grey.shade500, fontSize: 13))
                   else
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
+                      spacing: 8, runSpacing: 6,
                       children: [
                         _filterChip(
                           label: 'All',
@@ -826,23 +826,22 @@ class _StudentListScreenState extends State<StudentListScreen> {
 
                   // ── Class Filter ──
                   const Text('Class',
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600)),
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   if (classes.isEmpty)
-                    Text('No classes found',
-                        style: TextStyle(
-                            color: Colors.grey.shade500, fontSize: 13))
+                    Text('No classes found', style: TextStyle(color: Colors.grey.shade500, fontSize: 13))
                   else
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
+                      spacing: 8, runSpacing: 6,
                       children: [
                         _filterChip(
                           label: 'All',
                           selected: selClass == null,
                           onTap: () {
-                            setSheetState(() => selClass = null);
+                            setSheetState(() {
+                              selClass = null;
+                              selSection = null;   // clear section when class resets
+                            });
                             provider.setClassFilter(null);
                           },
                         ),
@@ -850,12 +849,44 @@ class _StudentListScreenState extends State<StudentListScreen> {
                           label: c,
                           selected: selClass == c,
                           onTap: () {
-                            setSheetState(() => selClass = c);
+                            setSheetState(() {
+                              selClass = c;
+                              selSection = null;   // class changed → reset section
+                            });
                             provider.setClassFilter(c);
                           },
                         )),
                       ],
                     ),
+
+                  // ── Section Filter (NEW) – only if class selected & has sections ──
+                  if (selClass != null && sections.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    Text('Section',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8, runSpacing: 6,
+                      children: [
+                        _filterChip(
+                          label: 'All',
+                          selected: selSection == null,
+                          onTap: () {
+                            setSheetState(() => selSection = null);
+                            provider.setSectionFilter(null);
+                          },
+                        ),
+                        ...sections.map((sec) => _filterChip(
+                          label: sec,
+                          selected: selSection == sec,
+                          onTap: () {
+                            setSheetState(() => selSection = sec);
+                            provider.setSectionFilter(sec);
+                          },
+                        )),
+                      ],
+                    ),
+                  ],
 
                   const SizedBox(height: 20),
                   ElevatedButton(
@@ -877,6 +908,147 @@ class _StudentListScreenState extends State<StudentListScreen> {
       },
     );
   }
+  // void _showFilters(BuildContext context, StudentProvider provider) {
+  //   showModalBottomSheet(
+  //     context: context,
+  //     isScrollControlled: true,
+  //     shape: const RoundedRectangleBorder(
+  //       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  //     ),
+  //     builder: (ctx) {
+  //       return StatefulBuilder(
+  //         builder: (ctx, setSheetState) {
+  //           final families = provider.allFamilies;
+  //           final classes  = provider.allClassNames;
+  //           String? selFamily = provider.selectedFamilyId;
+  //           String? selClass  = provider.selectedClassName;
+  //
+  //           return Padding(
+  //             padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+  //             child: Column(
+  //               mainAxisSize: MainAxisSize.min,
+  //               crossAxisAlignment: CrossAxisAlignment.start,
+  //               children: [
+  //                 // Handle
+  //                 Center(
+  //                   child: Container(
+  //                     width: 40,
+  //                     height: 4,
+  //                     decoration: BoxDecoration(
+  //                       color: Colors.grey.shade300,
+  //                       borderRadius: BorderRadius.circular(2),
+  //                     ),
+  //                   ),
+  //                 ),
+  //                 const SizedBox(height: 16),
+  //                 Row(
+  //                   children: [
+  //                     const Text('Filters',
+  //                         style: TextStyle(
+  //                             fontSize: 18, fontWeight: FontWeight.bold)),
+  //                     const Spacer(),
+  //                     if (provider.hasActiveFilters)
+  //                       TextButton(
+  //                         onPressed: () {
+  //                           provider.clearAllFilters();
+  //                           _searchCtrl.clear();
+  //                           Navigator.pop(ctx);
+  //                         },
+  //                         child: const Text('Clear All',
+  //                             style: TextStyle(color: Colors.red)),
+  //                       ),
+  //                   ],
+  //                 ),
+  //                 const SizedBox(height: 16),
+  //
+  //                 // ── Family Filter ──
+  //                 const Text('Family',
+  //                     style: TextStyle(
+  //                         fontSize: 13, fontWeight: FontWeight.w600)),
+  //                 const SizedBox(height: 8),
+  //                 if (families.isEmpty)
+  //                   Text('No families found',
+  //                       style: TextStyle(
+  //                           color: Colors.grey.shade500, fontSize: 13))
+  //                 else
+  //                   Wrap(
+  //                     spacing: 8,
+  //                     runSpacing: 6,
+  //                     children: [
+  //                       _filterChip(
+  //                         label: 'All',
+  //                         selected: selFamily == null,
+  //                         onTap: () {
+  //                           setSheetState(() => selFamily = null);
+  //                           provider.setFamilyFilter(null);
+  //                         },
+  //                       ),
+  //                       ...families.map((f) => _filterChip(
+  //                         label: '${f.value} (${f.key})',
+  //                         selected: selFamily == f.key,
+  //                         onTap: () {
+  //                           setSheetState(() => selFamily = f.key);
+  //                           provider.setFamilyFilter(f.key);
+  //                         },
+  //                       )),
+  //                     ],
+  //                   ),
+  //
+  //                 const SizedBox(height: 20),
+  //
+  //                 // ── Class Filter ──
+  //                 const Text('Class',
+  //                     style: TextStyle(
+  //                         fontSize: 13, fontWeight: FontWeight.w600)),
+  //                 const SizedBox(height: 8),
+  //                 if (classes.isEmpty)
+  //                   Text('No classes found',
+  //                       style: TextStyle(
+  //                           color: Colors.grey.shade500, fontSize: 13))
+  //                 else
+  //                   Wrap(
+  //                     spacing: 8,
+  //                     runSpacing: 6,
+  //                     children: [
+  //                       _filterChip(
+  //                         label: 'All',
+  //                         selected: selClass == null,
+  //                         onTap: () {
+  //                           setSheetState(() => selClass = null);
+  //                           provider.setClassFilter(null);
+  //                         },
+  //                       ),
+  //                       ...classes.map((c) => _filterChip(
+  //                         label: c,
+  //                         selected: selClass == c,
+  //                         onTap: () {
+  //                           setSheetState(() => selClass = c);
+  //                           provider.setClassFilter(c);
+  //                         },
+  //                       )),
+  //                     ],
+  //                   ),
+  //
+  //                 const SizedBox(height: 20),
+  //                 ElevatedButton(
+  //                   onPressed: () => Navigator.pop(ctx),
+  //                   style: ElevatedButton.styleFrom(
+  //                     backgroundColor: _purple,
+  //                     foregroundColor: Colors.white,
+  //                     minimumSize: const Size(double.infinity, 46),
+  //                     shape: RoundedRectangleBorder(
+  //                         borderRadius: BorderRadius.circular(12)),
+  //                   ),
+  //                   child: const Text('Apply'),
+  //                 ),
+  //               ],
+  //             ),
+  //           );
+  //         },
+  //       );
+  //     },
+  //   );
+  // }
 
   Widget _filterChip({
     required String label,
@@ -1071,18 +1243,14 @@ class _StudentListScreenState extends State<StudentListScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       child: Wrap(
-        spacing: 8,
-        runSpacing: 4,
+        spacing: 8, runSpacing: 4,
         children: [
           if (provider.selectedFamilyId != null)
             Chip(
               label: Text(
                 'Family: ${provider.allFamilies.firstWhere(
                       (f) => f.key == provider.selectedFamilyId,
-                  orElse: () => MapEntry(
-                    provider.selectedFamilyId!,
-                    provider.selectedFamilyId!,
-                  ),
+                  orElse: () => MapEntry(provider.selectedFamilyId!, provider.selectedFamilyId!),
                 ).value}',
                 style: const TextStyle(fontSize: 12),
               ),
@@ -1106,10 +1274,68 @@ class _StudentListScreenState extends State<StudentListScreen> {
               labelStyle: const TextStyle(color: Colors.blue),
               side: BorderSide(color: Colors.blue.withOpacity(0.3)),
             ),
+          // ── NEW: Section chip ──
+          if (provider.selectedSectionName != null)
+            Chip(
+              label: Text(
+                'Section: ${provider.selectedSectionName}',
+                style: const TextStyle(fontSize: 12),
+              ),
+              deleteIcon: const Icon(Icons.close, size: 16),
+              onDeleted: () => provider.setSectionFilter(null),
+              backgroundColor: Colors.teal.withOpacity(0.1),
+              deleteIconColor: Colors.teal,
+              labelStyle: const TextStyle(color: Colors.teal),
+              side: BorderSide(color: Colors.teal.withOpacity(0.3)),
+            ),
         ],
       ),
     );
   }
+
+  // Widget _buildActiveFilterBar(StudentProvider provider) {
+  //   return Padding(
+  //     padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+  //     child: Wrap(
+  //       spacing: 8,
+  //       runSpacing: 4,
+  //       children: [
+  //         if (provider.selectedFamilyId != null)
+  //           Chip(
+  //             label: Text(
+  //               'Family: ${provider.allFamilies.firstWhere(
+  //                     (f) => f.key == provider.selectedFamilyId,
+  //                 orElse: () => MapEntry(
+  //                   provider.selectedFamilyId!,
+  //                   provider.selectedFamilyId!,
+  //                 ),
+  //               ).value}',
+  //               style: const TextStyle(fontSize: 12),
+  //             ),
+  //             deleteIcon: const Icon(Icons.close, size: 16),
+  //             onDeleted: () => provider.setFamilyFilter(null),
+  //             backgroundColor: _purple.withOpacity(0.1),
+  //             deleteIconColor: _purple,
+  //             labelStyle: const TextStyle(color: _purple),
+  //             side: BorderSide(color: _purple.withOpacity(0.3)),
+  //           ),
+  //         if (provider.selectedClassName != null)
+  //           Chip(
+  //             label: Text(
+  //               'Class: ${provider.selectedClassName}',
+  //               style: const TextStyle(fontSize: 12),
+  //             ),
+  //             deleteIcon: const Icon(Icons.close, size: 16),
+  //             onDeleted: () => provider.setClassFilter(null),
+  //             backgroundColor: Colors.blue.withOpacity(0.1),
+  //             deleteIconColor: Colors.blue,
+  //             labelStyle: const TextStyle(color: Colors.blue),
+  //             side: BorderSide(color: Colors.blue.withOpacity(0.3)),
+  //           ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildEmpty(StudentProvider provider) {
     final bool hasFilters = provider.hasActiveFilters;
