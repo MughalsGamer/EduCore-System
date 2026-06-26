@@ -174,4 +174,23 @@ class AdmissionFirestoreService {
       return {};
     }
   }
+  // ─────────────────────────────────────────────
+//  Search families by name (prefix search)
+// ─────────────────────────────────────────────
+  Future<List<AdmissionModel>> searchFamiliesByName(String query) async {
+    if (query.trim().isEmpty) return [];
+    final snap = await _admissionsCol
+        .where('familyName', isGreaterThanOrEqualTo: query.trim())
+        .where('familyName', isLessThanOrEqualTo: '${query.trim()}\uf8ff')
+        .limit(20)
+        .get();
+
+    // Deduplicate by familyId — ek family ke multiple admissions ho sakty hain
+    final seen = <String>{};
+    return snap.docs
+        .map((doc) => AdmissionModel.fromFirestore(doc))
+        .where((a) => a.familyId.isNotEmpty && seen.add(a.familyId))
+        .toList();
+  }
+
 }

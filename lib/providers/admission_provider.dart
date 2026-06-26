@@ -193,4 +193,8 @@ class AdmissionProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
   }
+
+  Future<List<AdmissionModel>> searchFamilies(String query) =>
+      _service.searchFamiliesByName(query);
+
 }
