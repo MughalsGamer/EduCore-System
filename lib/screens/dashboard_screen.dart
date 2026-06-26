@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'admission mangement/admission_list_screen.dart';
+import 'family_management/family management.dart';
 import 'student_management/student_list.dart';
 import 'teacher_management/teacher_list.dart';
 import 'class_management/class_list.dart';
@@ -70,6 +71,10 @@ class _DashboardScreenState extends State<DashboardScreen>
           DashboardCard('Admissions', Icons.how_to_reg, () {
             Navigator.push(context, MaterialPageRoute(
                 builder: (_) => const AdmissionListScreen()));
+          }),
+          DashboardCard('Family Management', Icons.family_restroom, () {
+            Navigator.push(context, MaterialPageRoute(
+                builder: (_) => const FamilyManagementScreen()));
           }),
           DashboardCard('Students', Icons.people, () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentListScreen()));
