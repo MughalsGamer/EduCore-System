@@ -114,6 +114,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         showAppBar: false,
         onSaved: () => _closeRightPanel(),
       ),
+
     };
   }
 
