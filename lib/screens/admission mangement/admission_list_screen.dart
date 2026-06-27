@@ -90,13 +90,13 @@ class _AdmissionListScreenState extends State<AdmissionListScreen>
         ),
       ),
       // ─────────── CHANGED FAB ───────────
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: widget.showFAB
+          ? FloatingActionButton.extended(
         onPressed: () async {
           final result = await Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const AdmissionFormScreen()),
           );
-          // result is either null (cancelled) or an AdmissionType (saved)
           if (result is AdmissionType && context.mounted) {
             _switchTab(result);
           }
@@ -104,7 +104,23 @@ class _AdmissionListScreenState extends State<AdmissionListScreen>
         backgroundColor: _purple,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('New', style: TextStyle(color: Colors.white)),
-      ),
+      )
+          : null,
+      // floatingActionButton: FloatingActionButton.extended(
+      //   onPressed: () async {
+      //     final result = await Navigator.push(
+      //       context,
+      //       MaterialPageRoute(builder: (_) => const AdmissionFormScreen()),
+      //     );
+      //     // result is either null (cancelled) or an AdmissionType (saved)
+      //     if (result is AdmissionType && context.mounted) {
+      //       _switchTab(result);
+      //     }
+      //   },
+      //   backgroundColor: _purple,
+      //   icon: const Icon(Icons.add, color: Colors.white),
+      //   label: const Text('New', style: TextStyle(color: Colors.white)),
+      // ),
       // ───────────────────────────────────
       body: Consumer<AdmissionProvider>(
         builder: (context, provider, _) {
@@ -154,17 +170,19 @@ class _AdmissionListScreenState extends State<AdmissionListScreen>
           const SizedBox(height: 16),
           Text('No admissions yet',
               style: TextStyle(fontSize: 16, color: Colors.grey.shade500)),
-          const SizedBox(height: 8),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdmissionFormScreen()),
+          if (widget.showFAB) ...[    // ← यही condition add की है
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdmissionFormScreen()),
+              ),
+              icon: const Icon(Icons.add),
+              label: const Text('Add Admission'),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: _purple, foregroundColor: Colors.white),
             ),
-            icon: const Icon(Icons.add),
-            label: const Text('Add Admission'),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: _purple, foregroundColor: Colors.white),
-          ),
+          ],
         ],
       ),
     );

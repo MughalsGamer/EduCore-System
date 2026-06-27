@@ -21,6 +21,8 @@ class StaffMember {
   List<String> assignedClasses;         // ★ NEW
   List<String> subjects;          // ★ NEW
   final String? designation;
+  final String? joiningDate;   // ← NEW: format "yyyy-MM-dd"
+
 
 
   StaffMember({
@@ -46,6 +48,8 @@ class StaffMember {
     this.assignedClasses = const [],
     this.subjects = const [],
     this.designation,
+    this.joiningDate,           // ← NEW
+
   });
 
   Map<String, dynamic> toMap() {
@@ -71,6 +75,8 @@ class StaffMember {
       'assignedClasses': assignedClasses,
       'subjects': subjects,
       'designation': designation,
+      'joiningDate': joiningDate,   // ← NEW
+
 
     };
   }
@@ -99,6 +105,8 @@ class StaffMember {
       assignedClasses: List<String>.from(map['assignedClasses'] ?? []),
       subjects: List<String>.from(map['subjects'] ?? []),
       designation: map['designation'] as String?,
+      joiningDate: map['joiningDate'] as String?,   // ← NEW
+
 
     );
   }
