@@ -238,7 +238,14 @@ class _SubjectMultiSelect extends StatelessWidget {
 // ─────────────────────────────────────────────
 class AddEditClassScreen extends StatefulWidget {
   final SchoolClass? existingClass;
-  const AddEditClassScreen({super.key, this.existingClass});
+  final bool showAppBar;          // ← new
+  final VoidCallback? onSaved;
+  const AddEditClassScreen({
+    super.key,
+    this.existingClass,
+    this.showAppBar = true,       // ← new
+    this.onSaved,                 // ← new
+  });
 
   @override
   State<AddEditClassScreen> createState() => _AddEditClassScreenState();
@@ -646,7 +653,7 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
 
-    // Sync section subjects from per-section selected lists
+    // Sync section subjects...
     for (int i = 0; i < _sections.length; i++) {
       _sections[i].subjects = List<String>.from(_sectionSelectedSubjects[i]);
     }
@@ -655,9 +662,9 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
       id: widget.existingClass?.id,
       name: _classNameController.text.trim(),
       headOfClassTeacher: _headOfClassTeacherController.text.trim(),
-      annualFee: double.tryParse(_annualFeeController.text),          // ← NEW
-      registrationFee: double.tryParse(_registrationFeeController.text), // ← NEW
-      monthlyFee: double.tryParse(_monthlyFeeController.text),        // ← NEW
+      annualFee: double.tryParse(_annualFeeController.text),
+      registrationFee: double.tryParse(_registrationFeeController.text),
+      monthlyFee: double.tryParse(_monthlyFeeController.text),
       subjects: _classSubjects,
       timetable: _classTimetable,
       sections: _sections,
@@ -670,6 +677,9 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
       } else {
         await provider.updateClass(schoolClass);
       }
+      // ✅ ADD THIS LINE
+      widget.onSaved?.call();
+      // Then pop
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -680,6 +690,46 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
       if (mounted) setState(() => _isSaving = false);
     }
   }
+  // Future<void> _saveClass() async {
+  //   if (!_formKey.currentState!.validate()) return;
+  //   setState(() => _isSaving = true);
+  //
+  //   // Sync section subjects from per-section selected lists
+  //   for (int i = 0; i < _sections.length; i++) {
+  //     _sections[i].subjects = List<String>.from(_sectionSelectedSubjects[i]);
+  //   }
+  //
+  //   final schoolClass = SchoolClass(
+  //     id: widget.existingClass?.id,
+  //     name: _classNameController.text.trim(),
+  //     headOfClassTeacher: _headOfClassTeacherController.text.trim(),
+  //     annualFee: double.tryParse(_annualFeeController.text),          // ← NEW
+  //     registrationFee: double.tryParse(_registrationFeeController.text), // ← NEW
+  //     monthlyFee: double.tryParse(_monthlyFeeController.text),        // ← NEW
+  //     subjects: _classSubjects,
+  //     timetable: _classTimetable,
+  //     sections: _sections,
+  //   );
+  //
+  //   try {
+  //     final provider = context.read<ClassProvider>();
+  //     if (widget.existingClass == null) {
+  //       await provider.addClass(schoolClass);
+  //     } else {
+  //       await provider.updateClass(schoolClass);
+  //     }
+  //     if (mounted) Navigator.pop(context, true);
+  //   } catch (e) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+  //           content: Text('Error: $e'), backgroundColor: Colors.red));
+  //     }
+  //   } finally {
+  //     if (mounted) setState(() => _isSaving = false);
+  //   }
+  // }
+
+
 
   // ---------- Advanced timetable helpers (unchanged) ----------
   void _addClassTimetableDay() => setState(
@@ -1537,12 +1587,14 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
     const double desktopBreakpoint = 600;
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: widget.showAppBar
+          ? AppBar(
         title: Text(
             widget.existingClass == null ? 'Add Class' : 'Edit Class'),
         centerTitle: true,
         elevation: 0,
-      ),
+      )
+          : null,
       body: Form(
         key: _formKey,
         child: LayoutBuilder(
@@ -1833,6 +1885,7 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                     ),
                   ),
                   saveButton,
+
                 ],
               );
             } else {
@@ -1848,6 +1901,7 @@ class _AddEditClassScreenState extends State<AddEditClassScreen> {
                 ),
               );
             }
+
           },
         ),
       ),

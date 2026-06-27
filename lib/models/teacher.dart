@@ -20,6 +20,8 @@ class StaffMember {
   String? imageBase64;
   List<String> assignedClasses;         // ★ NEW
   List<String> subjects;          // ★ NEW
+  final String? designation;
+
 
   StaffMember({
     this.id,
@@ -43,6 +45,7 @@ class StaffMember {
     this.imageBase64,
     this.assignedClasses = const [],
     this.subjects = const [],
+    this.designation,
   });
 
   Map<String, dynamic> toMap() {
@@ -67,6 +70,8 @@ class StaffMember {
       'imageBase64': imageBase64,
       'assignedClasses': assignedClasses,
       'subjects': subjects,
+      'designation': designation,
+
     };
   }
 
@@ -93,6 +98,8 @@ class StaffMember {
       imageBase64: map['imageBase64'],
       assignedClasses: List<String>.from(map['assignedClasses'] ?? []),
       subjects: List<String>.from(map['subjects'] ?? []),
+      designation: map['designation'] as String?,
+
     );
   }
 }

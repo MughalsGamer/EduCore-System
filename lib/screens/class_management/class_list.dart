@@ -7,7 +7,13 @@ import '../../providers/teacher_provider.dart'; // ← ADDED
 import 'add_class.dart';
 
 class ClassesListScreen extends StatefulWidget {
-  const ClassesListScreen({super.key});
+  final bool showAppBar;
+  final bool showFAB;
+  const ClassesListScreen({
+    super.key,
+    this.showAppBar = true,
+    this.showFAB = true,
+  });
 
   @override
   State<ClassesListScreen> createState() => _ClassesListScreenState();
@@ -17,11 +23,14 @@ class _ClassesListScreenState extends State<ClassesListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: widget.showAppBar
+          ? AppBar(
         title: const Text('Classes'),
         centerTitle: true,
-      ),
-      floatingActionButton: FloatingActionButton(
+      )
+          : null,
+      floatingActionButton: widget.showFAB
+          ? FloatingActionButton(
         onPressed: () async {
           final result = await Navigator.push(
             context,
@@ -30,7 +39,8 @@ class _ClassesListScreenState extends State<ClassesListScreen> {
           if (result == true) {}
         },
         child: const Icon(Icons.add),
-      ),
+      )
+          : null,
       body: Consumer<ClassProvider>(
         builder: (context, provider, _) {
           if (provider.isLoading && provider.classes.isEmpty) {

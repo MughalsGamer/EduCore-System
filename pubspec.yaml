@@ -23,6 +23,7 @@ dependencies:
   flutter_image_compress:
   image_picker_web:
   image:
+  shared_preferences:
 
 
 dev_dependencies:

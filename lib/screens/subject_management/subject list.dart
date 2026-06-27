@@ -1,7 +1,10 @@
+//
 // import 'package:flutter/material.dart';
 // import 'package:provider/provider.dart';
 // import '../../models/subject_model.dart';
 // import '../../providers/subject_provider.dart';
+// import '../../providers/class_provider.dart';   // ← ADD
+// import '../../providers/teacher_provider.dart'; // ← ADD
 // import 'add_edit_subject.dart';
 //
 // const List<_SC> _colors = [
@@ -30,8 +33,6 @@
 // class _MuddulListScreenState extends State<MuddulListScreen> {
 //   final TextEditingController _searchController = TextEditingController();
 //   String _searchQuery = '';
-//
-//   // Stable color per subject
 //   final Map<String, int> _colorIdx = {};
 //   int _nextIdx = 0;
 //
@@ -44,8 +45,7 @@
 //       context.read<MuddulProvider>().startListening();
 //     });
 //     _searchController.addListener(
-//           () => setState(
-//               () => _searchQuery = _searchController.text.toLowerCase()),
+//           () => setState(() => _searchQuery = _searchController.text.toLowerCase()),
 //     );
 //   }
 //
@@ -72,12 +72,167 @@
 //         .toList();
 //   }
 //
+//   // ── Check karo kya subject assign hai ──
+//   Map<String, List<String>> _getAssignedPlaces(String subjectName) {
+//     final List<String> assignedClasses = [];
+//     final List<String> assignedStaff = [];
+//
+//     // Classes check
+//     final classes = context.read<ClassProvider>().classes;
+//     for (final cls in classes) {
+//       // Class level subjects
+//       if (cls.subjects != null && cls.subjects!.contains(subjectName)) {
+//         assignedClasses.add(cls.name);
+//         continue;
+//       }
+//       // Section level subjects
+//       for (final section in cls.sections) {
+//         if (section.subjects != null &&
+//             section.subjects!.contains(subjectName)) {
+//           assignedClasses.add('${cls.name} (${section.sectionName})');
+//           break;
+//         }
+//       }
+//     }
+//
+//     // Teachers & Staff check
+//     final staffProvider = context.read<StaffProvider>();
+//     final allStaff = [...staffProvider.teachers, ...staffProvider.staffOnly];
+//     for (final s in allStaff) {
+//       if (s.subjects.contains(subjectName)) {
+//         assignedStaff.add(s.name);
+//       }
+//     }
+//
+//     return {'classes': assignedClasses, 'staff': assignedStaff};
+//   }
+//
+//   // ── Warning dialog ──
+//   void _showAssignedWarning(
+//       String subjectName, Map<String, List<String>> places, String action) {
+//     final classes = places['classes']!;
+//     final staff = places['staff']!;
+//
+//     showDialog(
+//       context: context,
+//       builder: (_) => AlertDialog(
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+//         title: Row(
+//           children: [
+//             Container(
+//               padding: const EdgeInsets.all(8),
+//               decoration: BoxDecoration(
+//                 color: Colors.orange.shade50,
+//                 borderRadius: BorderRadius.circular(8),
+//               ),
+//               child: Icon(Icons.warning_amber_rounded,
+//                   color: Colors.orange.shade700, size: 20),
+//             ),
+//             const SizedBox(width: 10),
+//             const Expanded(
+//               child: Text('Cannot Perform Action',
+//                   style: TextStyle(fontSize: 15)),
+//             ),
+//           ],
+//         ),
+//         content: Column(
+//           mainAxisSize: MainAxisSize.min,
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             RichText(
+//               text: TextSpan(
+//                 style: const TextStyle(
+//                     fontSize: 13, color: Color(0xFF333333), height: 1.5),
+//                 children: [
+//                   const TextSpan(text: '"'),
+//                   TextSpan(
+//                     text: subjectName,
+//                     style: const TextStyle(fontWeight: FontWeight.bold),
+//                   ),
+//                   TextSpan(
+//                     text:
+//                     '" is currently assigned. Remove it from the following before trying to $action:',
+//                   ),
+//                 ],
+//               ),
+//             ),
+//             if (classes.isNotEmpty) ...[
+//               const SizedBox(height: 12),
+//               _warningSection(
+//                   Icons.class_outlined, 'Classes', classes, Colors.blue),
+//             ],
+//             if (staff.isNotEmpty) ...[
+//               const SizedBox(height: 8),
+//               _warningSection(
+//                   Icons.person_outline, 'Teachers / Staff', staff, _purple),
+//             ],
+//           ],
+//         ),
+//         actions: [
+//           FilledButton(
+//             onPressed: () => Navigator.pop(context),
+//             style: FilledButton.styleFrom(backgroundColor: _purple),
+//             child: const Text('OK'),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _warningSection(
+//       IconData icon, String title, List<String> items, Color color) {
+//     return Column(
+//       crossAxisAlignment: CrossAxisAlignment.start,
+//       children: [
+//         Row(
+//           children: [
+//             Icon(icon, size: 14, color: color),
+//             const SizedBox(width: 6),
+//             Text(title,
+//                 style: TextStyle(
+//                     fontSize: 12,
+//                     fontWeight: FontWeight.bold,
+//                     color: color)),
+//           ],
+//         ),
+//         const SizedBox(height: 4),
+//         ...items.map(
+//               (item) => Padding(
+//             padding: const EdgeInsets.only(left: 20, bottom: 2),
+//             child: Row(
+//               children: [
+//                 Icon(Icons.circle, size: 5, color: Colors.grey.shade400),
+//                 const SizedBox(width: 6),
+//                 Expanded(
+//                   child: Text(item,
+//                       style: TextStyle(
+//                           fontSize: 12, color: Colors.grey.shade700)),
+//                 ),
+//               ],
+//             ),
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+//
+//   // ── Delete (check + confirm) ──
 //   Future<void> _confirmDelete(Muddul m) async {
+//     // Pehle check karo
+//     final places = _getAssignedPlaces(m.subjectName);
+//     final isAssigned =
+//         places['classes']!.isNotEmpty || places['staff']!.isNotEmpty;
+//
+//     if (isAssigned) {
+//       _showAssignedWarning(m.subjectName, places, 'delete');
+//       return;
+//     }
+//
+//     // Assigned nahi hai → normal delete flow
 //     final ok = await showDialog<bool>(
 //       context: context,
 //       builder: (_) => AlertDialog(
-//         shape:
-//         RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
 //         title: const Text('Delete subject'),
 //         content: Text('Delete "${m.subjectName}"?\nThis cannot be undone.'),
 //         actions: [
@@ -100,20 +255,37 @@
 //             content: Text('"${m.subjectName}" deleted'),
 //             backgroundColor: Colors.red.shade600,
 //             behavior: SnackBarBehavior.floating,
-//             shape: RoundedRectangleBorder(
-//                 borderRadius: BorderRadius.circular(10)),
+//             shape:
+//             RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
 //           ));
 //         }
 //       } catch (e) {
 //         if (mounted) {
-//           ScaffoldMessenger.of(context).showSnackBar(
-//               SnackBar(content: Text('Error: $e')));
+//           ScaffoldMessenger.of(context)
+//               .showSnackBar(SnackBar(content: Text('Error: $e')));
 //         }
 //       }
 //     }
 //   }
 //
-//   // ── Stats row ──
+//   // ── Edit check ──
+//   void _tryEdit(Muddul m) {
+//     final places = _getAssignedPlaces(m.subjectName);
+//     final isAssigned =
+//         places['classes']!.isNotEmpty || places['staff']!.isNotEmpty;
+//
+//     if (isAssigned) {
+//       _showAssignedWarning(m.subjectName, places, 'edit');
+//       return;
+//     }
+//
+//     Navigator.push(
+//       context,
+//       MaterialPageRoute(builder: (_) => AddEditMuddulScreen(existingMuddul: m)),
+//     );
+//   }
+//
+//   // ── Stats ──
 //   Widget _buildStats(List<Muddul> all) {
 //     final now = DateTime.now();
 //     final thisMonth = all
@@ -150,8 +322,8 @@
 //                   fontSize: 22, fontWeight: FontWeight.w600)),
 //           const SizedBox(height: 2),
 //           Text(label,
-//               style: TextStyle(
-//                   fontSize: 11, color: Colors.grey.shade500)),
+//               style:
+//               TextStyle(fontSize: 11, color: Colors.grey.shade500)),
 //         ],
 //       ),
 //     ),
@@ -160,6 +332,12 @@
 //   // ── Subject card ──
 //   Widget _buildCard(Muddul m) {
 //     final c = _colorFor(m.subjectName);
+//
+//     // Check if assigned (for lock icon)
+//     final places = _getAssignedPlaces(m.subjectName);
+//     final isAssigned =
+//         places['classes']!.isNotEmpty || places['staff']!.isNotEmpty;
+//
 //     return Container(
 //       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
 //       decoration: BoxDecoration(
@@ -169,11 +347,7 @@
 //       ),
 //       child: InkWell(
 //         borderRadius: BorderRadius.circular(14),
-//         onTap: () => Navigator.push(
-//           context,
-//           MaterialPageRoute(
-//               builder: (_) => AddEditMuddulScreen(existingMuddul: m)),
-//         ),
+//         onTap: () => _tryEdit(m), // ← edit check here too
 //         child: Padding(
 //           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
 //           child: Row(
@@ -183,8 +357,7 @@
 //                 width: 76,
 //                 padding: const EdgeInsets.symmetric(vertical: 7),
 //                 decoration: BoxDecoration(
-//                     color: c.bg,
-//                     borderRadius: BorderRadius.circular(8)),
+//                     color: c.bg, borderRadius: BorderRadius.circular(8)),
 //                 alignment: Alignment.center,
 //                 child: Text(m.code,
 //                     style: TextStyle(
@@ -194,16 +367,47 @@
 //                         letterSpacing: 0.8)),
 //               ),
 //               const SizedBox(width: 12),
-//               // Subject name + description
+//               // Name + description
 //               Expanded(
 //                 child: Column(
 //                   crossAxisAlignment: CrossAxisAlignment.start,
 //                   children: [
-//                     Text(m.subjectName,
-//                         style: const TextStyle(
-//                             fontSize: 14, fontWeight: FontWeight.w600)),
-//                     if (m.description != null &&
-//                         m.description!.isNotEmpty) ...[
+//                     Row(
+//                       children: [
+//                         Expanded(
+//                           child: Text(m.subjectName,
+//                               style: const TextStyle(
+//                                   fontSize: 14, fontWeight: FontWeight.w600)),
+//                         ),
+//                         // Lock badge if assigned
+//                         if (isAssigned)
+//                           Container(
+//                             padding: const EdgeInsets.symmetric(
+//                                 horizontal: 6, vertical: 2),
+//                             decoration: BoxDecoration(
+//                               color: Colors.orange.shade50,
+//                               borderRadius: BorderRadius.circular(6),
+//                               border: Border.all(
+//                                   color: Colors.orange.shade200),
+//                             ),
+//                             child: Row(
+//                               mainAxisSize: MainAxisSize.min,
+//                               children: [
+//                                 Icon(Icons.lock_outline,
+//                                     size: 10,
+//                                     color: Colors.orange.shade700),
+//                                 const SizedBox(width: 3),
+//                                 Text('Assigned',
+//                                     style: TextStyle(
+//                                         fontSize: 9,
+//                                         color: Colors.orange.shade700,
+//                                         fontWeight: FontWeight.w600)),
+//                               ],
+//                             ),
+//                           ),
+//                       ],
+//                     ),
+//                     if (m.description != null && m.description!.isNotEmpty) ...[
 //                       const SizedBox(height: 3),
 //                       Text(m.description!,
 //                           style: TextStyle(
@@ -214,17 +418,19 @@
 //                   ],
 //                 ),
 //               ),
-//               // Edit / Delete
-//               _iconBtn(Icons.edit_outlined, c.text, 'Edit', () {
-//                 Navigator.push(
-//                   context,
-//                   MaterialPageRoute(
-//                       builder: (_) =>
-//                           AddEditMuddulScreen(existingMuddul: m)),
-//                 );
-//               }),
-//               _iconBtn(Icons.delete_outline, Colors.red.shade400, 'Delete',
-//                       () => _confirmDelete(m)),
+//               // Edit / Delete buttons
+//               _iconBtn(
+//                 isAssigned ? Icons.lock_outline : Icons.edit_outlined,
+//                 isAssigned ? Colors.orange.shade400 : c.text,
+//                 isAssigned ? 'Assigned – cannot edit' : 'Edit',
+//                     () => _tryEdit(m),
+//               ),
+//               _iconBtn(
+//                 isAssigned ? Icons.lock_outline : Icons.delete_outline,
+//                 isAssigned ? Colors.orange.shade400 : Colors.red.shade400,
+//                 isAssigned ? 'Assigned – cannot delete' : 'Delete',
+//                     () => _confirmDelete(m),
+//               ),
 //             ],
 //           ),
 //         ),
@@ -306,15 +512,13 @@
 //               style: const TextStyle(color: Colors.red)))
 //           : Column(
 //         children: [
-//           // Search
 //           Padding(
 //             padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
 //             child: TextField(
 //               controller: _searchController,
 //               decoration: InputDecoration(
 //                 hintText: 'Search subjects…',
-//                 prefixIcon:
-//                 const Icon(Icons.search, size: 20),
+//                 prefixIcon: const Icon(Icons.search, size: 20),
 //                 suffixIcon: _searchQuery.isNotEmpty
 //                     ? IconButton(
 //                   icon: const Icon(Icons.clear, size: 18),
@@ -332,19 +536,15 @@
 //               ),
 //             ),
 //           ),
-//           // Stats
 //           _buildStats(provider.mudduls),
 //           const SizedBox(height: 6),
-//           // List
 //           Expanded(
 //             child: filtered.isEmpty
 //                 ? _buildEmpty()
 //                 : ListView.builder(
-//               padding:
-//               const EdgeInsets.only(bottom: 110),
+//               padding: const EdgeInsets.only(bottom: 110),
 //               itemCount: filtered.length,
-//               itemBuilder: (_, i) =>
-//                   _buildCard(filtered[i]),
+//               itemBuilder: (_, i) => _buildCard(filtered[i]),
 //             ),
 //           ),
 //         ],
@@ -352,8 +552,7 @@
 //       floatingActionButton: FloatingActionButton.extended(
 //         onPressed: () => Navigator.push(
 //           context,
-//           MaterialPageRoute(
-//               builder: (_) => const AddEditMuddulScreen()),
+//           MaterialPageRoute(builder: (_) => const AddEditMuddulScreen()),
 //         ),
 //         backgroundColor: _purple,
 //         foregroundColor: Colors.white,
@@ -370,8 +569,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/subject_model.dart';
 import '../../providers/subject_provider.dart';
-import '../../providers/class_provider.dart';   // ← ADD
-import '../../providers/teacher_provider.dart'; // ← ADD
+import '../../providers/class_provider.dart';
+import '../../providers/teacher_provider.dart';
 import 'add_edit_subject.dart';
 
 const List<_SC> _colors = [
@@ -391,7 +590,14 @@ class _SC {
 }
 
 class MuddulListScreen extends StatefulWidget {
-  const MuddulListScreen({super.key});
+  final bool showAppBar;
+  final bool showFAB;
+
+  const MuddulListScreen({
+    super.key,
+    this.showAppBar = true,
+    this.showFAB = true,
+  });
 
   @override
   State<MuddulListScreen> createState() => _MuddulListScreenState();
@@ -439,20 +645,16 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
         .toList();
   }
 
-  // ── Check karo kya subject assign hai ──
   Map<String, List<String>> _getAssignedPlaces(String subjectName) {
     final List<String> assignedClasses = [];
     final List<String> assignedStaff = [];
 
-    // Classes check
     final classes = context.read<ClassProvider>().classes;
     for (final cls in classes) {
-      // Class level subjects
       if (cls.subjects != null && cls.subjects!.contains(subjectName)) {
         assignedClasses.add(cls.name);
         continue;
       }
-      // Section level subjects
       for (final section in cls.sections) {
         if (section.subjects != null &&
             section.subjects!.contains(subjectName)) {
@@ -462,7 +664,6 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
       }
     }
 
-    // Teachers & Staff check
     final staffProvider = context.read<StaffProvider>();
     final allStaff = [...staffProvider.teachers, ...staffProvider.staffOnly];
     for (final s in allStaff) {
@@ -474,7 +675,6 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
     return {'classes': assignedClasses, 'staff': assignedStaff};
   }
 
-  // ── Warning dialog ──
   void _showAssignedWarning(
       String subjectName, Map<String, List<String>> places, String action) {
     final classes = places['classes']!;
@@ -583,9 +783,7 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
     );
   }
 
-  // ── Delete (check + confirm) ──
   Future<void> _confirmDelete(Muddul m) async {
-    // Pehle check karo
     final places = _getAssignedPlaces(m.subjectName);
     final isAssigned =
         places['classes']!.isNotEmpty || places['staff']!.isNotEmpty;
@@ -595,7 +793,6 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
       return;
     }
 
-    // Assigned nahi hai → normal delete flow
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -635,7 +832,6 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
     }
   }
 
-  // ── Edit check ──
   void _tryEdit(Muddul m) {
     final places = _getAssignedPlaces(m.subjectName);
     final isAssigned =
@@ -652,7 +848,6 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
     );
   }
 
-  // ── Stats ──
   Widget _buildStats(List<Muddul> all) {
     final now = DateTime.now();
     final thisMonth = all
@@ -696,11 +891,9 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
     ),
   );
 
-  // ── Subject card ──
   Widget _buildCard(Muddul m) {
     final c = _colorFor(m.subjectName);
 
-    // Check if assigned (for lock icon)
     final places = _getAssignedPlaces(m.subjectName);
     final isAssigned =
         places['classes']!.isNotEmpty || places['staff']!.isNotEmpty;
@@ -714,12 +907,11 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => _tryEdit(m), // ← edit check here too
+        onTap: () => _tryEdit(m),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
-              // Code badge
               Container(
                 width: 76,
                 padding: const EdgeInsets.symmetric(vertical: 7),
@@ -734,7 +926,6 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
                         letterSpacing: 0.8)),
               ),
               const SizedBox(width: 12),
-              // Name + description
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -746,7 +937,6 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
                               style: const TextStyle(
                                   fontSize: 14, fontWeight: FontWeight.w600)),
                         ),
-                        // Lock badge if assigned
                         if (isAssigned)
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -785,7 +975,6 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
                   ],
                 ),
               ),
-              // Edit / Delete buttons
               _iconBtn(
                 isAssigned ? Icons.lock_outline : Icons.edit_outlined,
                 isAssigned ? Colors.orange.shade400 : c.text,
@@ -819,7 +1008,6 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
         ),
       );
 
-  // ── Empty state ──
   Widget _buildEmpty() => Center(
     child: Column(
       mainAxisSize: MainAxisSize.min,
@@ -844,7 +1032,8 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
+      appBar: widget.showAppBar
+          ? AppBar(
         title: const Text('Subjects'),
         centerTitle: true,
         elevation: 0,
@@ -870,7 +1059,8 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
             ),
           ),
         ],
-      ),
+      )
+          : null,
       body: provider.loading
           ? const Center(child: CircularProgressIndicator())
           : provider.error != null
@@ -916,17 +1106,20 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: widget.showFAB
+          ? FloatingActionButton.extended(
         onPressed: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const AddEditMuddulScreen()),
+          MaterialPageRoute(
+              builder: (_) => const AddEditMuddulScreen()),
         ),
         backgroundColor: _purple,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('Add subject',
             style: TextStyle(fontWeight: FontWeight.w600)),
-      ),
+      )
+          : null,
     );
   }
 }

@@ -9,7 +9,14 @@ import '../../providers/admission_provider.dart';
 import 'add_admission_screen.dart';
 
 class AdmissionListScreen extends StatefulWidget {
-  const AdmissionListScreen({super.key});
+  final bool showAppBar;
+  final bool showFAB;
+
+  const AdmissionListScreen({
+    super.key,
+    this.showAppBar = true,
+    this.showFAB = true,
+  });
 
   @override
   State<AdmissionListScreen> createState() => _AdmissionListScreenState();
