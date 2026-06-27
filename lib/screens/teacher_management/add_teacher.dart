@@ -1,12 +1,10 @@
-//
+//1st file
 // import 'dart:convert';
-// import 'dart:io' show File;
 // import 'dart:typed_data';
-// import 'package:flutter/foundation.dart' show kIsWeb;
 // import 'package:flutter/material.dart';
 // import 'package:flutter/services.dart';
+// import 'package:image/image.dart' as img;
 // import 'package:image_picker/image_picker.dart';
-// import 'package:image_picker_web/image_picker_web.dart' as web;
 // import 'package:provider/provider.dart';
 // import 'package:intl/intl.dart';
 // import '../../models/class_model.dart';
@@ -22,19 +20,13 @@
 //       TextEditingValue oldValue,
 //       TextEditingValue newValue,
 //       ) {
-//     // Sirf digits rakhein
 //     final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-//
-//     // Max 13 digits (5+7+1)
 //     final limited = digits.length > 13 ? digits.substring(0, 13) : digits;
-//
-//     // Format: XXXXX-XXXXXXX-X
 //     final buffer = StringBuffer();
 //     for (int i = 0; i < limited.length; i++) {
 //       if (i == 5 || i == 12) buffer.write('-');
 //       buffer.write(limited[i]);
 //     }
-//
 //     final formatted = buffer.toString();
 //     return TextEditingValue(
 //       text: formatted,
@@ -43,18 +35,19 @@
 //   }
 // }
 //
-//
-// // ───── Subject multi‑select (unchanged) ─────
+// // ───── Subject multi‑select ─────
 // class _SubjectMultiSelect extends StatelessWidget {
 //   final List<String> selectedSubjects;
 //   final ValueChanged<List<String>> onChanged;
-//   const _SubjectMultiSelect({required this.selectedSubjects, required this.onChanged});
+//   const _SubjectMultiSelect(
+//       {required this.selectedSubjects, required this.onChanged});
 //   static const _purple = Color(0xFF534AB7);
 //
 //   @override
 //   Widget build(BuildContext context) {
 //     final provider = context.watch<MuddulProvider>();
-//     final allSubjects = provider.mudduls.map((m) => m.subjectName).toSet().toList()..sort();
+//     final allSubjects =
+//     provider.mudduls.map((m) => m.subjectName).toSet().toList()..sort();
 //
 //     if (provider.loading) {
 //       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
@@ -90,8 +83,10 @@
 //         return GestureDetector(
 //           onTap: () {
 //             final updated = List<String>.from(selectedSubjects);
-//             if (isSelected) updated.remove(subject);
-//             else updated.add(subject);
+//             if (isSelected)
+//               updated.remove(subject);
+//             else
+//               updated.add(subject);
 //             onChanged(updated);
 //           },
 //           child: AnimatedContainer(
@@ -154,6 +149,7 @@
 //   final _salaryCtrl = TextEditingController();
 //   final _referenceCtrl = TextEditingController();
 //   final _noteCtrl = TextEditingController();
+//   final _designationCtrl = TextEditingController(); // ← NEW
 //
 //   // Selections
 //   String _type = 'staff';
@@ -165,7 +161,7 @@
 //   List<String> _assignedClasses = [];
 //   List<String> _subjects = [];
 //
-//   // Image: store as bytes (cross‑platform)
+//   // ── Image: bytes only (cross-platform, same as AdmissionFormScreen) ──
 //   Uint8List? _imageBytes;
 //   String? _existingImageBase64;
 //   bool _isSaving = false;
@@ -198,6 +194,7 @@
 //       _salaryCtrl.text = s.salary.toString();
 //       _referenceCtrl.text = s.reference ?? '';
 //       _noteCtrl.text = s.note ?? '';
+//       _designationCtrl.text = s.designation ?? ''; // ← NEW
 //       _existingImageBase64 = s.imageBase64;
 //       _assignedClasses = List<String>.from(s.assignedClasses);
 //       _subjects = List<String>.from(s.subjects);
@@ -217,30 +214,42 @@
 //     _salaryCtrl.dispose();
 //     _referenceCtrl.dispose();
 //     _noteCtrl.dispose();
+//     _designationCtrl.dispose(); // ← NEW
 //     super.dispose();
 //   }
 //
-//   // ───── Image picker (works on mobile & web) ─────
+//   // ───── Image picker — same style as AdmissionFormScreen ─────
+//   // Uses only image_picker (no image_picker_web) + image package for compression
 //   Future<void> _pickImage() async {
-//     if (kIsWeb) {
-//       // ✅ Correct static method call for web
-//       final bytes = await web.ImagePickerWeb.getImageAsBytes();   // ✅ Correct method
-//       if (bytes != null) {
-//         setState(() {
-//           _imageBytes = bytes;
-//           _existingImageBase64 = null;
-//         });
+//     final picked =
+//     await ImagePicker().pickImage(source: ImageSource.gallery);
+//     if (picked == null) return;
+//     final rawBytes = await picked.readAsBytes();
+//     final compressed = await _compressToBase64(rawBytes);
+//     if (compressed != null && mounted) {
+//       setState(() {
+//         _imageBytes = base64Decode(compressed);
+//         _existingImageBase64 = null;
+//       });
+//     }
+//   }
+//
+//   // Compress using image package — same approach as AdmissionFormScreen
+//   Future<String?> _compressToBase64(Uint8List rawBytes) async {
+//     try {
+//       final original = img.decodeImage(rawBytes);
+//       if (original == null) return null;
+//       final thumbnail = original.width >= original.height
+//           ? img.copyResize(original, width: 300)
+//           : img.copyResize(original, height: 300);
+//       final jpegBytes = img.encodeJpg(thumbnail, quality: 70);
+//       if (jpegBytes.length > 100 * 1024) {
+//         return base64Encode(img.encodeJpg(thumbnail, quality: 40));
 //       }
-//     } else {
-//       final picker = ImagePicker();
-//       final picked = await picker.pickImage(source: ImageSource.gallery);
-//       if (picked != null) {
-//         final bytes = await picked.readAsBytes();
-//         setState(() {
-//           _imageBytes = bytes;
-//           _existingImageBase64 = null;
-//         });
-//       }
+//       return base64Encode(jpegBytes);
+//     } catch (e) {
+//       debugPrint('Image compression failed: $e');
+//       return null;
 //     }
 //   }
 //
@@ -266,9 +275,10 @@
 //     if (!_formKey.currentState!.validate()) return;
 //     setState(() => _isSaving = true);
 //
+//     // Image: already compressed as bytes; convert to base64 for Firestore
 //     String? base64Image = _existingImageBase64;
 //     if (_imageBytes != null) {
-//       base64Image = await _service.compressAndEncodeBytes(_imageBytes!);
+//       base64Image = base64Encode(_imageBytes!);
 //     }
 //
 //     final staff = StaffMember(
@@ -288,8 +298,12 @@
 //       emergencyPhone: _emergencyPhoneCtrl.text.trim(),
 //       employmentType: _employmentType,
 //       salary: double.tryParse(_salaryCtrl.text) ?? 0,
-//       reference: _referenceCtrl.text.trim().isEmpty ? null : _referenceCtrl.text.trim(),
+//       reference:
+//       _referenceCtrl.text.trim().isEmpty ? null : _referenceCtrl.text.trim(),
 //       note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+//       designation: _designationCtrl.text.trim().isEmpty // ← NEW
+//           ? null
+//           : _designationCtrl.text.trim(),
 //       imageBase64: base64Image,
 //       assignedClasses: _assignedClasses,
 //       subjects: _subjects,
@@ -321,11 +335,14 @@
 //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
 //       child: ExpansionTile(
 //         initiallyExpanded: true,
-//         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+//         title:
+//         Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
 //         children: [
 //           Padding(
 //             padding: const EdgeInsets.all(16).copyWith(top: 0),
-//             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+//             child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: children),
 //           ),
 //         ],
 //       ),
@@ -344,7 +361,10 @@
 //           children: [
 //             const Text(
 //               'Assigned Classes',
-//               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black54),
+//               style: TextStyle(
+//                   fontSize: 13,
+//                   fontWeight: FontWeight.w500,
+//                   color: Colors.black54),
 //             ),
 //             const SizedBox(height: 8),
 //             Wrap(
@@ -364,12 +384,17 @@
 //                   },
 //                   child: AnimatedContainer(
 //                     duration: const Duration(milliseconds: 150),
-//                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+//                     padding: const EdgeInsets.symmetric(
+//                         horizontal: 12, vertical: 7),
 //                     decoration: BoxDecoration(
-//                       color: isSelected ? const Color(0xFF534AB7) : Colors.grey.shade100,
+//                       color: isSelected
+//                           ? const Color(0xFF534AB7)
+//                           : Colors.grey.shade100,
 //                       borderRadius: BorderRadius.circular(20),
 //                       border: Border.all(
-//                         color: isSelected ? const Color(0xFF534AB7) : Colors.grey.shade300,
+//                         color: isSelected
+//                             ? const Color(0xFF534AB7)
+//                             : Colors.grey.shade300,
 //                         width: isSelected ? 1.5 : 0.8,
 //                       ),
 //                     ),
@@ -377,7 +402,8 @@
 //                       mainAxisSize: MainAxisSize.min,
 //                       children: [
 //                         if (isSelected) ...[
-//                           const Icon(Icons.check, size: 14, color: Colors.white),
+//                           const Icon(Icons.check,
+//                               size: 14, color: Colors.white),
 //                           const SizedBox(width: 4),
 //                         ],
 //                         Text(
@@ -385,7 +411,8 @@
 //                           style: TextStyle(
 //                             fontSize: 13,
 //                             fontWeight: FontWeight.w500,
-//                             color: isSelected ? Colors.white : Colors.black87,
+//                             color:
+//                             isSelected ? Colors.white : Colors.black87,
 //                           ),
 //                         ),
 //                       ],
@@ -425,7 +452,8 @@
 //                       : (_existingImageBase64 != null
 //                       ? MemoryImage(base64Decode(_existingImageBase64!))
 //                       : null),
-//                   child: (_imageBytes == null && _existingImageBase64 == null)
+//                   child:
+//                   (_imageBytes == null && _existingImageBase64 == null)
 //                       ? const Icon(Icons.camera_alt, size: 40)
 //                       : null,
 //                 ),
@@ -463,61 +491,47 @@
 //               _buildSectionCard('Personal Information', [
 //                 TextFormField(
 //                   controller: _nameCtrl,
-//                   decoration: const InputDecoration(labelText: 'Full Name *', border: OutlineInputBorder()),
-//                   validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+//                   decoration: const InputDecoration(
+//                       labelText: 'Full Name *',
+//                       border: OutlineInputBorder()),
+//                   validator: (v) =>
+//                   v == null || v.trim().isEmpty ? 'Required' : null,
 //                 ),
 //                 const SizedBox(height: 12),
+//
+//                 // ── Designation (NEW) ──
+//                 TextFormField(
+//                   controller: _designationCtrl,
+//                   decoration: const InputDecoration(
+//                     labelText: 'Designation (Optional)',
+//                     hintText: 'e.g. Principal, Head Teacher, Clerk...',
+//                     border: OutlineInputBorder(),
+//                     prefixIcon: Icon(Icons.badge_outlined),
+//                   ),
+//                 ),
+//                 const SizedBox(height: 12),
+//
 //                 TextFormField(
 //                   controller: _fatherOrHusbandCtrl,
 //                   decoration: InputDecoration(
-//                     labelText: _maritalStatus == 'Married' ? 'Husband Name *' : 'Father Name *',
+//                     labelText: _maritalStatus == 'Married'
+//                         ? 'Husband Name *'
+//                         : 'Father Name *',
 //                     border: const OutlineInputBorder(),
 //                   ),
-//                   validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+//                   validator: (v) =>
+//                   v == null || v.trim().isEmpty ? 'Required' : null,
 //                 ),
 //                 const SizedBox(height: 12),
-//                 // TextFormField(
-//                 //   controller: _cnicCtrl,
-//                 //   decoration: const InputDecoration(
-//                 //     labelText: 'CNIC * (e.g., 12345-1234567-1)',
-//                 //     border: OutlineInputBorder(),
-//                 //   ),
-//                 //   keyboardType: TextInputType.number,
-//                 //   maxLength: 15,
-//                 //   validator: (v) {
-//                 //     if (v == null || v.trim().isEmpty) return 'Required';
-//                 //     final regex = RegExp(r'^\d{5}-\d{7}-\d{1}$');
-//                 //     if (!regex.hasMatch(v.trim())) return 'Invalid CNIC format';
-//                 //     return null;
-//                 //   },
-//                 // ),
-//                 // OLD:
-//                 // TextFormField(
-//                 //   controller: _cnicCtrl,
-//                 //   decoration: const InputDecoration(
-//                 //     labelText: 'CNIC * (e.g., 12345-1234567-1)',
-//                 //     border: OutlineInputBorder(),
-//                 //   ),
-//                 //   keyboardType: TextInputType.number,
-//                 //   maxLength: 15,
-//                 //   validator: (v) {
-//                 //     if (v == null || v.trim().isEmpty) return 'Required';
-//                 //     final regex = RegExp(r'^\d{5}-\d{7}-\d{1}$');
-//                 //     if (!regex.hasMatch(v.trim())) return 'Invalid CNIC format';
-//                 //     return null;
-//                 //   },
-//                 // ),
-//
-// // NEW:
 //                 TextFormField(
 //                   controller: _cnicCtrl,
 //                   decoration: const InputDecoration(
 //                     labelText: 'CNIC * (e.g., 34101-1234567-8)',
 //                     border: OutlineInputBorder(),
-//                     counterText: '',          // maxLength counter hide karo
+//                     counterText: '',
 //                   ),
 //                   keyboardType: TextInputType.number,
-//                   maxLength: 15,              // 13 digits + 2 dashes
+//                   maxLength: 15,
 //                   inputFormatters: [_CnicFormatter()],
 //                   validator: (v) {
 //                     if (v == null || v.trim().isEmpty) return 'Required';
@@ -536,43 +550,64 @@
 //                   ),
 //                   controller: TextEditingController(text: _dob),
 //                   onTap: _pickDob,
-//                   validator: (_) => _dob.isEmpty ? 'Please select date of birth' : null,
+//                   validator: (_) =>
+//                   _dob.isEmpty ? 'Please select date of birth' : null,
 //                 ),
 //                 const SizedBox(height: 12),
 //                 DropdownButtonFormField<String>(
 //                   value: _gender,
-//                   items: _genderOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+//                   items: _genderOptions
+//                       .map((g) =>
+//                       DropdownMenuItem(value: g, child: Text(g)))
+//                       .toList(),
 //                   onChanged: (v) => setState(() => _gender = v!),
-//                   decoration: const InputDecoration(labelText: 'Gender *', border: OutlineInputBorder()),
+//                   decoration: const InputDecoration(
+//                       labelText: 'Gender *',
+//                       border: OutlineInputBorder()),
 //                 ),
 //                 const SizedBox(height: 12),
 //                 DropdownButtonFormField<String>(
 //                   value: _maritalStatus,
-//                   items: _maritalOptions.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+//                   items: _maritalOptions
+//                       .map((m) =>
+//                       DropdownMenuItem(value: m, child: Text(m)))
+//                       .toList(),
 //                   onChanged: (v) => setState(() => _maritalStatus = v!),
-//                   decoration: const InputDecoration(labelText: 'Marital Status *', border: OutlineInputBorder()),
+//                   decoration: const InputDecoration(
+//                       labelText: 'Marital Status *',
+//                       border: OutlineInputBorder()),
 //                 ),
 //                 const SizedBox(height: 12),
 //                 DropdownButtonFormField<String?>(
 //                   value: _bloodGroup,
 //                   items: [
-//                     const DropdownMenuItem(value: null, child: Text('Select (Optional)')),
-//                     ..._bloodOptions.map((b) => DropdownMenuItem(value: b, child: Text(b))),
+//                     const DropdownMenuItem(
+//                         value: null, child: Text('Select (Optional)')),
+//                     ..._bloodOptions.map((b) =>
+//                         DropdownMenuItem(value: b, child: Text(b))),
 //                   ],
 //                   onChanged: (v) => setState(() => _bloodGroup = v),
-//                   decoration: const InputDecoration(labelText: 'Blood Group', border: OutlineInputBorder()),
+//                   decoration: const InputDecoration(
+//                       labelText: 'Blood Group',
+//                       border: OutlineInputBorder()),
 //                 ),
 //                 const SizedBox(height: 12),
 //                 TextFormField(
 //                   controller: _religionCtrl,
-//                   decoration: const InputDecoration(labelText: 'Religion *', border: OutlineInputBorder()),
-//                   validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+//                   decoration: const InputDecoration(
+//                       labelText: 'Religion *',
+//                       border: OutlineInputBorder()),
+//                   validator: (v) =>
+//                   v == null || v.trim().isEmpty ? 'Required' : null,
 //                 ),
 //                 const SizedBox(height: 12),
 //                 TextFormField(
 //                   controller: _nationalityCtrl,
-//                   decoration: const InputDecoration(labelText: 'Nationality *', border: OutlineInputBorder()),
-//                   validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+//                   decoration: const InputDecoration(
+//                       labelText: 'Nationality *',
+//                       border: OutlineInputBorder()),
+//                   validator: (v) =>
+//                   v == null || v.trim().isEmpty ? 'Required' : null,
 //                 ),
 //               ]),
 //
@@ -581,22 +616,31 @@
 //                 TextFormField(
 //                   controller: _addressCtrl,
 //                   maxLines: 3,
-//                   decoration: const InputDecoration(labelText: 'Address *', border: OutlineInputBorder()),
-//                   validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+//                   decoration: const InputDecoration(
+//                       labelText: 'Address *',
+//                       border: OutlineInputBorder()),
+//                   validator: (v) =>
+//                   v == null || v.trim().isEmpty ? 'Required' : null,
 //                 ),
 //                 const SizedBox(height: 12),
 //                 TextFormField(
 //                   controller: _phoneCtrl,
-//                   decoration: const InputDecoration(labelText: 'Phone No *', border: OutlineInputBorder()),
+//                   decoration: const InputDecoration(
+//                       labelText: 'Phone No *',
+//                       border: OutlineInputBorder()),
 //                   keyboardType: TextInputType.phone,
-//                   validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+//                   validator: (v) =>
+//                   v == null || v.trim().isEmpty ? 'Required' : null,
 //                 ),
 //                 const SizedBox(height: 12),
 //                 TextFormField(
 //                   controller: _emergencyPhoneCtrl,
-//                   decoration: const InputDecoration(labelText: 'Emergency No *', border: OutlineInputBorder()),
+//                   decoration: const InputDecoration(
+//                       labelText: 'Emergency No *',
+//                       border: OutlineInputBorder()),
 //                   keyboardType: TextInputType.phone,
-//                   validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+//                   validator: (v) =>
+//                   v == null || v.trim().isEmpty ? 'Required' : null,
 //                 ),
 //               ]),
 //
@@ -604,16 +648,25 @@
 //               _buildSectionCard('Job Details', [
 //                 DropdownButtonFormField<String>(
 //                   value: _employmentType,
-//                   items: _employmentOptions.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+//                   items: _employmentOptions
+//                       .map((e) =>
+//                       DropdownMenuItem(value: e, child: Text(e)))
+//                       .toList(),
 //                   onChanged: (v) => setState(() => _employmentType = v!),
-//                   decoration: const InputDecoration(labelText: 'Employment Type *', border: OutlineInputBorder()),
+//                   decoration: const InputDecoration(
+//                       labelText: 'Employment Type *',
+//                       border: OutlineInputBorder()),
 //                 ),
 //                 const SizedBox(height: 12),
 //                 TextFormField(
 //                   controller: _salaryCtrl,
-//                   decoration: const InputDecoration(labelText: 'Salary *', border: OutlineInputBorder(), prefixText: '\$ '),
+//                   decoration: const InputDecoration(
+//                       labelText: 'Salary *',
+//                       border: OutlineInputBorder(),
+//                       prefixText: 'Rs '),
 //                   keyboardType: TextInputType.number,
-//                   validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+//                   validator: (v) =>
+//                   v == null || v.trim().isEmpty ? 'Required' : null,
 //                 ),
 //               ]),
 //
@@ -624,7 +677,8 @@
 //                 const SizedBox(height: 8),
 //                 _SubjectMultiSelect(
 //                   selectedSubjects: _subjects,
-//                   onChanged: (updated) => setState(() => _subjects = updated),
+//                   onChanged: (updated) =>
+//                       setState(() => _subjects = updated),
 //                 ),
 //               ]),
 //
@@ -632,13 +686,16 @@
 //               _buildSectionCard('Additional Info (Optional)', [
 //                 TextFormField(
 //                   controller: _referenceCtrl,
-//                   decoration: const InputDecoration(labelText: 'Reference', border: OutlineInputBorder()),
+//                   decoration: const InputDecoration(
+//                       labelText: 'Reference',
+//                       border: OutlineInputBorder()),
 //                 ),
 //                 const SizedBox(height: 12),
 //                 TextFormField(
 //                   controller: _noteCtrl,
 //                   maxLines: 3,
-//                   decoration: const InputDecoration(labelText: 'Note', border: OutlineInputBorder()),
+//                   decoration: const InputDecoration(
+//                       labelText: 'Note', border: OutlineInputBorder()),
 //                 ),
 //               ]),
 //
@@ -650,7 +707,10 @@
 //                 child: ElevatedButton(
 //                   onPressed: _isSaving ? null : _save,
 //                   child: _isSaving
-//                       ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+//                       ? const SizedBox(
+//                       height: 20,
+//                       width: 20,
+//                       child: CircularProgressIndicator(strokeWidth: 2))
 //                       : Text(isEdit ? 'Update' : 'Save'),
 //                 ),
 //               ),
@@ -792,7 +852,15 @@ class _SubjectMultiSelect extends StatelessWidget {
 // ───── Main Add/Edit Screen ─────
 class AddEditStaffScreen extends StatefulWidget {
   final StaffMember? existingStaff;
-  const AddEditStaffScreen({super.key, this.existingStaff});
+  final bool showAppBar;          // ← NEW: To hide AppBar in Right Panel
+  final VoidCallback? onSaved;    // ← NEW: To close the panel after saving
+
+  const AddEditStaffScreen({
+    super.key,
+    this.existingStaff,
+    this.showAppBar = true,
+    this.onSaved,
+  });
 
   @override
   State<AddEditStaffScreen> createState() => _AddEditStaffScreenState();
@@ -981,7 +1049,15 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
       } else {
         await provider.updateStaff(widget.existingStaff!.id!, staff);
       }
-      if (mounted) Navigator.pop(context, true);
+
+      if (mounted) {
+        // ← NEW: Check if onSaved is provided to close Right Panel
+        if (widget.onSaved != null) {
+          widget.onSaved!();
+        } else {
+          Navigator.pop(context, true);
+        }
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1096,11 +1172,14 @@ class _AddEditStaffScreenState extends State<AddEditStaffScreen> {
   Widget build(BuildContext context) {
     final isEdit = widget.existingStaff != null;
     return Scaffold(
-      appBar: AppBar(
+      // ← NEW: Conditional AppBar based on showAppBar
+      appBar: widget.showAppBar
+          ? AppBar(
         title: Text(isEdit
             ? 'Edit ${_type == 'teacher' ? 'Teacher' : 'Staff'}'
             : 'Add Staff / Teacher'),
-      ),
+      )
+          : null,
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
