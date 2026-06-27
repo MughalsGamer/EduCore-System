@@ -43,8 +43,7 @@ class TimetableDay {
   factory TimetableDay.fromMap(Map<String, dynamic> map) => TimetableDay(
     day: map['day'] ?? 'Monday',
     periods: (map['periods'] as List<dynamic>?)
-        ?.map((p) =>
-        TimetablePeriod.fromMap(p as Map<String, dynamic>))
+        ?.map((p) => TimetablePeriod.fromMap(p as Map<String, dynamic>))
         .toList() ??
         [],
   );
@@ -53,10 +52,11 @@ class TimetableDay {
 class Section {
   String sectionName;
   String headOfTeacher;
-  double? annualFee;        // ← NEW
-  double? registrationFee;  // ← NEW
-  double? monthlyFee;       // ← NEW (replaced old single monthlyFee)
-  List<String>? subjects;
+  double? annualFee;
+  double? registrationFee;
+  double? monthlyFee;
+  List<String>? subjects;       // legacy field – kept for backward compat
+  List<SubjectMark>? subjectMarks;
   List<TimetableDay>? timetable;
 
   Section({
@@ -67,6 +67,7 @@ class Section {
     this.monthlyFee,
     this.subjects,
     this.timetable,
+    this.subjectMarks,
   });
 
   Map<String, dynamic> toMap() => {
@@ -77,6 +78,7 @@ class Section {
     'monthlyFee': monthlyFee,
     'subjects': subjects,
     'timetable': timetable?.map((t) => t.toMap()).toList(),
+    'subjectMarks': subjectMarks?.map((s) => s.toMap()).toList(),
   };
 
   factory Section.fromMap(Map<String, dynamic> map) => Section(
@@ -90,6 +92,9 @@ class Section {
     timetable: (map['timetable'] as List<dynamic>?)
         ?.map((t) => TimetableDay.fromMap(t as Map<String, dynamic>))
         .toList(),
+    subjectMarks: (map['subjectMarks'] as List<dynamic>?)
+        ?.map((s) => SubjectMark.fromMap(s as Map<String, dynamic>))
+        .toList(),
   );
 }
 
@@ -97,10 +102,14 @@ class SchoolClass {
   String? id;
   String name;
   String headOfClassTeacher;
-  double? annualFee;        // ← NEW
-  double? registrationFee;  // ← NEW
-  double? monthlyFee;       // ← NEW
-  List<String>? subjects;
+  double? annualFee;
+  double? registrationFee;
+  double? monthlyFee;
+
+  // ── CHANGED: was List<String>?, now List<SubjectMark>? ──
+  // Backward compat handled in fromMap/_parseSubjects below.
+  List<SubjectMark>? subjects;
+
   List<TimetableDay>? timetable;
   List<Section> sections;
 
@@ -122,7 +131,8 @@ class SchoolClass {
     'annualFee': annualFee,
     'registrationFee': registrationFee,
     'monthlyFee': monthlyFee,
-    'subjects': subjects,
+    // Serialize as list of maps (SubjectMark)
+    'subjects': subjects?.map((s) => s.toMap()).toList(),
     'timetable': timetable?.map((t) => t.toMap()).toList(),
     'sections': sections.map((s) => s.toMap()).toList(),
   };
@@ -135,8 +145,8 @@ class SchoolClass {
         annualFee: map['annualFee']?.toDouble(),
         registrationFee: map['registrationFee']?.toDouble(),
         monthlyFee: map['monthlyFee']?.toDouble(),
-        subjects:
-        map['subjects'] != null ? List<String>.from(map['subjects']) : null,
+        // Backward compat: handles both old List<String> and new List<SubjectMark>
+        subjects: _parseSubjects(map['subjects']),
         timetable: (map['timetable'] as List<dynamic>?)
             ?.map((t) => TimetableDay.fromMap(t as Map<String, dynamic>))
             .toList(),
@@ -150,4 +160,41 @@ class SchoolClass {
     final data = doc.data() as Map<String, dynamic>;
     return SchoolClass.fromMap(data, doc.id);
   }
+
+  /// Handles Firestore data that may be:
+  ///   - null
+  ///   - List<String>  (old format)
+  ///   - List<Map>     (new format with name + totalMarks)
+  static List<SubjectMark>? _parseSubjects(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is! List) return null;
+    if (raw.isEmpty) return [];
+    return raw.map((s) {
+      if (s is String) {
+        // Old format – default marks to 100
+        return SubjectMark(name: s, totalMarks: 100);
+      } else if (s is Map<String, dynamic>) {
+        return SubjectMark.fromMap(s);
+      }
+      return SubjectMark(name: s.toString(), totalMarks: 100);
+    }).toList();
+  }
+}
+
+// ── Subject with marks ──
+class SubjectMark {
+  String name;
+  int totalMarks;
+
+  SubjectMark({required this.name, this.totalMarks = 100});
+
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'totalMarks': totalMarks,
+  };
+
+  factory SubjectMark.fromMap(Map<String, dynamic> map) => SubjectMark(
+    name: map['name'] ?? '',
+    totalMarks: (map['totalMarks'] as num?)?.toInt() ?? 100,
+  );
 }
