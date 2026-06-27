@@ -2009,6 +2009,9 @@ Widget _labelDivider(String label, BuildContext context) {
 // ─────────────────────────────────────────────
 //  Subject + Marks selector (table style)
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+//  Subject + Marks selector (compact, clean)
+// ─────────────────────────────────────────────
 class _SubjectMarkSelector extends StatefulWidget {
   final List<SubjectMark> selectedSubjectMarks;
   final ValueChanged<List<SubjectMark>> onChanged;
@@ -2058,53 +2061,68 @@ class _SubjectMarkSelectorState extends State<_SubjectMarkSelector> {
 
     if (allSubjects.isEmpty) {
       return Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.amber.shade50,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: Colors.amber.shade200),
         ),
         child: Row(children: [
-          Icon(Icons.info_outline, size: 16, color: Colors.amber.shade700),
+          Icon(Icons.info_outline, size: 15, color: Colors.amber.shade700),
           const SizedBox(width: 8),
           Expanded(
-            child: Text('No subjects found. Add subjects first.',
-                style:
-                TextStyle(fontSize: 12, color: Colors.amber.shade800)),
+            child: Text(
+              'No subjects found. Add subjects first.',
+              style: TextStyle(fontSize: 12, color: Colors.amber.shade800),
+            ),
           ),
         ]),
       );
     }
 
+    final selectedCount = widget.selectedSubjectMarks.length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header row
+        // ── Header row ──
         Container(
-          padding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(10)),
-            border: Border.all(color: Colors.grey.shade200),
+            color: _kPurple.withOpacity(0.05),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+            border: Border.all(color: _kPurple.withOpacity(0.15)),
           ),
           child: Row(children: [
             Expanded(
-              flex: 3,
-              child: Text('Subject',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade600)),
-            ),
-            Text('Total Marks',
+              flex: 5,
+              child: Text(
+                'Subject',
                 style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600)),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey.shade600,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 88,
+              child: Text(
+                'Total Marks',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey.shade600,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
           ]),
         ),
+
+        // ── Subject rows ──
         Container(
           decoration: BoxDecoration(
             border: Border(
@@ -2125,147 +2143,442 @@ class _SubjectMarkSelectorState extends State<_SubjectMarkSelector> {
               final currentMarks = isSelected
                   ? widget.selectedSubjectMarks[existingIndex].totalMarks
                   : 0;
+              final ctrl =
+              isSelected ? _getController(subject, currentMarks) : null;
+              final isLast = idx == allSubjects.length - 1;
 
-              final ctrl = isSelected
-                  ? _getController(subject, currentMarks)
-                  : null;
-
-              return Container(
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? _kPurpleLight.withOpacity(0.5)
-                      : Colors.transparent,
-                  border: idx < allSubjects.length - 1
-                      ? Border(
-                      bottom:
-                      BorderSide(color: Colors.grey.shade100))
-                      : null,
-                ),
-                child: InkWell(
-                  onTap: () {
-                    final updated = List<SubjectMark>.from(
-                        widget.selectedSubjectMarks);
-                    if (isSelected) {
-                      _controllers.remove(subject)?.dispose();
-                      updated.removeAt(existingIndex);
-                    } else {
-                      updated.add(SubjectMark(
-                          name: subject, totalMarks: 0));
-                    }
-                    widget.onChanged(updated);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                    child: Row(children: [
-                      // Checkbox
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: isSelected ? _kPurple : Colors.white,
-                          borderRadius: BorderRadius.circular(5),
-                          border: Border.all(
-                            color: isSelected
-                                ? _kPurple
-                                : Colors.grey.shade300,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: isSelected
-                            ? const Icon(Icons.check,
-                            size: 13, color: Colors.white)
-                            : null,
-                      ),
-                      const SizedBox(width: 10),
-                      // Subject name
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          subject,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                            color: isSelected
-                                ? _kPurple
-                                : Colors.black87,
-                          ),
-                        ),
-                      ),
-                      // Marks field
-                      if (isSelected)
-                        SizedBox(
-                          width: 90,
-                          child: TextFormField(
-                            controller: ctrl,
-                            decoration: InputDecoration(
-                              hintText: 'e.g. 100',
-                              hintStyle: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade400),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(
-                                    color: Colors.grey.shade300),
+              return InkWell(
+                onTap: () {
+                  final updated =
+                  List<SubjectMark>.from(widget.selectedSubjectMarks);
+                  if (isSelected) {
+                    _controllers.remove(subject)?.dispose();
+                    updated.removeAt(existingIndex);
+                  } else {
+                    updated.add(SubjectMark(name: subject, totalMarks: 0));
+                  }
+                  widget.onChanged(updated);
+                },
+                child: Column(
+                  children: [
+                    Container(
+                      color: isSelected
+                          ? _kPurple.withOpacity(0.04)
+                          : Colors.transparent,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 9),
+                      child: Row(
+                        children: [
+                          // ── Checkbox ──
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 140),
+                            width: 18,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              color: isSelected ? _kPurple : Colors.white,
+                              borderRadius: BorderRadius.circular(5),
+                              border: Border.all(
+                                color: isSelected
+                                    ? _kPurple
+                                    : Colors.grey.shade300,
+                                width: 1.5,
                               ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(
-                                    color: _kPurple, width: 1.5),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(
-                                    color: Colors.grey.shade300),
-                              ),
-                              isDense: true,
-                              contentPadding:
-                              const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 8),
                             ),
-                            style: const TextStyle(
+                            child: isSelected
+                                ? const Icon(Icons.check,
+                                size: 12, color: Colors.white)
+                                : null,
+                          ),
+                          const SizedBox(width: 10),
+
+                          // ── Subject name ──
+                          Expanded(
+                            flex: 5,
+                            child: Text(
+                              subject,
+                              style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: FontWeight.w500),
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            onTap: () {},
-                            onChanged: (val) {
-                              final parsed = int.tryParse(val) ?? 0;
-                              final updated = List<SubjectMark>.from(
-                                  widget.selectedSubjectMarks);
-                              updated[existingIndex] = SubjectMark(
-                                  name: subject,
-                                  totalMarks: parsed);
-                              widget.onChanged(updated);
-                            },
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                color:
+                                isSelected ? _kPurple : Colors.black87,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        )
-                      else
-                        SizedBox(
-                          width: 90,
-                          child: Center(
-                            child: Text('—',
-                                style: TextStyle(
+
+                          // ── Marks field (always visible) ──
+                          SizedBox(
+                            width: 88,
+                            child: isSelected
+                                ? GestureDetector(
+                              onTap: () {}, // prevent row tap
+                              behavior: HitTestBehavior.opaque,
+                              child: TextFormField(
+                                controller: ctrl,
+                                textAlign: TextAlign.center,
+                                decoration: InputDecoration(
+                                  hintText: '100',
+                                  hintStyle: TextStyle(
+                                    fontSize: 12,
                                     color: Colors.grey.shade400,
-                                    fontSize: 13)),
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(7),
+                                    borderSide: BorderSide(
+                                        color: Colors.grey.shade300),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(7),
+                                    borderSide: const BorderSide(
+                                        color: _kPurple, width: 1.5),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(7),
+                                    borderSide: BorderSide(
+                                        color: _kPurple
+                                            .withOpacity(0.3)),
+                                  ),
+                                  isDense: true,
+                                  contentPadding:
+                                  const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 7),
+                                  filled: true,
+                                  fillColor:
+                                  _kPurple.withOpacity(0.04),
+                                ),
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter
+                                      .digitsOnly,
+                                ],
+                                onChanged: (val) {
+                                  final parsed =
+                                      int.tryParse(val) ?? 0;
+                                  final updated =
+                                  List<SubjectMark>.from(
+                                      widget.selectedSubjectMarks);
+                                  updated[existingIndex] = SubjectMark(
+                                      name: subject,
+                                      totalMarks: parsed);
+                                  widget.onChanged(updated);
+                                },
+                              ),
+                            )
+                                : Center(
+                              child: Text(
+                                '—',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade300),
+                              ),
+                            ),
                           ),
-                        ),
-                    ]),
-                  ),
+                        ],
+                      ),
+                    ),
+                    // Divider after every row except last
+                    if (!isLast)
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Colors.grey.shade100,
+                        indent: 12,
+                        endIndent: 12,
+                      ),
+                  ],
                 ),
               );
             }).toList(),
           ),
         ),
+
+        // ── Footer: selected count ──
+        if (selectedCount > 0) ...[
+          const SizedBox(height: 8),
+          Row(children: [
+            const SizedBox(width: 2),
+            Icon(Icons.check_circle_outline,
+                size: 13, color: Colors.green.shade600),
+            const SizedBox(width: 5),
+            Text(
+              '$selectedCount subject${selectedCount == 1 ? '' : 's'} selected',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.green.shade700,
+              ),
+            ),
+          ]),
+        ],
       ],
     );
   }
 }
+// class _SubjectMarkSelector extends StatefulWidget {
+//   final List<SubjectMark> selectedSubjectMarks;
+//   final ValueChanged<List<SubjectMark>> onChanged;
+//
+//   const _SubjectMarkSelector({
+//     required this.selectedSubjectMarks,
+//     required this.onChanged,
+//   });
+//
+//   @override
+//   State<_SubjectMarkSelector> createState() => _SubjectMarkSelectorState();
+// }
+//
+// class _SubjectMarkSelectorState extends State<_SubjectMarkSelector> {
+//   final Map<String, TextEditingController> _controllers = {};
+//
+//   @override
+//   void dispose() {
+//     for (final c in _controllers.values) c.dispose();
+//     super.dispose();
+//   }
+//
+//   TextEditingController _getController(String subject, int currentMarks) {
+//     if (!_controllers.containsKey(subject)) {
+//       _controllers[subject] = TextEditingController(
+//         text: currentMarks == 0 ? '' : currentMarks.toString(),
+//       );
+//     }
+//     return _controllers[subject]!;
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     final provider = context.watch<MuddulProvider>();
+//     final allSubjects = provider.mudduls
+//         .map((m) => m.subjectName)
+//         .toSet()
+//         .toList()
+//       ..sort();
+//
+//     if (provider.loading) {
+//       return const Padding(
+//         padding: EdgeInsets.symmetric(vertical: 12),
+//         child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+//       );
+//     }
+//
+//     if (allSubjects.isEmpty) {
+//       return Container(
+//         padding: const EdgeInsets.all(12),
+//         decoration: BoxDecoration(
+//           color: Colors.amber.shade50,
+//           borderRadius: BorderRadius.circular(10),
+//           border: Border.all(color: Colors.amber.shade200),
+//         ),
+//         child: Row(children: [
+//           Icon(Icons.info_outline, size: 16, color: Colors.amber.shade700),
+//           const SizedBox(width: 8),
+//           Expanded(
+//             child: Text('No subjects found. Add subjects first.',
+//                 style:
+//                 TextStyle(fontSize: 12, color: Colors.amber.shade800)),
+//           ),
+//         ]),
+//       );
+//     }
+//
+//     return Column(
+//       crossAxisAlignment: CrossAxisAlignment.start,
+//       children: [
+//         // Header row
+//         Container(
+//           padding:
+//           const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+//           decoration: BoxDecoration(
+//             color: Colors.grey.shade50,
+//             borderRadius:
+//             const BorderRadius.vertical(top: Radius.circular(10)),
+//             border: Border.all(color: Colors.grey.shade200),
+//           ),
+//           child: Row(children: [
+//             Expanded(
+//               flex: 3,
+//               child: Text('Subject',
+//                   style: TextStyle(
+//                       fontSize: 12,
+//                       fontWeight: FontWeight.w600,
+//                       color: Colors.grey.shade600)),
+//             ),
+//             Text('Total Marks',
+//                 style: TextStyle(
+//                     fontSize: 12,
+//                     fontWeight: FontWeight.w600,
+//                     color: Colors.grey.shade600)),
+//           ]),
+//         ),
+//         Container(
+//           decoration: BoxDecoration(
+//             border: Border(
+//               left: BorderSide(color: Colors.grey.shade200),
+//               right: BorderSide(color: Colors.grey.shade200),
+//               bottom: BorderSide(color: Colors.grey.shade200),
+//             ),
+//             borderRadius:
+//             const BorderRadius.vertical(bottom: Radius.circular(10)),
+//           ),
+//           child: Column(
+//             children: allSubjects.asMap().entries.map((entry) {
+//               final idx = entry.key;
+//               final subject = entry.value;
+//               final existingIndex = widget.selectedSubjectMarks
+//                   .indexWhere((s) => s.name == subject);
+//               final isSelected = existingIndex >= 0;
+//               final currentMarks = isSelected
+//                   ? widget.selectedSubjectMarks[existingIndex].totalMarks
+//                   : 0;
+//
+//               final ctrl = isSelected
+//                   ? _getController(subject, currentMarks)
+//                   : null;
+//
+//               return Container(
+//                 decoration: BoxDecoration(
+//                   color: isSelected
+//                       ? _kPurpleLight.withOpacity(0.5)
+//                       : Colors.transparent,
+//                   border: idx < allSubjects.length - 1
+//                       ? Border(
+//                       bottom:
+//                       BorderSide(color: Colors.grey.shade100))
+//                       : null,
+//                 ),
+//                 child: InkWell(
+//                   onTap: () {
+//                     final updated = List<SubjectMark>.from(
+//                         widget.selectedSubjectMarks);
+//                     if (isSelected) {
+//                       _controllers.remove(subject)?.dispose();
+//                       updated.removeAt(existingIndex);
+//                     } else {
+//                       updated.add(SubjectMark(
+//                           name: subject, totalMarks: 0));
+//                     }
+//                     widget.onChanged(updated);
+//                   },
+//                   child: Padding(
+//                     padding: const EdgeInsets.symmetric(
+//                         horizontal: 12, vertical: 10),
+//                     child: Row(children: [
+//                       // Checkbox
+//                       AnimatedContainer(
+//                         duration: const Duration(milliseconds: 150),
+//                         width: 20,
+//                         height: 20,
+//                         decoration: BoxDecoration(
+//                           color: isSelected ? _kPurple : Colors.white,
+//                           borderRadius: BorderRadius.circular(5),
+//                           border: Border.all(
+//                             color: isSelected
+//                                 ? _kPurple
+//                                 : Colors.grey.shade300,
+//                             width: 1.5,
+//                           ),
+//                         ),
+//                         child: isSelected
+//                             ? const Icon(Icons.check,
+//                             size: 13, color: Colors.white)
+//                             : null,
+//                       ),
+//                       const SizedBox(width: 10),
+//                       // Subject name
+//                       Expanded(
+//                         flex: 3,
+//                         child: Text(
+//                           subject,
+//                           style: TextStyle(
+//                             fontSize: 13,
+//                             fontWeight: isSelected
+//                                 ? FontWeight.w600
+//                                 : FontWeight.w400,
+//                             color: isSelected
+//                                 ? _kPurple
+//                                 : Colors.black87,
+//                           ),
+//                         ),
+//                       ),
+//                       // Marks field
+//                       if (isSelected)
+//                         SizedBox(
+//                           width: 90,
+//                           child: TextFormField(
+//                             controller: ctrl,
+//                             decoration: InputDecoration(
+//                               hintText: 'e.g. 100',
+//                               hintStyle: TextStyle(
+//                                   fontSize: 12,
+//                                   color: Colors.grey.shade400),
+//                               border: OutlineInputBorder(
+//                                 borderRadius: BorderRadius.circular(8),
+//                                 borderSide: BorderSide(
+//                                     color: Colors.grey.shade300),
+//                               ),
+//                               focusedBorder: OutlineInputBorder(
+//                                 borderRadius: BorderRadius.circular(8),
+//                                 borderSide: const BorderSide(
+//                                     color: _kPurple, width: 1.5),
+//                               ),
+//                               enabledBorder: OutlineInputBorder(
+//                                 borderRadius: BorderRadius.circular(8),
+//                                 borderSide: BorderSide(
+//                                     color: Colors.grey.shade300),
+//                               ),
+//                               isDense: true,
+//                               contentPadding:
+//                               const EdgeInsets.symmetric(
+//                                   horizontal: 8, vertical: 8),
+//                             ),
+//                             style: const TextStyle(
+//                                 fontSize: 13,
+//                                 fontWeight: FontWeight.w500),
+//                             keyboardType: TextInputType.number,
+//                             inputFormatters: [
+//                               FilteringTextInputFormatter.digitsOnly,
+//                             ],
+//                             onTap: () {},
+//                             onChanged: (val) {
+//                               final parsed = int.tryParse(val) ?? 0;
+//                               final updated = List<SubjectMark>.from(
+//                                   widget.selectedSubjectMarks);
+//                               updated[existingIndex] = SubjectMark(
+//                                   name: subject,
+//                                   totalMarks: parsed);
+//                               widget.onChanged(updated);
+//                             },
+//                           ),
+//                         )
+//                       else
+//                         SizedBox(
+//                           width: 90,
+//                           child: Center(
+//                             child: Text('—',
+//                                 style: TextStyle(
+//                                     color: Colors.grey.shade400,
+//                                     fontSize: 13)),
+//                           ),
+//                         ),
+//                     ]),
+//                   ),
+//                 ),
+//               );
+//             }).toList(),
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+// }
 
 // ─────────────────────────────────────────────
 //  Timetable generator widget (extracted)
