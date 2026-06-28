@@ -1,223 +1,360 @@
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../models/teacher.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Screen wrapper (mobile navigation)
+// ─────────────────────────────────────────────────────────────────────────────
 class StaffProfileScreen extends StatelessWidget {
   final StaffMember staff;
   final Map<String, String> classIdToName;
-  const StaffProfileScreen({super.key, required this.staff,this.classIdToName = const {},});
 
-  static const _purple = Color(0xFF534AB7);
-  static const _purpleLight = Color(0xFFEEECFA);
-  static const _purpleDark = Color(0xFF3D3589);
+  const StaffProfileScreen({
+    super.key,
+    required this.staff,
+    this.classIdToName = const {},
+  });
 
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF0EFF8),
+      appBar: AppBar(
+        title: const Text(
+          'Staff Profile',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: const Color(0xFF534AB7),
+        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: StaffProfileView(staff: staff, classIdToName: classIdToName),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core view — usable in mobile screen AND desktop side-panel
+// ─────────────────────────────────────────────────────────────────────────────
+class StaffProfileView extends StatelessWidget {
+  final StaffMember staff;
+  final Map<String, String> classIdToName;
+  final VoidCallback? onClose;
+
+  const StaffProfileView({
+    super.key,
+    required this.staff,
+    this.classIdToName = const {},
+    this.onClose,
+  });
+
+  // ── Theme ──
+  static const _purple       = Color(0xFF534AB7);
+  static const _purpleLight  = Color(0xFFF0EFFE);
+  static const _purpleDark   = Color(0xFF3D3589);
+  static const _purpleAccent = Color(0xFF7B6FD0);
+
+  // ── Build ──
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 720;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.07),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: isMobile
+          ? _buildMobileLayout(context)
+          : _buildDesktopLayout(context),
+    );
+  }
+
+  // ─────────────────────────────────── Desktop ──────────────────────────────
+  Widget _buildDesktopLayout(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Left: gradient sidebar (fixed 260 px wide)
+        SizedBox(width: 260, child: _buildSidebar()),
+        // Right: scrollable detail panel
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Staff Details',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A1A2E),
+                      ),
+                    ),
+                    if (onClose != null)
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.grey),
+                        onPressed: onClose,
+                        tooltip: 'Close',
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ..._contentWidgets(),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─────────────────────────────────── Mobile ───────────────────────────────
+  Widget _buildMobileLayout(BuildContext context) {
+    return Column(
+      children: [
+        _buildSidebar(),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(children: _contentWidgets()),
+        ),
+      ],
+    );
+  }
+
+  // ────────────────────── Shared scrollable content ─────────────────────────
+  List<Widget> _contentWidgets() {
+    return [
+      // ── Personal ──
+      _buildInfoCard(
+        icon: Icons.person_outline,
+        title: 'Personal Information',
+        rows: [
+          _InfoRow('Father / Husband', staff.fatherOrHusbandName),
+          _InfoRow('CNIC',             staff.cnic),
+          _InfoRow('Date of Birth',    staff.dob),
+          _InfoRow('Gender',           staff.gender),
+          _InfoRow('Marital Status',   staff.maritalStatus),
+          _InfoRow('Blood Group',      staff.bloodGroup ?? '-'),
+          _InfoRow('Religion',         staff.religion),
+          _InfoRow('Nationality',      staff.nationality),
+        ],
+      ),
+      const SizedBox(height: 14),
+
+      // ── Contact ──
+      _buildInfoCard(
+        icon: Icons.contact_phone_outlined,
+        title: 'Contact Information',
+        rows: [
+          _InfoRow('Address',   staff.address),
+          _InfoRow('Phone',     staff.phone),
+          _InfoRow('Emergency', staff.emergencyPhone),
+        ],
+      ),
+      const SizedBox(height: 14),
+
+      // ── Job ──
+      _buildInfoCard(
+        icon: Icons.work_outline,
+        title: 'Job Details',
+        rows: [
+          _InfoRow('Employment Type', staff.employmentType),
+          _InfoRow('Salary', 'PKR ${staff.salary.toStringAsFixed(0)}',
+              highlight: true),
+          if (staff.reference != null && staff.reference!.isNotEmpty)
+            _InfoRow('Reference', staff.reference!),
+        ],
+      ),
+
+      // ── Subjects ──
+      if (staff.subjects.isNotEmpty) ...[
+        const SizedBox(height: 14),
+        _buildChipCard(
+          icon: Icons.menu_book_outlined,
+          title: 'Assigned Subjects',
+          count: staff.subjects.length,
+          accentColor: _purple,
+          bgColor: _purpleLight,
+          chips: staff.subjects
+              .map((s) => _chipItem(label: s, bg: _purpleLight, color: _purple))
+              .toList(),
+        ),
+      ],
+
+      // ── Classes — classIdToName se NAME show hoga, ID nahi ──
+      if (staff.assignedClasses.isNotEmpty) ...[
+        const SizedBox(height: 14),
+        _buildChipCard(
+          icon: Icons.class_outlined,
+          title: 'Assigned Classes',
+          count: staff.assignedClasses.length,
+          accentColor: const Color(0xFF2E7D32),
+          bgColor: const Color(0xFFE8F5E9),
+          chips: staff.assignedClasses.map((id) {
+            final name = classIdToName[id] ?? id; // ← NAME, not raw ID
+            return _chipItem(
+              label: name,
+              bg: const Color(0xFFE8F5E9),
+              color: const Color(0xFF2E7D32),
+              icon: Icons.class_,
+            );
+          }).toList(),
+        ),
+      ],
+
+      // ── Note ──
+      if (staff.note != null && staff.note!.isNotEmpty) ...[
+        const SizedBox(height: 14),
+        _buildNoteCard(),
+      ],
+    ];
+  }
+
+  // ─────────────────────────── Gradient Sidebar ─────────────────────────────
+  Widget _buildSidebar() {
     final isTeacher = staff.type == 'teacher';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F8),
-      body: CustomScrollView(
-        slivers: [
-          // ── Hero Header ──
-          SliverAppBar(
-            expandedHeight: 260,
-            pinned: true,
-            backgroundColor: _purple,
-            iconTheme: const IconThemeData(color: Colors.white),
-            flexibleSpace: FlexibleSpaceBar(
-              background: _buildHeader(context, isTeacher),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [_purpleDark, _purple, _purpleAccent],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // ── Portrait photo (ID-card shape — same as shared frame) ──────
+          Container(
+            width: 120,
+            height: 160,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.35),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.edit_outlined, color: Colors.white),
-                onPressed: () => Navigator.pop(context, 'edit'),
-                tooltip: 'Edit',
-              ),
-            ],
-          ),
-
-          // ── Body Content ──
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
-              child: Column(
-                children: [
-                  // Subjects chips (if any)
-                  if (staff.subjects.isNotEmpty) ...[
-                    _buildSubjectsCard(),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Assigned Classes (if any)
-                  if (staff.assignedClasses.isNotEmpty) ...[
-                    _buildClassesCard(),
-                    const SizedBox(height: 16),
-                  ],
-
-                  _buildSection(
-                    icon: Icons.person_outline,
-                    title: 'Personal Information',
-                    rows: [
-                      _InfoRow('Father / Husband', staff.fatherOrHusbandName),
-                      _InfoRow('CNIC', staff.cnic),
-                      _InfoRow('Date of Birth', staff.dob),
-                      _InfoRow('Gender', staff.gender),
-                      _InfoRow('Marital Status', staff.maritalStatus),
-                      if (staff.bloodGroup != null)
-                        _InfoRow('Blood Group', staff.bloodGroup!),
-                      _InfoRow('Religion', staff.religion),
-                      _InfoRow('Nationality', staff.nationality),
-                    ],
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(17),
+              child: staff.imageBase64 != null
+                  ? Image.memory(
+                base64Decode(staff.imageBase64!),
+                fit: BoxFit.cover,
+                width: 120,
+                height: 160,
+              )
+                  : Container(
+                color: Colors.white.withOpacity(0.18),
+                child: Center(
+                  child: Text(
+                    _initials(staff.name),
+                    style: const TextStyle(
+                      fontSize: 44,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-
-                  _buildSection(
-                    icon: Icons.contact_phone_outlined,
-                    title: 'Contact Information',
-                    rows: [
-                      _InfoRow('Address', staff.address),
-                      _InfoRow('Phone', staff.phone),
-                      _InfoRow('Emergency', staff.emergencyPhone),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  _buildSection(
-                    icon: Icons.work_outline,
-                    title: 'Job Details',
-                    rows: [
-                      _InfoRow('Employment Type', staff.employmentType),
-                      _InfoRow(
-                        'Salary',
-                        'PKR ${staff.salary.toStringAsFixed(0)}',
-                        highlight: true,
-                      ),
-                      if (staff.reference != null && staff.reference!.isNotEmpty)
-                        _InfoRow('Reference', staff.reference!),
-                    ],
-                  ),
-
-                  if (staff.note != null && staff.note!.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    _buildNoteCard(),
-                  ],
-                ],
+                ),
               ),
             ),
           ),
+
+          const SizedBox(height: 20),
+
+          // ── Name ──
+          Text(
+            staff.name,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // ── Role badge ──
+          Container(
+            padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white30),
+            ),
+            child: Text(
+              isTeacher ? '👨‍🏫 Teacher' : '🏢 Staff',
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+          Container(height: 1, color: Colors.white24),
+          const SizedBox(height: 20),
+
+          // ── Quick info ──
+          _sidebarRow(Icons.phone_outlined,    staff.phone),
+          const SizedBox(height: 10),
+          _sidebarRow(Icons.badge_outlined,    staff.employmentType),
+          if (staff.bloodGroup != null && staff.bloodGroup!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _sidebarRow(Icons.water_drop_outlined, staff.bloodGroup!),
+          ],
         ],
       ),
     );
   }
 
-  // ── Hero Header ──
-  Widget _buildHeader(BuildContext context, bool isTeacher) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [_purpleDark, _purple, Color(0xFF7B6FD0)],
+  Widget _sidebarRow(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 14, color: Colors.white70),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, color: Colors.white70),
+          ),
         ),
-      ),
-      child: SafeArea(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const SizedBox(height: 40),
-            // Profile Picture
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.25),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: CircleAvatar(
-                radius: 48,
-                backgroundColor: Colors.white24,
-                backgroundImage: staff.imageBase64 != null
-                    ? MemoryImage(base64Decode(staff.imageBase64!))
-                    : null,
-                child: staff.imageBase64 == null
-                    ? Text(
-                  _initials(staff.name),
-                  style: const TextStyle(
-                    fontSize: 34,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                )
-                    : null,
-              ),
-            ),
-            const SizedBox(height: 14),
-            // Name
-            Text(
-              staff.name,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: 0.3,
-              ),
-            ),
-            const SizedBox(height: 6),
-            // Role badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white30),
-              ),
-              child: Text(
-                isTeacher ? '👨‍🏫 Teacher' : '🏢 Staff',
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            // Quick stats row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _QuickStat(
-                  icon: Icons.phone_outlined,
-                  label: staff.phone,
-                ),
-                Container(
-                  height: 16,
-                  width: 1,
-                  color: Colors.white30,
-                  margin: const EdgeInsets.symmetric(horizontal: 12),
-                ),
-                _QuickStat(
-                  icon: Icons.badge_outlined,
-                  label: staff.employmentType,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+      ],
     );
   }
 
-  // ── Info Section Card ──
-  Widget _buildSection({
+  // ─────────────────────────── Info section card ────────────────────────────
+  Widget _buildInfoCard({
     required IconData icon,
     required String title,
     required List<_InfoRow> rows,
@@ -225,11 +362,12 @@ class StaffProfileScreen extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFEEEEF5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
@@ -237,7 +375,7 @@ class StaffProfileScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section header
+          // Header
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Row(
@@ -254,10 +392,9 @@ class StaffProfileScreen extends StatelessWidget {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF1A1A2E),
-                    letterSpacing: 0.2,
                   ),
                 ),
               ],
@@ -265,247 +402,175 @@ class StaffProfileScreen extends StatelessWidget {
           ),
           const Divider(height: 1, color: Color(0xFFF0F0F5)),
           // Rows
-          ...rows.asMap().entries.map((entry) {
-            final isLast = entry.key == rows.length - 1;
-            final row = entry.value;
-            return _buildInfoRow(row, isLast);
+          ...rows.asMap().entries.map((e) {
+            final isLast = e.key == rows.length - 1;
+            final row   = e.value;
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 11),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 130,
+                        child: Text(
+                          row.label,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF888899),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          row.value,
+                          textAlign: TextAlign.end,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: row.highlight
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            color: row.highlight
+                                ? _purple
+                                : const Color(0xFF1A1A2E),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!isLast)
+                  const Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: Color(0xFFF0F0F5),
+                  ),
+              ],
+            );
           }),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(_InfoRow row, bool isLast) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  // ─────────────────────────── Chip card (subjects / classes) ──────────────
+  Widget _buildChipCard({
+    required IconData icon,
+    required String title,
+    required int count,
+    required Color accentColor,
+    required Color bgColor,
+    required List<Widget> chips,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFEEEEF5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              SizedBox(
-                width: 120,
-                child: Text(
-                  row.label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF888899),
-                    fontWeight: FontWeight.w500,
-                  ),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 16, color: accentColor),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A1A2E),
                 ),
               ),
-              Expanded(
+              const Spacer(),
+              Container(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 child: Text(
-                  row.value,
+                  '$count',
                   style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: row.highlight ? FontWeight.bold : FontWeight.w500,
-                    color: row.highlight ? _purple : const Color(0xFF1A1A2E),
-                  ),
-                  textAlign: TextAlign.end,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (!isLast)
-          const Divider(height: 1, indent: 16, endIndent: 16, color: Color(0xFFF0F0F5)),
-      ],
-    );
-  }
-
-  // ── Subjects Card ──
-  Widget _buildSubjectsCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: _purpleLight,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.menu_book_outlined, size: 16, color: _purple),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'Assigned Subjects',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A1A2E),
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: _purpleLight,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '${staff.subjects.length}',
-                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: _purple,
+                    color: accentColor,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: staff.subjects.map((subject) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _purpleLight,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _purple.withOpacity(0.3)),
-                ),
-                child: Text(
-                  subject,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _purple,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
+          Wrap(spacing: 8, runSpacing: 6, children: chips),
         ],
       ),
     );
   }
 
-  // ── Classes Card ──
-  Widget _buildClassesCard() {
+  Widget _chipItem({
+    required String label,
+    required Color bg,
+    required Color color,
+    IconData? icon,
+  }) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.class_outlined, size: 16, color: Color(0xFF2E7D32)),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'Assigned Classes',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A1A2E),
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child:
-                Text(
-                  '${staff.assignedClasses.length}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2E7D32),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: staff.assignedClasses.map((cls) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF2E7D32).withOpacity(0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.class_, size: 12, color: Color(0xFF2E7D32)),
-                    const SizedBox(width: 4),
-                    Text(
-                      classIdToName[cls] ?? cls,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF2E7D32),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
           ),
         ],
       ),
     );
   }
 
-  // ── Note Card ──
+  // ─────────────────────────────── Note card ────────────────────────────────
   Widget _buildNoteCard() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFFFFFBEB),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFFDE68A)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.orange.withOpacity(0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -525,7 +590,7 @@ class StaffProfileScreen extends StatelessWidget {
               const Text(
                 'Notes',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF92400E),
                 ),
@@ -556,37 +621,12 @@ class StaffProfileScreen extends StatelessWidget {
   }
 }
 
-// ── Helper classes ──
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper model
+// ─────────────────────────────────────────────────────────────────────────────
 class _InfoRow {
   final String label;
   final String value;
   final bool highlight;
   const _InfoRow(this.label, this.value, {this.highlight = false});
 }
-
-class _QuickStat extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _QuickStat({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: Colors.white70),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.white70,
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-

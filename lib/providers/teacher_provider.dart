@@ -52,6 +52,8 @@ class StaffProvider extends ChangeNotifier {
 
   Future<void> deleteStaff(String id) async {
     await _service.deleteStaff(id);
+    await fetchTeachers();       // ← this is what the teacher list screen reads
+    await fetchStaffOnly();      // ← this is what the staff list screen reads
     await fetchAll();
   }
 

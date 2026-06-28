@@ -1,10 +1,12 @@
 
 import 'package:educoresystem/screens/register_user.dart';
 import 'package:educoresystem/screens/subject_management/subject%20list.dart';
+import 'package:educoresystem/screens/teacher_management/Staff%20Profile.dart';
 import 'package:educoresystem/screens/teacher_management/add_teacher.dart';
 import 'package:educoresystem/screens/teacher_management/staff_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/teacher.dart';
 import '../providers/auth_provider.dart';
 import 'admission mangement/admission_list_screen.dart';
 import 'family_management/family management.dart';
@@ -176,6 +178,72 @@ class _DashboardScreenState extends State<DashboardScreen>
       _QuickAction('Add Staff/Teacher', Icons.person_add_rounded,
               () => _openQuickAction('Add Staff/Teacher')),
     ];
+  }
+
+  // Add inside _DashboardScreenState
+
+  /// Opens a staff/teacher profile – in the right panel on wide screens,
+  /// otherwise as a full‑screen push.
+  void _openProfile(StaffMember staff, {Map<String, String>? classIdToName}) {
+    final isWide = MediaQuery.of(context).size.width >= 700;
+    final mapping = classIdToName ?? {};
+
+    if (isWide) {
+      setState(() {
+        _rightPanelWidget = _buildProfilePanel(staff, mapping);
+      });
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => StaffProfileScreen(
+            staff: staff,
+            classIdToName: mapping,
+          ),
+        ),
+      );
+    }
+  }
+
+  /// Builds the right‑panel profile widget with a header and close button.
+  Widget _buildProfilePanel(StaffMember staff, Map<String, String> classIdToName) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.person, color: _purple),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Staff Profile',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _closeRightPanel,
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: StaffProfileView(
+              staff: staff,
+              classIdToName: classIdToName,
+              onClose: _closeRightPanel,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   void _openQuickAction(String key) {
