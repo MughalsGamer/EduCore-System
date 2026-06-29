@@ -14,7 +14,6 @@
 // const _kGreenBg = Color(0xFFDCFCE7);
 //
 // class StaffListScreen extends StatefulWidget {
-//   // ── Optional callback for opening profile in a side panel ──
 //   final void Function(StaffMember staff,
 //       {Map<String, String> classIdToName})? onItemTap;
 //
@@ -68,13 +67,11 @@
 //         if (c.id != null) c.id!: c.name
 //     };
 //
-//     // If a callback exists, use it instead of pushing a full‑screen page.
 //     if (widget.onItemTap != null) {
 //       widget.onItemTap!(s, classIdToName: classIdToName);
 //       return;
 //     }
 //
-//     // Fallback: full‑screen navigation (standalone usage)
 //     final result = await Navigator.push(
 //       context,
 //       MaterialPageRoute(
@@ -133,7 +130,7 @@
 //     return isDesktop ? _buildDesktop() : _buildMobile();
 //   }
 //
-//   // ── DESKTOP (flex‑based columns) ────────────────────────────────────────
+//   // ── DESKTOP (with sections column) ──────────────────────────────────────
 //   Widget _buildDesktop() {
 //     final provider = context.watch<StaffProvider>();
 //     final filtered = _filtered(provider.staffOnly);
@@ -226,7 +223,6 @@
 //                           offset: const Offset(0, 2))
 //                     ]),
 //                 child: Column(children: [
-//                   // Show entries row
 //                   Padding(
 //                       padding: const EdgeInsets.symmetric(
 //                           horizontal: 20, vertical: 14),
@@ -268,7 +264,7 @@
 //                               child: CircularProgressIndicator(
 //                                   strokeWidth: 2, color: _kPurple)),
 //                       ])),
-//                   // Table header – flex‑based columns
+//                   // Table header
 //                   Container(
 //                       color: const Color(0xFFF8F9FC),
 //                       padding: const EdgeInsets.symmetric(
@@ -276,14 +272,14 @@
 //                       child: Row(children: [
 //                         _th('PHOTO', flex: 7),
 //                         _th('NAME', flex: 22),
-//                         _th('DESIGNATION', flex: 17),
-//                         _th('PHONE', flex: 16),
+//                         _th('DESIGNATION', flex: 15),
+//                         _th('SECTIONS', flex: 12),     // NEW
+//                         _th('PHONE', flex: 14),
 //                         _th('EMPLOYMENT', flex: 14),
 //                         _th('STATUS', flex: 10),
-//                         _th('ACTION', flex: 14, align: TextAlign.center),
+//                         _th('ACTION', flex: 12, align: TextAlign.center),
 //                       ])),
 //                   const Divider(height: 1, color: Color(0xFFEEEFF3)),
-//                   // Body
 //                   Expanded(
 //                       child: provider.loading
 //                           ? const Center(
@@ -297,7 +293,6 @@
 //                               height: 1, color: Color(0xFFEEEFF3)),
 //                           itemBuilder: (ctx, i) =>
 //                               _desktopRow(ctx, pageItems[i]))),
-//                   // Footer pagination
 //                   Container(
 //                     decoration: const BoxDecoration(
 //                         border: Border(
@@ -346,6 +341,8 @@
 //       );
 //
 //   Widget _desktopRow(BuildContext context, dynamic s) {
+//     final sections = (s.assignedSections as List?)?.cast<String>() ?? [];
+//
 //     return InkWell(
 //       onTap: () => _openProfile(context, s),
 //       hoverColor: const Color(0xFFF8F8FF),
@@ -390,16 +387,23 @@
 //             ),
 //             // DESIGNATION
 //             Expanded(
-//               flex: 17,
+//               flex: 15,
 //               child: Text(
 //                   s.designation?.isNotEmpty == true ? s.designation! : '—',
 //                   style: TextStyle(
 //                       fontSize: 13, color: Colors.grey.shade700),
 //                   overflow: TextOverflow.ellipsis),
 //             ),
+//             // SECTIONS
+//             Expanded(
+//               flex: 12,
+//               child: sections.isEmpty
+//                   ? Text('—', style: TextStyle(fontSize: 13, color: Colors.grey.shade400))
+//                   : _buildChipRow(sections, const Color(0xFFE8F5E9), const Color(0xFF2E7D32)),
+//             ),
 //             // PHONE
 //             Expanded(
-//               flex: 16,
+//               flex: 14,
 //               child: Text(s.phone,
 //                   style: const TextStyle(fontSize: 13),
 //                   overflow: TextOverflow.ellipsis),
@@ -444,7 +448,7 @@
 //             ),
 //             // ACTION
 //             Expanded(
-//               flex: 14,
+//               flex: 12,
 //               child: Center(
 //                 child: Row(
 //                     mainAxisAlignment: MainAxisAlignment.center,
@@ -465,6 +469,40 @@
 //               ),
 //             ),
 //           ])),
+//     );
+//   }
+//
+//   Widget _buildChipRow(List<String> items, Color bgColor, Color textColor) {
+//     return Wrap(
+//       spacing: 4,
+//       runSpacing: 4,
+//       children: items
+//           .take(2)
+//           .map((item) => Container(
+//         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+//         decoration: BoxDecoration(
+//             color: bgColor,
+//             borderRadius: BorderRadius.circular(10)),
+//         child: Text(item,
+//             style: TextStyle(
+//                 fontSize: 10,
+//                 color: textColor,
+//                 fontWeight: FontWeight.w500)),
+//       ))
+//           .toList()
+//         ..addAll(items.length > 2
+//             ? [
+//           Container(
+//             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+//             decoration: BoxDecoration(
+//                 color: Colors.grey.shade100,
+//                 borderRadius: BorderRadius.circular(10)),
+//             child: Text('+${items.length - 2}',
+//                 style: TextStyle(
+//                     fontSize: 10, color: Colors.grey.shade600)),
+//           )
+//         ]
+//             : []),
 //     );
 //   }
 //
@@ -534,7 +572,7 @@
 //                         isActive ? Colors.white : Colors.grey.shade700)))));
 //   }
 //
-//   // ── MOBILE (unchanged) ──────────────────────────────────────────────────
+//   // ── MOBILE (added sections) ──────────────────────────────────────────────
 //   Widget _buildMobile() {
 //     final provider = context.watch<StaffProvider>();
 //     final filtered = _filtered(provider.staffOnly);
@@ -625,70 +663,85 @@
 //     );
 //   }
 //
-//   Widget _mobileCard(BuildContext context, dynamic s) => Container(
-//       margin: const EdgeInsets.only(bottom: 10),
-//       decoration: BoxDecoration(
-//           color: Colors.white,
-//           borderRadius: BorderRadius.circular(14),
-//           boxShadow: [
-//             BoxShadow(
-//                 color: Colors.black.withOpacity(0.04),
-//                 blurRadius: 8,
-//                 offset: const Offset(0, 2))
-//           ]),
-//       child: InkWell(
-//           onTap: () => _openProfile(context, s),
-//           borderRadius: BorderRadius.circular(14),
-//           child: Padding(
-//               padding: const EdgeInsets.all(14),
-//               child: Row(children: [
-//                 CircleAvatar(
-//                     radius: 26,
-//                     backgroundColor: _kPurpleLight,
-//                     backgroundImage: s.imageBase64 != null
-//                         ? MemoryImage(base64Decode(s.imageBase64!))
-//                         : null,
-//                     child: s.imageBase64 == null
-//                         ? Text(
-//                         s.name.isNotEmpty ? s.name[0].toUpperCase() : '?',
-//                         style: const TextStyle(
-//                             fontSize: 18,
-//                             fontWeight: FontWeight.bold,
-//                             color: _kPurple))
-//                         : null),
-//                 const SizedBox(width: 12),
-//                 Expanded(
-//                     child: Column(
-//                         crossAxisAlignment: CrossAxisAlignment.start,
-//                         children: [
-//                           Text(s.name,
-//                               style: const TextStyle(
-//                                   fontSize: 15,
-//                                   fontWeight: FontWeight.w600,
-//                                   color: Color(0xFF1A1A2E))),
-//                           if (s.designation?.isNotEmpty == true) ...[
-//                             const SizedBox(height: 2),
-//                             Text(s.designation!,
-//                                 style: TextStyle(
-//                                     fontSize: 12, color: Colors.grey.shade600)),
-//                           ],
-//                           const SizedBox(height: 6),
-//                           Wrap(spacing: 6, children: [
-//                             _mobilePill(s.employmentType, _kPurple,
-//                                 const Color(0xFFF0EFFE)),
-//                             _mobilePill(s.phone, Colors.grey.shade700,
-//                                 Colors.grey.shade100,
-//                                 icon: Icons.phone_outlined),
-//                           ]),
-//                         ])),
-//                 Column(mainAxisSize: MainAxisSize.min, children: [
-//                   _mobileIconBtn(Icons.edit_outlined, _kPurple,
-//                           () => _openEdit(context, s)),
-//                   const SizedBox(height: 4),
-//                   _mobileIconBtn(Icons.delete_outline, Colors.red.shade600,
-//                           () => _confirmDelete(context, s.id!)),
-//                 ]),
-//               ]))));
+//   Widget _mobileCard(BuildContext context, dynamic s) {
+//     final sections = (s.assignedSections as List?)?.cast<String>() ?? [];
+//
+//     return Container(
+//         margin: const EdgeInsets.only(bottom: 10),
+//         decoration: BoxDecoration(
+//             color: Colors.white,
+//             borderRadius: BorderRadius.circular(14),
+//             boxShadow: [
+//               BoxShadow(
+//                   color: Colors.black.withOpacity(0.04),
+//                   blurRadius: 8,
+//                   offset: const Offset(0, 2))
+//             ]),
+//         child: InkWell(
+//             onTap: () => _openProfile(context, s),
+//             borderRadius: BorderRadius.circular(14),
+//             child: Padding(
+//                 padding: const EdgeInsets.all(14),
+//                 child: Row(children: [
+//                   CircleAvatar(
+//                       radius: 26,
+//                       backgroundColor: _kPurpleLight,
+//                       backgroundImage: s.imageBase64 != null
+//                           ? MemoryImage(base64Decode(s.imageBase64!))
+//                           : null,
+//                       child: s.imageBase64 == null
+//                           ? Text(
+//                           s.name.isNotEmpty ? s.name[0].toUpperCase() : '?',
+//                           style: const TextStyle(
+//                               fontSize: 18,
+//                               fontWeight: FontWeight.bold,
+//                               color: _kPurple))
+//                           : null),
+//                   const SizedBox(width: 12),
+//                   Expanded(
+//                       child: Column(
+//                           crossAxisAlignment: CrossAxisAlignment.start,
+//                           children: [
+//                             Text(s.name,
+//                                 style: const TextStyle(
+//                                     fontSize: 15,
+//                                     fontWeight: FontWeight.w600,
+//                                     color: Color(0xFF1A1A2E))),
+//                             if (s.designation?.isNotEmpty == true) ...[
+//                               const SizedBox(height: 2),
+//                               Text(s.designation!,
+//                                   style: TextStyle(
+//                                       fontSize: 12, color: Colors.grey.shade600)),
+//                             ],
+//                             const SizedBox(height: 6),
+//                             Wrap(spacing: 6, runSpacing: 4, children: [
+//                               _mobilePill(s.employmentType, _kPurple,
+//                                   const Color(0xFFF0EFFE)),
+//                               _mobilePill(s.phone, Colors.grey.shade700,
+//                                   Colors.grey.shade100,
+//                                   icon: Icons.phone_outlined),
+//                               if (sections.isNotEmpty)
+//                                 _mobilePill(
+//                                     sections.first,
+//                                     const Color(0xFF2E7D32),
+//                                     const Color(0xFFE8F5E9),
+//                                     icon: Icons.class_outlined),
+//                               if (sections.length > 1)
+//                                 _mobilePill(
+//                                     '+${sections.length - 1}',
+//                                     Colors.grey.shade600,
+//                                     Colors.grey.shade100),
+//                             ]),
+//                           ])),
+//                   Column(mainAxisSize: MainAxisSize.min, children: [
+//                     _mobileIconBtn(Icons.edit_outlined, _kPurple,
+//                             () => _openEdit(context, s)),
+//                     const SizedBox(height: 4),
+//                     _mobileIconBtn(Icons.delete_outline, Colors.red.shade600,
+//                             () => _confirmDelete(context, s.id!)),
+//                   ]),
+//                 ]))));
+//   }
 //
 //   Widget _mobilePill(String label, Color textColor, Color bgColor,
 //       {IconData? icon}) =>
@@ -723,6 +776,7 @@
 // }
 
 import 'dart:convert';
+import 'package:educoresystem/screens/teacher_management/staff_bulk_staff_management.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/teacher.dart';
@@ -909,7 +963,26 @@ class _StaffListScreenState extends State<StaffListScreen> {
                       fillColor: Colors.white),
                   style: const TextStyle(fontSize: 13),
                 )),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
+            // --- BULK OPTIONS (PopupMenu) ---
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: Colors.grey),
+              onSelected: (value) {
+                if (value == 'bulk_add') {
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const BulkAddStaffScreen()));
+                } else if (value == 'bulk_edit') {
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'staff')));
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(value: 'bulk_add', child: Text('Bulk Add')),
+                const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
+              ],
+            ),
+            const SizedBox(width: 4),
+            // Add Staff button
             ElevatedButton.icon(
               onPressed: () async {
                 final result = await Navigator.push(context,
@@ -1313,6 +1386,23 @@ class _StaffListScreenState extends State<StaffListScreen> {
               style: const TextStyle(fontSize: 11, color: Colors.white70)),
         ]),
         actions: [
+          // --- BULK OPTIONS (PopupMenu) for mobile ---
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onSelected: (value) {
+              if (value == 'bulk_add') {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const BulkAddStaffScreen()));
+              } else if (value == 'bulk_edit') {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'staff')));
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'bulk_add', child: Text('Bulk Add')),
+              const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
+            ],
+          ),
           IconButton(
               icon: const Icon(Icons.add),
               tooltip: 'Add Staff',

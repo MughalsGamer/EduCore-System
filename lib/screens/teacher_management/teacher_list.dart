@@ -14,7 +14,6 @@
 // const _kGreenBg = Color(0xFFDCFCE7);
 //
 // class TeacherListScreen extends StatefulWidget {
-//   // ── Optional callback for opening profile in a side panel ──
 //   final void Function(StaffMember staff,
 //       {Map<String, String> classIdToName})? onItemTap;
 //
@@ -68,13 +67,11 @@
 //         if (c.id != null) c.id!: c.name
 //     };
 //
-//     // If a callback exists, use it instead of pushing a full‑screen page.
 //     if (widget.onItemTap != null) {
 //       widget.onItemTap!(t, classIdToName: classIdToName);
 //       return;
 //     }
 //
-//     // Fallback: full‑screen navigation (standalone usage)
 //     final result = await Navigator.push(
 //       context,
 //       MaterialPageRoute(
@@ -193,8 +190,7 @@
 //             ElevatedButton.icon(
 //               onPressed: () async {
 //                 final result = await Navigator.push(context,
-//                     MaterialPageRoute(
-//                         builder: (_) => const AddEditStaffScreen()));
+//                     MaterialPageRoute(builder: (_) => const AddEditStaffScreen(initialType: 'teacher')));
 //                 if (result == true && mounted) provider.fetchTeachers();
 //               },
 //               icon: const Icon(Icons.add, size: 18),
@@ -275,12 +271,13 @@
 //                       child: Row(children: [
 //                         _th('PHOTO', flex: 6),
 //                         _th('NAME', flex: 19),
-//                         _th('DESIGNATION', flex: 15),
-//                         _th('SUBJECTS', flex: 15),
-//                         _th('PHONE', flex: 13),
-//                         _th('EMPLOYMENT', flex: 11),
-//                         _th('STATUS', flex: 9),
-//                         _th('ACTION', flex: 10, align: TextAlign.center),
+//                         _th('DESIGNATION', flex: 13),
+//                         _th('SUBJECTS', flex: 12),
+//                         _th('SECTIONS', flex: 12),     // NEW
+//                         _th('PHONE', flex: 11),
+//                         _th('EMPLOYMENT', flex: 10),
+//                         _th('STATUS', flex: 8),
+//                         _th('ACTION', flex: 9, align: TextAlign.center),
 //                       ])),
 //                   const Divider(height: 1, color: Color(0xFFEEEFF3)),
 //                   Expanded(
@@ -346,6 +343,8 @@
 //
 //   Widget _desktopRow(BuildContext context, dynamic t) {
 //     final subjects = (t.subjects as List?)?.cast<String>() ?? [];
+//     final sections = (t.assignedSections as List?)?.cast<String>() ?? [];
+//
 //     return InkWell(
 //       onTap: () => _openProfile(context, t),
 //       hoverColor: const Color(0xFFF8F8FF),
@@ -390,7 +389,7 @@
 //             ),
 //             // DESIGNATION
 //             Expanded(
-//               flex: 15,
+//               flex: 13,
 //               child: Text(
 //                   t.designation?.isNotEmpty == true ? t.designation! : '—',
 //                   style: TextStyle(
@@ -399,59 +398,28 @@
 //             ),
 //             // SUBJECTS
 //             Expanded(
-//               flex: 15,
+//               flex: 12,
 //               child: subjects.isEmpty
-//                   ? Text('—',
-//                   style: TextStyle(
-//                       fontSize: 13,
-//                       color: Colors.grey.shade400))
-//                   : Wrap(
-//                   spacing: 4,
-//                   runSpacing: 4,
-//                   children: subjects
-//                       .take(2)
-//                       .map((sub) => Container(
-//                     padding: const EdgeInsets.symmetric(
-//                         horizontal: 7, vertical: 2),
-//                     decoration: BoxDecoration(
-//                         color: const Color(0xFFF0EFFE),
-//                         borderRadius:
-//                         BorderRadius.circular(10)),
-//                     child: Text(sub,
-//                         style: const TextStyle(
-//                             fontSize: 10,
-//                             color: _kPurple,
-//                             fontWeight: FontWeight.w500)),
-//                   ))
-//                       .toList()
-//                     ..addAll(subjects.length > 2
-//                         ? [
-//                       Container(
-//                         padding: const EdgeInsets.symmetric(
-//                             horizontal: 7, vertical: 2),
-//                         decoration: BoxDecoration(
-//                             color: Colors.grey.shade100,
-//                             borderRadius:
-//                             BorderRadius.circular(10)),
-//                         child: Text(
-//                             '+${subjects.length - 2}',
-//                             style: TextStyle(
-//                                 fontSize: 10,
-//                                 color: Colors.grey.shade600)),
-//                       )
-//                     ]
-//                         : [])),
+//                   ? Text('—', style: TextStyle(fontSize: 13, color: Colors.grey.shade400))
+//                   : _buildChipRow(subjects, const Color(0xFFF0EFFE), _kPurple),
+//             ),
+//             // SECTIONS
+//             Expanded(
+//               flex: 12,
+//               child: sections.isEmpty
+//                   ? Text('—', style: TextStyle(fontSize: 13, color: Colors.grey.shade400))
+//                   : _buildChipRow(sections, const Color(0xFFE8F5E9), const Color(0xFF2E7D32)),
 //             ),
 //             // PHONE
 //             Expanded(
-//               flex: 13,
+//               flex: 11,
 //               child: Text(t.phone,
 //                   style: const TextStyle(fontSize: 13),
 //                   overflow: TextOverflow.ellipsis),
 //             ),
 //             // EMPLOYMENT
 //             Expanded(
-//               flex: 11,
+//               flex: 10,
 //               child: Center(
 //                 child: Container(
 //                   padding: const EdgeInsets.symmetric(
@@ -470,7 +438,7 @@
 //             ),
 //             // STATUS
 //             Expanded(
-//               flex: 9,
+//               flex: 8,
 //               child: Center(
 //                 child: Container(
 //                   padding: const EdgeInsets.symmetric(
@@ -489,7 +457,7 @@
 //             ),
 //             // ACTION
 //             Expanded(
-//               flex: 10,
+//               flex: 9,
 //               child: Center(
 //                 child: Row(
 //                     mainAxisAlignment: MainAxisAlignment.center,
@@ -510,6 +478,41 @@
 //               ),
 //             ),
 //           ])),
+//     );
+//   }
+//
+//   // Helper to build chip list with +N overflow
+//   Widget _buildChipRow(List<String> items, Color bgColor, Color textColor) {
+//     return Wrap(
+//       spacing: 4,
+//       runSpacing: 4,
+//       children: items
+//           .take(2)
+//           .map((item) => Container(
+//         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+//         decoration: BoxDecoration(
+//             color: bgColor,
+//             borderRadius: BorderRadius.circular(10)),
+//         child: Text(item,
+//             style: TextStyle(
+//                 fontSize: 10,
+//                 color: textColor,
+//                 fontWeight: FontWeight.w500)),
+//       ))
+//           .toList()
+//         ..addAll(items.length > 2
+//             ? [
+//           Container(
+//             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+//             decoration: BoxDecoration(
+//                 color: Colors.grey.shade100,
+//                 borderRadius: BorderRadius.circular(10)),
+//             child: Text('+${items.length - 2}',
+//                 style: TextStyle(
+//                     fontSize: 10, color: Colors.grey.shade600)),
+//           )
+//         ]
+//             : []),
 //     );
 //   }
 //
@@ -579,7 +582,7 @@
 //                         isActive ? Colors.white : Colors.grey.shade700)))));
 //   }
 //
-//   // ── MOBILE (unchanged) ──────────────────────────────────────────────────
+//   // ── MOBILE (unchanged layout, added sections) ───────────────────────────
 //   Widget _buildMobile() {
 //     final provider = context.watch<StaffProvider>();
 //     final filtered = _filtered(provider.teachers);
@@ -672,6 +675,8 @@
 //
 //   Widget _mobileCard(BuildContext context, dynamic t) {
 //     final subjects = (t.subjects as List?)?.cast<String>() ?? [];
+//     final sections = (t.assignedSections as List?)?.cast<String>() ?? [];
+//
 //     return Container(
 //         margin: const EdgeInsets.only(bottom: 10),
 //         decoration: BoxDecoration(
@@ -737,6 +742,17 @@
 //                                     '+${subjects.length - 1}',
 //                                     Colors.grey.shade600,
 //                                     Colors.grey.shade100),
+//                               if (sections.isNotEmpty)
+//                                 _mobilePill(
+//                                     sections.first,
+//                                     const Color(0xFF2E7D32),
+//                                     const Color(0xFFE8F5E9),
+//                                     icon: Icons.class_outlined),
+//                               if (sections.length > 1)
+//                                 _mobilePill(
+//                                     '+${sections.length - 1}',
+//                                     Colors.grey.shade600,
+//                                     Colors.grey.shade100),
 //                             ]),
 //                           ])),
 //                   Column(mainAxisSize: MainAxisSize.min, children: [
@@ -781,7 +797,9 @@
 //               child: Icon(icon, size: 16, color: color)));
 // }
 
+
 import 'dart:convert';
+import 'package:educoresystem/screens/teacher_management/staff_bulk_staff_management.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/teacher.dart';
@@ -968,7 +986,26 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                       fillColor: Colors.white),
                   style: const TextStyle(fontSize: 13),
                 )),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
+            // --- BULK OPTIONS (PopupMenu) ---
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: Colors.grey),
+              onSelected: (value) {
+                if (value == 'bulk_add') {
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const BulkAddStaffScreen()));
+                } else if (value == 'bulk_edit') {
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'teacher')));
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(value: 'bulk_add', child: Text('Bulk Add')),
+                const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
+              ],
+            ),
+            const SizedBox(width: 4),
+            // Add Teacher button
             ElevatedButton.icon(
               onPressed: () async {
                 final result = await Navigator.push(context,
@@ -1382,6 +1419,23 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
               style: const TextStyle(fontSize: 11, color: Colors.white70)),
         ]),
         actions: [
+          // --- BULK OPTIONS (PopupMenu) for mobile ---
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onSelected: (value) {
+              if (value == 'bulk_add') {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const BulkAddStaffScreen()));
+              } else if (value == 'bulk_edit') {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'teacher')));
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'bulk_add', child: Text('Bulk Add')),
+              const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
+            ],
+          ),
           IconButton(
               icon: const Icon(Icons.add),
               tooltip: 'Add Teacher',
@@ -1389,7 +1443,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                 final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const AddEditStaffScreen()));
+                        builder: (_) => const AddEditStaffScreen(initialType: 'teacher')));
                 if (result == true && mounted) provider.fetchTeachers();
               })
         ],
@@ -1448,7 +1502,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
             final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (_) => const AddEditStaffScreen()));
+                    builder: (_) => const AddEditStaffScreen(initialType: 'teacher')));
             if (result == true && mounted) provider.fetchTeachers();
           },
           child: const Icon(Icons.add)),
