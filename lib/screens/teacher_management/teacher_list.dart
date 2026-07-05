@@ -1,5 +1,7 @@
-//
+
+//2nd screen
 // import 'dart:convert';
+// import 'package:educoresystem/screens/teacher_management/staff_bulk_staff_management.dart';
 // import 'package:flutter/material.dart';
 // import 'package:provider/provider.dart';
 // import '../../models/teacher.dart';
@@ -186,7 +188,26 @@
 //                       fillColor: Colors.white),
 //                   style: const TextStyle(fontSize: 13),
 //                 )),
-//             const SizedBox(width: 12),
+//             const SizedBox(width: 8),
+//             // --- BULK OPTIONS (PopupMenu) ---
+//             PopupMenuButton<String>(
+//               icon: const Icon(Icons.more_vert, color: Colors.grey),
+//               onSelected: (value) {
+//                 if (value == 'bulk_add') {
+//                   Navigator.push(context,
+//                       MaterialPageRoute(builder: (_) => const BulkAddStaffScreen()));
+//                 } else if (value == 'bulk_edit') {
+//                   Navigator.push(context,
+//                       MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'teacher')));
+//                 }
+//               },
+//               itemBuilder: (context) => [
+//                 const PopupMenuItem(value: 'bulk_add', child: Text('Bulk Add')),
+//                 const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
+//               ],
+//             ),
+//             const SizedBox(width: 4),
+//             // Add Teacher button
 //             ElevatedButton.icon(
 //               onPressed: () async {
 //                 final result = await Navigator.push(context,
@@ -600,6 +621,23 @@
 //               style: const TextStyle(fontSize: 11, color: Colors.white70)),
 //         ]),
 //         actions: [
+//           // --- BULK OPTIONS (PopupMenu) for mobile ---
+//           PopupMenuButton<String>(
+//             icon: const Icon(Icons.more_vert, color: Colors.white),
+//             onSelected: (value) {
+//               if (value == 'bulk_add') {
+//                 Navigator.push(context,
+//                     MaterialPageRoute(builder: (_) => const BulkAddStaffScreen()));
+//               } else if (value == 'bulk_edit') {
+//                 Navigator.push(context,
+//                     MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'teacher')));
+//               }
+//             },
+//             itemBuilder: (context) => [
+//               const PopupMenuItem(value: 'bulk_add', child: Text('Bulk Add')),
+//               const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
+//             ],
+//           ),
 //           IconButton(
 //               icon: const Icon(Icons.add),
 //               tooltip: 'Add Teacher',
@@ -607,7 +645,7 @@
 //                 final result = await Navigator.push(
 //                     context,
 //                     MaterialPageRoute(
-//                         builder: (_) => const AddEditStaffScreen()));
+//                         builder: (_) => const AddEditStaffScreen(initialType: 'teacher')));
 //                 if (result == true && mounted) provider.fetchTeachers();
 //               })
 //         ],
@@ -666,7 +704,7 @@
 //             final result = await Navigator.push(
 //                 context,
 //                 MaterialPageRoute(
-//                     builder: (_) => const AddEditStaffScreen()));
+//                     builder: (_) => const AddEditStaffScreen(initialType: 'teacher')));
 //             if (result == true && mounted) provider.fetchTeachers();
 //           },
 //           child: const Icon(Icons.add)),
@@ -797,7 +835,6 @@
 //               child: Icon(icon, size: 16, color: color)));
 // }
 
-
 import 'dart:convert';
 import 'package:educoresystem/screens/teacher_management/staff_bulk_staff_management.dart';
 import 'package:flutter/material.dart';
@@ -807,6 +844,7 @@ import '../../providers/teacher_provider.dart';
 import '../../providers/class_provider.dart';
 import 'Staff Profile.dart';
 import 'add_teacher.dart';
+import 'deactivate_staff_teacher_management.dart';
 
 const _kPurple = Color(0xFF534AB7);
 const _kPurpleLight = Color(0xFFF0EFFE);
@@ -924,6 +962,51 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
         ));
   }
 
+  // ★ NEW – confirmation dialog then deactivate + refresh list
+  void _confirmDeactivate(BuildContext context, dynamic t) {
+    showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14)),
+          title: const Text('Deactivate Teacher?',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          content: Text(
+              'This will move "${t.name}" to the Deactivated list. You can reactivate them later.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange.shade700,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8))),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await context.read<StaffProvider>().deactivateStaff(t.id!);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('${t.name} has been deactivated')),
+                  );
+                  setState(() {}); // refresh screen; provider list already excludes inactive
+                }
+              },
+              child: const Text('Deactivate'),
+            ),
+          ],
+        ));
+  }
+
+  void _openDeactivatedList(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => const DeactivatedStaffScreen(initialTypeFilter: 'teacher')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width >= 720;
@@ -997,11 +1080,16 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                 } else if (value == 'bulk_edit') {
                   Navigator.push(context,
                       MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'teacher')));
+                } else if (value == 'deactivated_list') {
+                  _openDeactivatedList(context);
                 }
               },
               itemBuilder: (context) => [
                 const PopupMenuItem(value: 'bulk_add', child: Text('Bulk Add')),
                 const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
+                const PopupMenuItem(
+                    value: 'deactivated_list',
+                    child: Text('Deactivated List')), // ★ NEW
               ],
             ),
             const SizedBox(width: 4),
@@ -1092,7 +1180,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                         _th('NAME', flex: 19),
                         _th('DESIGNATION', flex: 13),
                         _th('SUBJECTS', flex: 12),
-                        _th('SECTIONS', flex: 12),     // NEW
+                        _th('SECTIONS', flex: 12),
                         _th('PHONE', flex: 11),
                         _th('EMPLOYMENT', flex: 10),
                         _th('STATUS', flex: 8),
@@ -1281,10 +1369,11 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                 child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _actionBtn(Icons.visibility_outlined,
-                          Colors.blue.shade600,
-                              () => _openProfile(context, t),
-                          tooltip: 'View'),
+                      // ★ CHANGED: View icon → Deactivate icon
+                      _actionBtn(Icons.person_off_outlined,
+                          Colors.orange.shade700,
+                              () => _confirmDeactivate(context, t),
+                          tooltip: 'Deactivate'),
                       const SizedBox(width: 4),
                       _actionBtn(Icons.edit_outlined, _kPurple,
                               () => _openEdit(context, t),
@@ -1429,11 +1518,16 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
               } else if (value == 'bulk_edit') {
                 Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'teacher')));
+              } else if (value == 'deactivated_list') {
+                _openDeactivatedList(context);
               }
             },
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'bulk_add', child: Text('Bulk Add')),
               const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
+              const PopupMenuItem(
+                  value: 'deactivated_list',
+                  child: Text('Deactivated List')), // ★ NEW
             ],
           ),
           IconButton(
@@ -1592,6 +1686,11 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                             ]),
                           ])),
                   Column(mainAxisSize: MainAxisSize.min, children: [
+                    // ★ CHANGED: View icon → Deactivate icon
+                    _mobileIconBtn(Icons.person_off_outlined,
+                        Colors.orange.shade700,
+                            () => _confirmDeactivate(context, t)),
+                    const SizedBox(height: 4),
                     _mobileIconBtn(Icons.edit_outlined, _kPurple,
                             () => _openEdit(context, t)),
                     const SizedBox(height: 4),

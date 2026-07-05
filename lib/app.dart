@@ -1,4 +1,5 @@
 import 'package:educoresystem/providers/admission_provider.dart';
+import 'package:educoresystem/providers/attendance_provider.dart';
 import 'package:educoresystem/providers/subject_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -23,6 +24,7 @@ class SchoolApp extends StatelessWidget {
         ChangeNotifierProvider<ClassProvider>(create: (_) => ClassProvider()),
         ChangeNotifierProvider<StudentProvider>(create: (_) => StudentProvider()),
         ChangeNotifierProvider<StaffProvider>(create: (_) => StaffProvider()),
+        ChangeNotifierProvider(create: (_) => AttendanceProvider()),
         ChangeNotifierProvider<FeeProvider>(create: (_) => FeeProvider()),
         ChangeNotifierProvider<ExpenseProvider>(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => MuddulProvider()..startListening()),

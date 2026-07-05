@@ -1,5 +1,6 @@
 //
 // import 'dart:convert';
+// import 'package:educoresystem/screens/teacher_management/staff_bulk_staff_management.dart';
 // import 'package:flutter/material.dart';
 // import 'package:provider/provider.dart';
 // import '../../models/teacher.dart';
@@ -186,7 +187,26 @@
 //                       fillColor: Colors.white),
 //                   style: const TextStyle(fontSize: 13),
 //                 )),
-//             const SizedBox(width: 12),
+//             const SizedBox(width: 8),
+//             // --- BULK OPTIONS (PopupMenu) ---
+//             PopupMenuButton<String>(
+//               icon: const Icon(Icons.more_vert, color: Colors.grey),
+//               onSelected: (value) {
+//                 if (value == 'bulk_add') {
+//                   Navigator.push(context,
+//                       MaterialPageRoute(builder: (_) => const BulkAddStaffScreen()));
+//                 } else if (value == 'bulk_edit') {
+//                   Navigator.push(context,
+//                       MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'staff')));
+//                 }
+//               },
+//               itemBuilder: (context) => [
+//                 const PopupMenuItem(value: 'bulk_add', child: Text('Bulk Add')),
+//                 const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
+//               ],
+//             ),
+//             const SizedBox(width: 4),
+//             // Add Staff button
 //             ElevatedButton.icon(
 //               onPressed: () async {
 //                 final result = await Navigator.push(context,
@@ -590,6 +610,23 @@
 //               style: const TextStyle(fontSize: 11, color: Colors.white70)),
 //         ]),
 //         actions: [
+//           // --- BULK OPTIONS (PopupMenu) for mobile ---
+//           PopupMenuButton<String>(
+//             icon: const Icon(Icons.more_vert, color: Colors.white),
+//             onSelected: (value) {
+//               if (value == 'bulk_add') {
+//                 Navigator.push(context,
+//                     MaterialPageRoute(builder: (_) => const BulkAddStaffScreen()));
+//               } else if (value == 'bulk_edit') {
+//                 Navigator.push(context,
+//                     MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'staff')));
+//               }
+//             },
+//             itemBuilder: (context) => [
+//               const PopupMenuItem(value: 'bulk_add', child: Text('Bulk Add')),
+//               const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
+//             ],
+//           ),
 //           IconButton(
 //               icon: const Icon(Icons.add),
 //               tooltip: 'Add Staff',
@@ -784,6 +821,7 @@ import '../../providers/teacher_provider.dart';
 import '../../providers/class_provider.dart';
 import 'Staff Profile.dart';
 import 'add_teacher.dart';
+import 'deactivate_staff_teacher_management.dart';
 
 const _kPurple = Color(0xFF534AB7);
 const _kPurpleLight = Color(0xFFF0EFFE);
@@ -901,6 +939,51 @@ class _StaffListScreenState extends State<StaffListScreen> {
         ));
   }
 
+  // ★ NEW – confirmation dialog then deactivate + refresh list
+  void _confirmDeactivate(BuildContext context, dynamic s) {
+    showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14)),
+          title: const Text('Deactivate Staff?',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          content: Text(
+              'This will move "${s.name}" to the Deactivated list. You can reactivate them later.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange.shade700,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8))),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await context.read<StaffProvider>().deactivateStaff(s.id!);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('${s.name} has been deactivated')),
+                  );
+                  setState(() {});
+                }
+              },
+              child: const Text('Deactivate'),
+            ),
+          ],
+        ));
+  }
+
+  void _openDeactivatedList(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => const DeactivatedStaffScreen(initialTypeFilter: 'staff')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width >= 720;
@@ -974,11 +1057,16 @@ class _StaffListScreenState extends State<StaffListScreen> {
                 } else if (value == 'bulk_edit') {
                   Navigator.push(context,
                       MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'staff')));
+                } else if (value == 'deactivated_list') {
+                  _openDeactivatedList(context);
                 }
               },
               itemBuilder: (context) => [
                 const PopupMenuItem(value: 'bulk_add', child: Text('Bulk Add')),
                 const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
+                const PopupMenuItem(
+                    value: 'deactivated_list',
+                    child: Text('Deactivated List')), // ★ NEW
               ],
             ),
             const SizedBox(width: 4),
@@ -1069,7 +1157,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
                         _th('PHOTO', flex: 7),
                         _th('NAME', flex: 22),
                         _th('DESIGNATION', flex: 15),
-                        _th('SECTIONS', flex: 12),     // NEW
+                        _th('SECTIONS', flex: 12),
                         _th('PHONE', flex: 14),
                         _th('EMPLOYMENT', flex: 14),
                         _th('STATUS', flex: 10),
@@ -1249,10 +1337,11 @@ class _StaffListScreenState extends State<StaffListScreen> {
                 child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _actionBtn(Icons.visibility_outlined,
-                          Colors.blue.shade600,
-                              () => _openProfile(context, s),
-                          tooltip: 'View'),
+                      // ★ CHANGED: View icon → Deactivate icon
+                      _actionBtn(Icons.person_off_outlined,
+                          Colors.orange.shade700,
+                              () => _confirmDeactivate(context, s),
+                          tooltip: 'Deactivate'),
                       const SizedBox(width: 4),
                       _actionBtn(Icons.edit_outlined, _kPurple,
                               () => _openEdit(context, s),
@@ -1396,11 +1485,16 @@ class _StaffListScreenState extends State<StaffListScreen> {
               } else if (value == 'bulk_edit') {
                 Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'staff')));
+              } else if (value == 'deactivated_list') {
+                _openDeactivatedList(context);
               }
             },
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'bulk_add', child: Text('Bulk Add')),
               const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
+              const PopupMenuItem(
+                  value: 'deactivated_list',
+                  child: Text('Deactivated List')), // ★ NEW
             ],
           ),
           IconButton(
@@ -1547,6 +1641,11 @@ class _StaffListScreenState extends State<StaffListScreen> {
                             ]),
                           ])),
                   Column(mainAxisSize: MainAxisSize.min, children: [
+                    // ★ CHANGED: View icon → Deactivate icon
+                    _mobileIconBtn(Icons.person_off_outlined,
+                        Colors.orange.shade700,
+                            () => _confirmDeactivate(context, s)),
+                    const SizedBox(height: 4),
                     _mobileIconBtn(Icons.edit_outlined, _kPurple,
                             () => _openEdit(context, s)),
                     const SizedBox(height: 4),
