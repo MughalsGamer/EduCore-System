@@ -1,145 +1,228 @@
-import 'package:flutter/foundation.dart';
+// import 'package:flutter/material.dart';
+// import 'package:provider/provider.dart';
+// import '../models/attendance_model.dart';
+// import '../models/teacher.dart';
+// import '../providers/teacher_provider.dart';
+// import '../services/attendance_firestore_service.dart'; // Your existing provider
+//
+// class AttendanceProvider extends ChangeNotifier {
+//   final StaffProvider _staffProvider;
+//   final AttendanceFirestoreService _service = AttendanceFirestoreService();
+//
+//   List<AttendanceRecord> _records = [];
+//   bool _loading = false;
+//   String _selectedDate = DateTime.now().toIso8601String().split('T')[0];
+//   String _filterType = 'all'; // 'all', 'teacher', 'staff'
+//
+//   List<AttendanceRecord> get records => _records;
+//   bool get loading => _loading;
+//   String get selectedDate => _selectedDate;
+//   String get filterType => _filterType;
+//
+//   AttendanceProvider(this._staffProvider);
+//
+//   Future<void> loadData({String? typeFilter}) async {
+//     _loading = true;
+//     _filterType = typeFilter ?? _filterType;
+//     notifyListeners();
+//
+//     // 1. Ensure StaffProvider has latest active data
+//     await _staffProvider.fetchTeachers();
+//     await _staffProvider.fetchStaffOnly();
+//
+//     // 2. Fetch existing attendance from Firestore
+//     final existingRecords = await _service.getAttendanceForDate(_selectedDate);
+//
+//     // 3. Determine which staff to show based on filter
+//     List<StaffMember> activeStaff = [];
+//     if (_filterType == 'teacher') {
+//       activeStaff = _staffProvider.teachers;
+//     } else if (_filterType == 'staff') {
+//       activeStaff = _staffProvider.staffOnly;
+//     } else {
+//       activeStaff = [..._staffProvider.teachers, ..._staffProvider.staffOnly];
+//     }
+//
+//     // 4. Merge into local records (✅ FIXED HERE)
+//     _records = activeStaff.map((staff) {
+//       final matchingRecords = existingRecords.where((r) => r.staffId == staff.id).toList();
+//       final existing = matchingRecords.isNotEmpty ? matchingRecords.first : null;
+//
+//       return AttendanceRecord(
+//         id: existing?.id ?? '${staff.id}_${_selectedDate}',
+//         staffId: staff.id!,
+//         staffName: staff.name,
+//         photoBase64: staff.imageBase64,
+//         type: staff.type,
+//         date: _selectedDate,
+//         status: existing?.status ?? 'present',
+//         remarks: existing?.remarks ?? '',
+//       );
+//     }).toList();
+//
+//     _loading = false;
+//     notifyListeners();
+//   }
+//
+//   // Change date and reload
+//   void changeDate(DateTime newDate) {
+//     _selectedDate = newDate.toIso8601String().split('T')[0];
+//     loadData();
+//   }
+//
+//   // Change filter and reload
+//   void changeFilter(String newFilter) {
+//     _filterType = newFilter;
+//     loadData();
+//   }
+//
+//   // Update single status
+//   void updateStatus(String staffId, String status) {
+//     final index = _records.indexWhere((r) => r.staffId == staffId);
+//     if (index != -1) {
+//       _records[index].status = status;
+//       notifyListeners();
+//     }
+//   }
+//
+//   // Update single remark
+//   void updateRemarks(String staffId, String remark) {
+//     final index = _records.indexWhere((r) => r.staffId == staffId);
+//     if (index != -1) {
+//       _records[index].remarks = remark;
+//       notifyListeners();
+//     }
+//   }
+//
+//   // Quick action: Mark all present/absent
+//   void markAll(String status) {
+//     for (final record in _records) {
+//       record.status = status;
+//     }
+//     notifyListeners();
+//   }
+//
+//   // Save to Firestore
+//   Future<void> saveAttendance() async {
+//     await _service.saveAttendance(_records);
+//     // Optionally reload to ensure local data matches server state
+//     await loadData();
+//   }
+// }
 
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/attendance_model.dart';
-import '../services/attendance_firestore_service.dart';
+import '../models/teacher.dart';
+import '../providers/teacher_provider.dart';
+import '../services/attendance_firestore_service.dart'; // Your existing provider
 
-/// Attendance state management, mirroring StaffProvider's ChangeNotifier
-/// pattern so it plugs into the app the same way.
 class AttendanceProvider extends ChangeNotifier {
+  final StaffProvider _staffProvider;
   final AttendanceFirestoreService _service = AttendanceFirestoreService();
 
+  List<AttendanceRecord> _records = [];
   bool _loading = false;
+  String _selectedDate = DateTime.now().toIso8601String().split('T')[0];
+  String _filterType = 'all'; // 'all', 'teacher', 'staff'
+
+  List<AttendanceRecord> get records => _records;
   bool get loading => _loading;
+  String get selectedDate => _selectedDate;
+  String get filterType => _filterType;
 
-  bool _saving = false;
-  bool get saving => _saving;
+  AttendanceProvider(this._staffProvider);
 
-  String? _error;
-  String? get error => _error;
-
-  // ── View/Edit screen state ──
-  List<AttendanceRecord> _byDateRecords = [];
-  List<AttendanceRecord> get byDateRecords => _byDateRecords;
-
-  List<AttendanceRecord> _byStaffRecords = [];
-  List<AttendanceRecord> get byStaffRecords => _byStaffRecords;
-
-  /// Marks a single attendance record.
-  Future<bool> markAttendance(AttendanceRecord record) async {
-    try {
-      await _service.markAttendance(record);
-      return true;
-    } catch (e) {
-      _error = 'Attendance save nahi ho saki: $e';
-      notifyListeners();
-      return false;
-    }
-  }
-
-  /// Marks multiple attendance records at once (used by both Mode 1's
-  /// multi-staff single-date save and Mode 2's multi-staff multi-date save).
-  /// Returns true on success so calling screens can show the right feedback.
-  Future<bool> markMultiple(List<AttendanceRecord> records) async {
-    _saving = true;
-    _error = null;
-    notifyListeners();
-    try {
-      await _service.markMultiple(records);
-      _saving = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _saving = false;
-      _error = 'Records save karte waqt error aayi: $e';
-      notifyListeners();
-      return false;
-    }
-  }
-
-  /// Loads every attendance record for a given date (View/Edit → By Date).
-  Future<void> fetchByDate(String date) async {
+  Future<void> loadData({String? typeFilter}) async {
     _loading = true;
-    _error = null;
+    _filterType = typeFilter ?? _filterType;
     notifyListeners();
-    try {
-      final results = await _service.getByDate(date);
-      results.sort((a, b) => a.staffName.compareTo(b.staffName));
-      _byDateRecords = results;
-    } catch (e) {
-      _error = 'Attendance load nahi ho saki: $e';
-    } finally {
-      _loading = false;
+
+    // 1. Ensure StaffProvider has latest active data
+    await _staffProvider.fetchTeachers();
+    await _staffProvider.fetchStaffOnly();
+
+    // 2. Fetch existing attendance from Firestore
+    final existingRecords = await _service.getAttendanceForDate(_selectedDate);
+
+    // 3. Determine which staff to show based on filter
+    List<StaffMember> activeStaff = [];
+    if (_filterType == 'teacher') {
+      activeStaff = _staffProvider.teachers;
+    } else if (_filterType == 'staff') {
+      activeStaff = _staffProvider.staffOnly;
+    } else {
+      activeStaff = [..._staffProvider.teachers, ..._staffProvider.staffOnly];
+    }
+
+    // 4. Merge into local records (✅ FIXED HERE)
+    _records = activeStaff.map((staff) {
+      final matchingRecords =
+      existingRecords.where((r) => r.staffId == staff.id).toList();
+      final existing = matchingRecords.isNotEmpty ? matchingRecords.first : null;
+
+      return AttendanceRecord(
+        id: existing?.id ?? '${staff.id}_${_selectedDate}',
+        staffId: staff.id!,
+        staffName: staff.name,
+        photoBase64: staff.imageBase64,
+        type: staff.type,
+        date: _selectedDate,
+        status: existing?.status ?? 'present',
+        remarks: existing?.remarks ?? '',
+        designation: staff.designation,
+        // ★ NEW – true means this staff already has an attendance record
+        // saved in Firestore for the currently selected date.
+        isSaved: existing != null,
+      );
+    }).toList();
+
+    _loading = false;
+    notifyListeners();
+  }
+
+  // Change date and reload
+  void changeDate(DateTime newDate) {
+    _selectedDate = newDate.toIso8601String().split('T')[0];
+    loadData();
+  }
+
+  // Change filter and reload
+  void changeFilter(String newFilter) {
+    _filterType = newFilter;
+    loadData();
+  }
+
+  // Update single status
+  void updateStatus(String staffId, String status) {
+    final index = _records.indexWhere((r) => r.staffId == staffId);
+    if (index != -1) {
+      _records[index].status = status;
       notifyListeners();
     }
   }
 
-  /// Loads every attendance record for a given staff member within a
-  /// given month, formatted 'yyyy-MM' (View/Edit → By Staff).
-  Future<void> fetchByStaffAndMonth(String staffId, String yearMonth) async {
-    _loading = true;
-    _error = null;
-    notifyListeners();
-    try {
-      _byStaffRecords =
-      await _service.getByStaffAndMonth(staffId, yearMonth);
-    } catch (e) {
-      _error = 'Attendance load nahi ho saki: $e';
-    } finally {
-      _loading = false;
+  // Update single remark
+  void updateRemarks(String staffId, String remark) {
+    final index = _records.indexWhere((r) => r.staffId == staffId);
+    if (index != -1) {
+      _records[index].remarks = remark;
       notifyListeners();
     }
   }
 
-  /// Edits an already-marked record's status, then keeps whichever local
-  /// cached list (by-date or by-staff) is showing it in sync so the UI
-  /// updates immediately without a re-fetch.
-  Future<bool> updateStatus(AttendanceRecord record, String newStatus) async {
-    try {
-      await _service.updateStatus(record, newStatus);
-
-      final updated = record.copyWith(status: newStatus);
-
-      final dateIndex =
-      _byDateRecords.indexWhere((r) => r.docId == record.docId);
-      if (dateIndex != -1) _byDateRecords[dateIndex] = updated;
-
-      final staffIndex =
-      _byStaffRecords.indexWhere((r) => r.docId == record.docId);
-      if (staffIndex != -1) _byStaffRecords[staffIndex] = updated;
-
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _error = 'Status update nahi ho saka: $e';
-      notifyListeners();
-      return false;
+  // Quick action: Mark all present/absent
+  void markAll(String status) {
+    for (final record in _records) {
+      record.status = status;
     }
-  }
-
-  /// Deletes a single attendance record entirely.
-  Future<bool> deleteRecord(AttendanceRecord record) async {
-    try {
-      await _service.deleteRecord(record.docId);
-      _byDateRecords.removeWhere((r) => r.docId == record.docId);
-      _byStaffRecords.removeWhere((r) => r.docId == record.docId);
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _error = 'Record delete nahi ho saka: $e';
-      notifyListeners();
-      return false;
-    }
-  }
-
-  void clearError() {
-    _error = null;
     notifyListeners();
   }
 
-  void clear() {
-    _byDateRecords = [];
-    _byStaffRecords = [];
-    _error = null;
-    notifyListeners();
+  // Save to Firestore
+  Future<void> saveAttendance() async {
+    await _service.saveAttendance(_records);
+    // Optionally reload to ensure local data matches server state
+    await loadData();
   }
 }

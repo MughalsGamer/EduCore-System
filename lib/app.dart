@@ -24,7 +24,12 @@ class SchoolApp extends StatelessWidget {
         ChangeNotifierProvider<ClassProvider>(create: (_) => ClassProvider()),
         ChangeNotifierProvider<StudentProvider>(create: (_) => StudentProvider()),
         ChangeNotifierProvider<StaffProvider>(create: (_) => StaffProvider()),
-        ChangeNotifierProvider(create: (_) => AttendanceProvider()),
+        ChangeNotifierProxyProvider<StaffProvider, AttendanceProvider>(
+          create: (context) => AttendanceProvider(context.read<StaffProvider>()),
+          update: (context, staffProvider, attendanceProvider) {
+            return attendanceProvider ?? AttendanceProvider(staffProvider);
+          },
+        ),
         ChangeNotifierProvider<FeeProvider>(create: (_) => FeeProvider()),
         ChangeNotifierProvider<ExpenseProvider>(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => MuddulProvider()..startListening()),
