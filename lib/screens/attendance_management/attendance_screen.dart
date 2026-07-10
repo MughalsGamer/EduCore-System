@@ -29,12 +29,46 @@
 // const _kPurple = Color(0xFF6D28D9);
 // const _kPurpleBg = Color(0xFFF5F3FF);
 //
+// // ★ Saved-record highlight (whole card/row tint when attendance already exists)
+// const _kSavedBg = Color(0xFFEFFCF3); // light green
+// const _kSavedBorder = Color(0xFFBBEBC7);
+//
 // const List<Map<String, Object>> _kStatuses = [
-//   {'key': 'present', 'label': 'Present', 'color': _kGreen, 'bg': _kGreenBg},
-//   {'key': 'absent', 'label': 'Absent', 'color': _kRed, 'bg': _kRedBg},
-//   {'key': 'late', 'label': 'Late', 'color': _kOrange, 'bg': _kOrangeBg},
-//   {'key': 'leave', 'label': 'Leave', 'color': _kBlue, 'bg': _kBlueBg},
-//   {'key': 'half_day', 'label': 'Half Day', 'color': _kPurple, 'bg': _kPurpleBg},
+//   {
+//     'key': 'present',
+//     'label': 'Present',
+//     'icon': Icons.check_circle_rounded,
+//     'color': _kGreen,
+//     'bg': _kGreenBg,
+//   },
+//   {
+//     'key': 'absent',
+//     'label': 'Absent',
+//     'icon': Icons.cancel_rounded,
+//     'color': _kRed,
+//     'bg': _kRedBg,
+//   },
+//   {
+//     'key': 'late',
+//     'label': 'Late',
+//     'icon': Icons.schedule_rounded,
+//     'color': _kOrange,
+//     'bg': _kOrangeBg,
+//   },
+//   {
+//     'key': 'leave',
+//     'label': 'Leave',
+//     'icon': Icons.beach_access_rounded,
+//     'color': _kBlue,
+//     'bg': _kBlueBg,
+//   },
+//   {
+//     'key': 'half_day',
+//     'label': 'Half Day',
+//     'icon': Icons.hourglass_bottom_rounded,
+//     'color': _kPurple,
+//     'bg': _kPurpleBg,
+//   },
 // ];
 //
 // const double _kDesktopBreakpoint = 900;
@@ -67,6 +101,9 @@
 //
 //     return Scaffold(
 //       backgroundColor: _kSurface,
+//       // Full-screen: no bottom nav / drawer clipping, body takes entire
+//       // available height below the AppBar.
+//       extendBody: false,
 //       appBar: _buildAppBar(context),
 //       body: SafeArea(
 //         child: LayoutBuilder(
@@ -134,22 +171,23 @@
 //   Widget _buildDesktopLayout(BuildContext context,
 //       AttendanceProvider provider, BoxConstraints constraints) {
 //     return Padding(
-//       padding: const EdgeInsets.fromLTRB(28, 20, 28, 20),
+//       padding: const EdgeInsets.fromLTRB(28, 16, 28, 16),
 //       child: Column(
 //         crossAxisAlignment: CrossAxisAlignment.stretch,
 //         children: [
 //           _buildToolbarCard(context, provider, isDesktop: true),
-//           const SizedBox(height: 16),
+//           const SizedBox(height: 14),
 //           _buildSummaryStrip(provider),
-//           const SizedBox(height: 16),
+//           const SizedBox(height: 14),
+//           // Full-screen: list area takes all remaining vertical space.
 //           Expanded(
 //             child: provider.loading
 //                 ? _buildLoadingState()
 //                 : provider.records.isEmpty
 //                 ? _buildEmptyState()
-//                 : _buildDesktopTableCard(provider),
+//                 : _buildDesktopCardList(provider),
 //           ),
-//           const SizedBox(height: 16),
+//           const SizedBox(height: 14),
 //           _buildSaveBar(context, provider, isDesktop: true),
 //         ],
 //       ),
@@ -164,15 +202,16 @@
 //     return Column(
 //       children: [
 //         Padding(
-//           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+//           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
 //           child: _buildToolbarCard(context, provider, isDesktop: false),
 //         ),
-//         const SizedBox(height: 12),
+//         const SizedBox(height: 10),
 //         Padding(
 //           padding: const EdgeInsets.symmetric(horizontal: 16),
 //           child: _buildSummaryStrip(provider),
 //         ),
 //         const SizedBox(height: 8),
+//         // Full-screen: list gets all remaining space, scrolls independently.
 //         Expanded(
 //           child: provider.loading
 //               ? _buildLoadingState()
@@ -192,7 +231,7 @@
 //       BuildContext context, AttendanceProvider provider,
 //       {required bool isDesktop}) {
 //     return Container(
-//       padding: const EdgeInsets.all(16),
+//       padding: const EdgeInsets.all(14),
 //       decoration: BoxDecoration(
 //         color: _kCard,
 //         borderRadius: BorderRadius.circular(10),
@@ -205,7 +244,7 @@
 //           const SizedBox(width: 12),
 //           _buildTypeFilter(provider),
 //           const Spacer(),
-//           _buildQuickActions(provider),
+//           _buildQuickActions(context, provider),
 //         ],
 //       )
 //           : Column(
@@ -223,7 +262,7 @@
 //             ],
 //           ),
 //           const SizedBox(height: 10),
-//           _buildQuickActions(provider, fullWidth: true),
+//           _buildQuickActions(context, provider, fullWidth: true),
 //         ],
 //       ),
 //     );
@@ -330,18 +369,24 @@
 //     );
 //   }
 //
-//   Widget _buildQuickActions(AttendanceProvider provider,
+//   // ★ FIX: Quick actions (Mark All Present / Mark All Absent) now skip
+//   // records that are already saved, and warn the user via a SnackBar
+//   // if one or more people were skipped because their attendance was
+//   // already marked for the selected date.
+//   Widget _buildQuickActions(BuildContext context, AttendanceProvider provider,
 //       {bool fullWidth = false}) {
 //     final children = [
 //       _buildQuickActionBtn(
 //           'Mark All Present', Icons.check_circle_outline, _kGreen, _kGreenBg,
 //               () {
-//             provider.markAll('present');
+//             final skipped = provider.markAll('present');
+//             _showMarkAllResult(context, skipped);
 //           }),
 //       const SizedBox(width: 8),
 //       _buildQuickActionBtn(
 //           'Mark All Absent', Icons.cancel_outlined, _kRed, _kRedBg, () {
-//         provider.markAll('absent');
+//         final skipped = provider.markAll('absent');
+//         _showMarkAllResult(context, skipped);
 //       }),
 //     ];
 //
@@ -355,6 +400,20 @@
 //       );
 //     }
 //     return Row(mainAxisSize: MainAxisSize.min, children: children);
+//   }
+//
+//   void _showMarkAllResult(BuildContext context, int skippedCount) {
+//     if (skippedCount <= 0) return;
+//     ScaffoldMessenger.of(context).showSnackBar(
+//       SnackBar(
+//         content: Text(
+//           skippedCount == 1
+//               ? 'Attendance already marked for 1 person on this date. Skipped.'
+//               : 'Attendance already marked for $skippedCount people on this date. Skipped.',
+//         ),
+//         backgroundColor: _kOrange,
+//       ),
+//     );
 //   }
 //
 //   Widget _buildQuickActionBtn(String label, IconData icon, Color color,
@@ -401,34 +460,42 @@
 //         counts[r.status] = counts[r.status]! + 1;
 //       }
 //     }
+//     final savedCount = provider.records.where((r) => r.isSaved).length;
 //
 //     return SizedBox(
 //       height: 64,
-//       child: LayoutBuilder(builder: (context, constraints) {
-//         return Row(
-//           children: [
+//       child: Row(
+//         children: [
+//           Expanded(
+//             child: _buildSummaryTile(
+//               'Total',
+//               provider.records.length.toString(),
+//               _kInk,
+//               _kSurface,
+//             ),
+//           ),
+//           const SizedBox(width: 8),
+//           Expanded(
+//             child: _buildSummaryTile(
+//               'Saved',
+//               savedCount.toString(),
+//               _kGreen,
+//               _kSavedBg,
+//             ),
+//           ),
+//           for (final s in _kStatuses) ...[
+//             const SizedBox(width: 8),
 //             Expanded(
 //               child: _buildSummaryTile(
-//                 'Total',
-//                 provider.records.length.toString(),
-//                 _kInk,
-//                 _kSurface,
+//                 s['label'] as String,
+//                 counts[s['key']].toString(),
+//                 s['color'] as Color,
+//                 s['bg'] as Color,
 //               ),
 //             ),
-//             for (final s in _kStatuses) ...[
-//               const SizedBox(width: 8),
-//               Expanded(
-//                 child: _buildSummaryTile(
-//                   s['label'] as String,
-//                   counts[s['key']].toString(),
-//                   s['color'] as Color,
-//                   s['bg'] as Color,
-//                 ),
-//               ),
-//             ],
 //           ],
-//         );
-//       }),
+//         ],
+//       ),
 //     );
 //   }
 //
@@ -463,100 +530,25 @@
 //   }
 //
 //   // ============================================================
-//   // DESKTOP TABLE
+//   // DESKTOP: card list (replaces the old DataTable so the big
+//   // status buttons have room to breathe, same as mobile but in
+//   // a wider two-column-ish row layout).
 //   // ============================================================
-//   Widget _buildDesktopTableCard(AttendanceProvider provider) {
-//     return Container(
-//       decoration: BoxDecoration(
-//         color: _kCard,
-//         borderRadius: BorderRadius.circular(10),
-//         border: Border.all(color: _kBorder),
-//       ),
-//       clipBehavior: Clip.antiAlias,
-//       child: Column(
-//         children: [
-//           Expanded(
-//             child: SingleChildScrollView(
-//               scrollDirection: Axis.horizontal,
-//               child: ConstrainedBox(
-//                 constraints: const BoxConstraints(minWidth: 860),
-//                 child: SingleChildScrollView(
-//                   scrollDirection: Axis.vertical,
-//                   child: DataTable(
-//                     headingRowHeight: 44,
-//                     dataRowMinHeight: 58,
-//                     dataRowMaxHeight: 64,
-//                     columnSpacing: 20,
-//                     horizontalMargin: 20,
-//                     headingRowColor:
-//                     WidgetStateProperty.all(_kSurface),
-//                     headingTextStyle: const TextStyle(
-//                       fontWeight: FontWeight.w700,
-//                       color: _kSlate,
-//                       fontSize: 11.5,
-//                       letterSpacing: 0.4,
-//                     ),
-//                     dividerThickness: 1,
-//                     columns: const [
-//                       DataColumn(label: Text('#')),
-//                       DataColumn(label: Text('')),
-//                       DataColumn(label: Text('NAME')),
-//                       DataColumn(label: Text('TYPE')),
-//                       DataColumn(label: Text('STATUS')),
-//                       DataColumn(label: Text('REMARKS')),
-//                     ],
-//                     rows: List.generate(provider.records.length, (index) {
-//                       final record = provider.records[index];
-//                       return DataRow(
-//                         color: WidgetStateProperty.resolveWith((states) {
-//                           return index.isEven ? _kCard : _kSurface.withOpacity(0.4);
-//                         }),
-//                         cells: [
-//                           DataCell(Text('${index + 1}',
-//                               style: const TextStyle(
-//                                   fontSize: 12.5, color: _kSlate))),
-//                           DataCell(_buildAvatar(
-//                               record.photoBase64, record.staffName)),
-//                           DataCell(Column(
-//                             crossAxisAlignment: CrossAxisAlignment.start,
-//                             mainAxisAlignment: MainAxisAlignment.center,
-//                             mainAxisSize: MainAxisSize.min,
-//                             children: [
-//                               Text(record.staffName,
-//                                   style: const TextStyle(
-//                                       fontWeight: FontWeight.w600,
-//                                       fontSize: 13,
-//                                       color: _kInk)),
-//                               const SizedBox(height: 2),
-//                               Text(record.staffId,
-//                                   style: const TextStyle(
-//                                       fontSize: 11, color: _kSlate)),
-//                             ],
-//                           )),
-//                           DataCell(_buildTypeBadge(record.type)),
-//                           DataCell(_buildStatusSegments(record.status, (val) {
-//                             provider.updateStatus(record.staffId, val);
-//                           })),
-//                           DataCell(SizedBox(
-//                             width: 160,
-//                             child: _RemarksField(
-//                               key: ValueKey('remark-${record.staffId}'),
-//                               initialValue: record.remarks,
-//                               onChanged: (val) {
-//                                 provider.updateRemarks(record.staffId, val);
-//                               },
-//                             ),
-//                           )),
-//                         ],
-//                       );
-//                     }),
-//                   ),
-//                 ),
-//               ),
-//             ),
-//           ),
-//         ],
-//       ),
+//   Widget _buildDesktopCardList(AttendanceProvider provider) {
+//     return ListView.separated(
+//       padding: const EdgeInsets.only(bottom: 4),
+//       itemCount: provider.records.length,
+//       separatorBuilder: (_, __) => const SizedBox(height: 12),
+//       itemBuilder: (ctx, index) {
+//         final record = provider.records[index];
+//         return _buildPersonCard(
+//           context: ctx,
+//           provider: provider,
+//           record: record,
+//           index: index,
+//           isDesktop: true,
+//         );
+//       },
 //     );
 //   }
 //
@@ -583,70 +575,201 @@
 //     return ListView.separated(
 //       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
 //       itemCount: provider.records.length,
-//       separatorBuilder: (_, __) => const SizedBox(height: 10),
+//       // ★ Strong visual gap between each person's card so it's obvious
+//       // where one person's data ends and the next one's begins.
+//       separatorBuilder: (_, __) => const SizedBox(height: 18),
 //       itemBuilder: (ctx, index) {
 //         final record = provider.records[index];
-//         return Container(
-//           decoration: BoxDecoration(
-//             color: _kCard,
-//             borderRadius: BorderRadius.circular(10),
-//             border: Border.all(color: _kBorder),
-//           ),
-//           child: Padding(
-//             padding: const EdgeInsets.all(12),
-//             child: Column(
-//               crossAxisAlignment: CrossAxisAlignment.stretch,
-//               children: [
-//                 Row(
-//                   children: [
-//                     _buildAvatar(record.photoBase64, record.staffName,
-//                         size: 38),
-//                     const SizedBox(width: 10),
-//                     Expanded(
-//                       child: Column(
-//                         crossAxisAlignment: CrossAxisAlignment.start,
-//                         mainAxisSize: MainAxisSize.min,
-//                         children: [
-//                           Text(record.staffName,
-//                               overflow: TextOverflow.ellipsis,
-//                               style: const TextStyle(
-//                                   fontWeight: FontWeight.w600,
-//                                   fontSize: 14,
-//                                   color: _kInk)),
-//                           const SizedBox(height: 2),
-//                           Row(
-//                             children: [
-//                               Text(record.staffId,
-//                                   style: const TextStyle(
-//                                       fontSize: 11.5, color: _kSlate)),
-//                               const SizedBox(width: 6),
-//                               _buildTypeBadge(record.type),
-//                             ],
-//                           ),
-//                         ],
-//                       ),
-//                     ),
-//                   ],
-//                 ),
-//                 const SizedBox(height: 10),
-//                 _buildStatusSegments(record.status, (val) {
-//                   provider.updateStatus(record.staffId, val);
-//                 }, stretch: true),
-//                 const SizedBox(height: 8),
-//                 _RemarksField(
-//                   key: ValueKey('remark-mobile-${record.staffId}'),
-//                   initialValue: record.remarks,
-//                   hint: 'Add remarks (optional)',
-//                   onChanged: (val) {
-//                     provider.updateRemarks(record.staffId, val);
-//                   },
-//                 ),
-//               ],
-//             ),
-//           ),
+//         return _buildPersonCard(
+//           context: ctx,
+//           provider: provider,
+//           record: record,
+//           index: index,
+//           isDesktop: false,
 //         );
 //       },
 //     );
+//   }
+//
+//   // ============================================================
+//   // ★ SHARED PERSON CARD (used by both mobile list and desktop list)
+//   // - Green tint + border when attendance already saved for this date
+//   // - Numbered badge so each person is clearly indexed
+//   // - Name + designation (or type if no designation) under it
+//   // - Large, prominent status buttons (wrap grid, not tiny segments)
+//   // - ★ FIX: if already saved, status buttons + remarks are locked
+//   //   (non-editable) and tapping shows a message instead of changing data.
+//   // ============================================================
+//   Widget _buildPersonCard({
+//     required BuildContext context,
+//     required AttendanceProvider provider,
+//     required dynamic record,
+//     required int index,
+//     required bool isDesktop,
+//   }) {
+//     final bool isSaved = record.isSaved == true;
+//     final String? designation =
+//     (record.designation != null && (record.designation as String).trim().isNotEmpty)
+//         ? record.designation as String
+//         : null;
+//     final String subtitleText = designation ?? _typeLabel(record.type as String);
+//
+//     void notifyAlreadySaved() {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(
+//           content: Text(
+//               'Attendance already marked for ${record.staffName} on this date.'),
+//           backgroundColor: _kOrange,
+//         ),
+//       );
+//     }
+//
+//     return Container(
+//       decoration: BoxDecoration(
+//         color: isSaved ? _kSavedBg : _kCard,
+//         borderRadius: BorderRadius.circular(12),
+//         border: Border.all(
+//           color: isSaved ? _kSavedBorder : _kBorder,
+//           width: isSaved ? 1.4 : 1,
+//         ),
+//         boxShadow: [
+//           BoxShadow(
+//             color: Colors.black.withOpacity(0.03),
+//             blurRadius: 6,
+//             offset: const Offset(0, 2),
+//           ),
+//         ],
+//       ),
+//       child: Padding(
+//         padding: const EdgeInsets.all(14),
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.stretch,
+//           children: [
+//             Row(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 // Numbered badge — makes each person's start obvious
+//                 Container(
+//                   width: 26,
+//                   height: 26,
+//                   alignment: Alignment.center,
+//                   margin: const EdgeInsets.only(right: 10, top: 2),
+//                   decoration: BoxDecoration(
+//                     color: isSaved ? _kGreen.withOpacity(0.12) : _kPrimaryLight,
+//                     shape: BoxShape.circle,
+//                   ),
+//                   child: Text(
+//                     '${index + 1}',
+//                     style: TextStyle(
+//                       fontSize: 11.5,
+//                       fontWeight: FontWeight.w700,
+//                       color: isSaved ? _kGreen : _kPrimary,
+//                     ),
+//                   ),
+//                 ),
+//                 _buildAvatar(record.photoBase64 as String?, record.staffName as String,
+//                     size: 42),
+//                 const SizedBox(width: 10),
+//                 Expanded(
+//                   child: Column(
+//                     crossAxisAlignment: CrossAxisAlignment.start,
+//                     mainAxisSize: MainAxisSize.min,
+//                     children: [
+//                       Row(
+//                         crossAxisAlignment: CrossAxisAlignment.start,
+//                         children: [
+//                           Expanded(
+//                             child: Text(
+//                               record.staffName as String,
+//                               overflow: TextOverflow.ellipsis,
+//                               style: const TextStyle(
+//                                   fontWeight: FontWeight.w700,
+//                                   fontSize: 15,
+//                                   color: _kInk),
+//                             ),
+//                           ),
+//                           if (isSaved) ...[
+//                             const SizedBox(width: 8),
+//                             _buildSavedChip(),
+//                           ],
+//                         ],
+//                       ),
+//                       const SizedBox(height: 3),
+//                       Row(
+//                         children: [
+//                           Flexible(
+//                             child: Text(
+//                               subtitleText,
+//                               overflow: TextOverflow.ellipsis,
+//                               style: const TextStyle(
+//                                   fontSize: 12, color: _kSlate),
+//                             ),
+//                           ),
+//                           const SizedBox(width: 6),
+//                           _buildTypeBadge(record.type as String),
+//                         ],
+//                       ),
+//                     ],
+//                   ),
+//                 ),
+//               ],
+//             ),
+//             const SizedBox(height: 12),
+//             _buildStatusButtons(
+//               currentStatus: record.status as String,
+//               isDesktop: isDesktop,
+//               locked: isSaved,
+//               onChanged: (val) {
+//                 if (isSaved) {
+//                   notifyAlreadySaved();
+//                   return;
+//                 }
+//                 provider.updateStatus(record.staffId as String, val);
+//               },
+//             ),
+//             const SizedBox(height: 10),
+//             _RemarksField(
+//               key: ValueKey('remark-${record.staffId}'),
+//               initialValue: record.remarks as String,
+//               hint: 'Add remarks (optional)',
+//               enabled: !isSaved,
+//               onChanged: (val) {
+//                 provider.updateRemarks(record.staffId as String, val);
+//               },
+//               onLockedTap: notifyAlreadySaved,
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+//
+//   Widget _buildSavedChip() {
+//     return Container(
+//       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+//       decoration: BoxDecoration(
+//         color: _kGreen.withOpacity(0.14),
+//         borderRadius: BorderRadius.circular(20),
+//         border: Border.all(color: _kGreen.withOpacity(0.3)),
+//       ),
+//       child: const Row(
+//         mainAxisSize: MainAxisSize.min,
+//         children: [
+//           Icon(Icons.check_circle, size: 12, color: _kGreen),
+//           SizedBox(width: 4),
+//           Text(
+//             'Saved',
+//             style: TextStyle(
+//                 fontSize: 10.5, fontWeight: FontWeight.w700, color: _kGreen),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   String _typeLabel(String type) {
+//     if (type.toLowerCase() == 'teacher') return 'Teacher';
+//     return 'Staff';
 //   }
 //
 //   Widget _buildAvatar(String? base64, String name, {double size = 32}) {
@@ -676,61 +799,53 @@
 //   }
 //
 //   // ============================================================
-//   // STATUS SEGMENTED CONTROL (Professional)
+//   // ★ STATUS BUTTONS — big, prominent, icon + label.
+//   // Wraps into a grid instead of tiny text segments so it's the
+//   // most visually dominant part of each card, as requested.
+//   // ★ FIX: `locked` dims the buttons and disables the ripple when
+//   // attendance for this person is already saved for the selected date.
 //   // ============================================================
-//   Widget _buildStatusSegments(
-//       String currentStatus, Function(String) onChanged,
-//       {bool stretch = false}) {
-//     final control = Container(
-//       decoration: BoxDecoration(
-//         borderRadius: BorderRadius.circular(6),
-//         border: Border.all(color: _kBorder),
-//       ),
-//       clipBehavior: Clip.antiAlias,
-//       child: Row(
-//         mainAxisSize: stretch ? MainAxisSize.max : MainAxisSize.min,
-//         children: List.generate(_kStatuses.length, (i) {
-//           final s = _kStatuses[i];
+//   Widget _buildStatusButtons({
+//     required String currentStatus,
+//     required bool isDesktop,
+//     required Function(String) onChanged,
+//     bool locked = false,
+//   }) {
+//     // 5 statuses: 3-per-row on mobile (2 rows: 3 + 2),
+//     // and on wider desktop cards let them sit on one row.
+//     return LayoutBuilder(builder: (context, constraints) {
+//       final bool wide = constraints.maxWidth >= 560;
+//       final int columns = wide ? 5 : 3;
+//       final double spacing = 8;
+//       final double itemWidth =
+//           (constraints.maxWidth - spacing * (columns - 1)) / columns;
+//
+//       return Wrap(
+//         spacing: spacing,
+//         runSpacing: spacing,
+//         children: _kStatuses.map((s) {
 //           final key = s['key'] as String;
 //           final label = s['label'] as String;
+//           final icon = s['icon'] as IconData;
 //           final color = s['color'] as Color;
 //           final bg = s['bg'] as Color;
 //           final isSelected = currentStatus == key;
-//           final isLast = i == _kStatuses.length - 1;
 //
-//           final segment = InkWell(
-//             onTap: () => onChanged(key),
-//             child: Container(
-//               decoration: BoxDecoration(
-//                 color: isSelected ? bg : _kCard,
-//                 border: isLast
-//                     ? null
-//                     : const Border(
-//                   right: BorderSide(color: _kBorder, width: 1),
-//                 ),
-//               ),
-//               padding:
-//               const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-//               child: Text(
-//                 label,
-//                 textAlign: TextAlign.center,
-//                 style: TextStyle(
-//                   fontSize: 10.5,
-//                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-//                   color: isSelected ? color : _kSlate,
-//                 ),
-//               ),
+//           return SizedBox(
+//             width: itemWidth,
+//             child: _StatusButton(
+//               label: label,
+//               icon: icon,
+//               color: color,
+//               bg: bg,
+//               isSelected: isSelected,
+//               locked: locked,
+//               onTap: () => onChanged(key),
 //             ),
 //           );
-//
-//           return stretch ? Expanded(child: segment) : segment;
-//         }),
-//       ),
-//     );
-//
-//     return stretch
-//         ? control
-//         : IntrinsicWidth(child: control);
+//         }).toList(),
+//       );
+//     });
 //   }
 //
 //   Widget _buildLoadingState() {
@@ -821,20 +936,107 @@
 // }
 //
 // // ============================================================
+// // ★ Individual big status button — replaces the old tiny
+// // segmented-control text buttons with a real, tappable,
+// // icon + label button that's visually dominant.
+// // ★ FIX: supports a `locked` state (already-saved record) that
+// // dims colors and swaps the cursor/feel so it reads as disabled,
+// // while still calling onTap so the parent can show a warning message.
+// // ============================================================
+// class _StatusButton extends StatelessWidget {
+//   final String label;
+//   final IconData icon;
+//   final Color color;
+//   final Color bg;
+//   final bool isSelected;
+//   final bool locked;
+//   final VoidCallback onTap;
+//
+//   const _StatusButton({
+//     required this.label,
+//     required this.icon,
+//     required this.color,
+//     required this.bg,
+//     required this.isSelected,
+//     required this.onTap,
+//     this.locked = false,
+//   });
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     final Color effectiveColor = locked ? color.withOpacity(0.45) : color;
+//     final Color effectiveSlate = locked ? _kSlate.withOpacity(0.5) : _kSlate;
+//     final Color effectiveBg =
+//     isSelected ? (locked ? bg.withOpacity(0.6) : bg) : _kSurface;
+//     final Color effectiveBorder = isSelected
+//         ? (locked ? color.withOpacity(0.35) : color)
+//         : _kBorder;
+//
+//     return Material(
+//       color: Colors.transparent,
+//       child: InkWell(
+//         onTap: onTap,
+//         borderRadius: BorderRadius.circular(10),
+//         splashColor: locked ? Colors.transparent : null,
+//         highlightColor: locked ? Colors.transparent : null,
+//         child: AnimatedContainer(
+//           duration: const Duration(milliseconds: 150),
+//           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+//           decoration: BoxDecoration(
+//             color: effectiveBg,
+//             borderRadius: BorderRadius.circular(10),
+//             border: Border.all(
+//               color: effectiveBorder,
+//               width: isSelected ? 1.6 : 1,
+//             ),
+//           ),
+//           child: Column(
+//             mainAxisSize: MainAxisSize.min,
+//             children: [
+//               Icon(icon, size: 22,
+//                   color: isSelected ? effectiveColor : effectiveSlate),
+//               const SizedBox(height: 4),
+//               Text(
+//                 label,
+//                 textAlign: TextAlign.center,
+//                 maxLines: 1,
+//                 overflow: TextOverflow.ellipsis,
+//                 style: TextStyle(
+//                   fontSize: 11.5,
+//                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+//                   color: isSelected ? effectiveColor : effectiveSlate,
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
+//
+// // ============================================================
 // // Stateful remarks field — keeps its own controller so rebuilds
 // // triggered by provider.notifyListeners() (e.g. from other rows'
 // // status taps) don't reset cursor position or steal focus.
+// // ★ FIX: supports `enabled: false` for already-saved records —
+// // field becomes read-only and tapping it shows the "already
+// // marked" message via onLockedTap.
 // // ============================================================
 // class _RemarksField extends StatefulWidget {
 //   final String initialValue;
 //   final ValueChanged<String> onChanged;
 //   final String hint;
+//   final bool enabled;
+//   final VoidCallback? onLockedTap;
 //
 //   const _RemarksField({
 //     super.key,
 //     required this.initialValue,
 //     required this.onChanged,
 //     this.hint = 'Remarks',
+//     this.enabled = true,
+//     this.onLockedTap,
 //   });
 //
 //   @override
@@ -858,17 +1060,21 @@
 //
 //   @override
 //   Widget build(BuildContext context) {
-//     return TextField(
+//     final field = TextField(
 //       controller: _controller,
-//       onChanged: widget.onChanged,
+//       onChanged: widget.enabled ? widget.onChanged : null,
+//       readOnly: !widget.enabled,
 //       maxLines: 1,
-//       style: const TextStyle(fontSize: 12.5, color: _kInk),
+//       style: TextStyle(
+//         fontSize: 12.5,
+//         color: widget.enabled ? _kInk : _kSlate,
+//       ),
 //       decoration: InputDecoration(
 //         hintText: widget.hint,
 //         hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
 //         isDense: true,
 //         filled: true,
-//         fillColor: _kSurface,
+//         fillColor: widget.enabled ? _kSurface : _kBorder.withOpacity(0.3),
 //         border: OutlineInputBorder(
 //           borderRadius: BorderRadius.circular(6),
 //           borderSide: const BorderSide(color: _kBorder),
@@ -885,6 +1091,16 @@
 //         const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
 //       ),
 //     );
+//
+//     if (widget.enabled) return field;
+//
+//     // Wrap with a tap-catcher so tapping a locked field still shows
+//     // the "already marked" warning instead of doing nothing silently.
+//     return GestureDetector(
+//       onTap: widget.onLockedTap,
+//       behavior: HitTestBehavior.opaque,
+//       child: AbsorbPointer(child: field),
+//     );
 //   }
 // }
 
@@ -895,6 +1111,7 @@ import 'package:provider/provider.dart';
 import 'dart:convert';
 import '../../providers/teacher_provider.dart'; // Your existing provider
 import '../../providers/attendance_provider.dart'; // Our new provider
+import 'attendance_history_screen.dart'; // ★ NEW — By Date / By Person history view
 
 // ============================================================
 // CORPORATE / PROFESSIONAL DESIGN TOKENS
@@ -1030,6 +1247,30 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       shape: const Border(bottom: BorderSide(color: _kBorder, width: 1)),
       actions: [
         Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const AttendanceHistoryScreen()),
+              );
+            },
+            icon: const Icon(Icons.history_rounded, size: 16),
+            label: const Text('History',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _kPrimary,
+              side: const BorderSide(color: _kBorder),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+        Padding(
           padding: const EdgeInsets.only(right: 16),
           child: OutlinedButton.icon(
             onPressed: () {
@@ -1134,7 +1375,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           const SizedBox(width: 12),
           _buildTypeFilter(provider),
           const Spacer(),
-          _buildQuickActions(provider),
+          _buildQuickActions(context, provider),
         ],
       )
           : Column(
@@ -1152,7 +1393,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ],
           ),
           const SizedBox(height: 10),
-          _buildQuickActions(provider, fullWidth: true),
+          _buildQuickActions(context, provider, fullWidth: true),
         ],
       ),
     );
@@ -1259,18 +1500,24 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  Widget _buildQuickActions(AttendanceProvider provider,
+  // ★ FIX: Quick actions (Mark All Present / Mark All Absent) now skip
+  // records that are already saved, and warn the user via a SnackBar
+  // if one or more people were skipped because their attendance was
+  // already marked for the selected date.
+  Widget _buildQuickActions(BuildContext context, AttendanceProvider provider,
       {bool fullWidth = false}) {
     final children = [
       _buildQuickActionBtn(
           'Mark All Present', Icons.check_circle_outline, _kGreen, _kGreenBg,
               () {
-            provider.markAll('present');
+            final skipped = provider.markAll('present');
+            _showMarkAllResult(context, skipped);
           }),
       const SizedBox(width: 8),
       _buildQuickActionBtn(
           'Mark All Absent', Icons.cancel_outlined, _kRed, _kRedBg, () {
-        provider.markAll('absent');
+        final skipped = provider.markAll('absent');
+        _showMarkAllResult(context, skipped);
       }),
     ];
 
@@ -1284,6 +1531,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       );
     }
     return Row(mainAxisSize: MainAxisSize.min, children: children);
+  }
+
+  void _showMarkAllResult(BuildContext context, int skippedCount) {
+    if (skippedCount <= 0) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          skippedCount == 1
+              ? 'Attendance already marked for 1 person on this date. Skipped.'
+              : 'Attendance already marked for $skippedCount people on this date. Skipped.',
+        ),
+        backgroundColor: _kOrange,
+      ),
+    );
   }
 
   Widget _buildQuickActionBtn(String label, IconData icon, Color color,
@@ -1412,6 +1673,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       itemBuilder: (ctx, index) {
         final record = provider.records[index];
         return _buildPersonCard(
+          context: ctx,
           provider: provider,
           record: record,
           index: index,
@@ -1450,6 +1712,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       itemBuilder: (ctx, index) {
         final record = provider.records[index];
         return _buildPersonCard(
+          context: ctx,
           provider: provider,
           record: record,
           index: index,
@@ -1465,8 +1728,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   // - Numbered badge so each person is clearly indexed
   // - Name + designation (or type if no designation) under it
   // - Large, prominent status buttons (wrap grid, not tiny segments)
+  // - ★ FIX: if already saved, status buttons + remarks are locked
+  //   (non-editable) and tapping shows a message instead of changing data.
   // ============================================================
   Widget _buildPersonCard({
+    required BuildContext context,
     required AttendanceProvider provider,
     required dynamic record,
     required int index,
@@ -1478,6 +1744,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ? record.designation as String
         : null;
     final String subtitleText = designation ?? _typeLabel(record.type as String);
+
+    void notifyAlreadySaved() {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Attendance already marked for ${record.staffName} on this date.'),
+          backgroundColor: _kOrange,
+        ),
+      );
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -1573,7 +1849,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             _buildStatusButtons(
               currentStatus: record.status as String,
               isDesktop: isDesktop,
+              locked: isSaved,
               onChanged: (val) {
+                if (isSaved) {
+                  notifyAlreadySaved();
+                  return;
+                }
                 provider.updateStatus(record.staffId as String, val);
               },
             ),
@@ -1582,9 +1863,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               key: ValueKey('remark-${record.staffId}'),
               initialValue: record.remarks as String,
               hint: 'Add remarks (optional)',
+              enabled: !isSaved,
               onChanged: (val) {
                 provider.updateRemarks(record.staffId as String, val);
               },
+              onLockedTap: notifyAlreadySaved,
             ),
           ],
         ),
@@ -1650,11 +1933,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   // ★ STATUS BUTTONS — big, prominent, icon + label.
   // Wraps into a grid instead of tiny text segments so it's the
   // most visually dominant part of each card, as requested.
+  // ★ FIX: `locked` dims the buttons and disables the ripple when
+  // attendance for this person is already saved for the selected date.
   // ============================================================
   Widget _buildStatusButtons({
     required String currentStatus,
     required bool isDesktop,
     required Function(String) onChanged,
+    bool locked = false,
   }) {
     // 5 statuses: 3-per-row on mobile (2 rows: 3 + 2),
     // and on wider desktop cards let them sit on one row.
@@ -1684,6 +1970,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               color: color,
               bg: bg,
               isSelected: isSelected,
+              locked: locked,
               onTap: () => onChanged(key),
             ),
           );
@@ -1783,6 +2070,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 // ★ Individual big status button — replaces the old tiny
 // segmented-control text buttons with a real, tappable,
 // icon + label button that's visually dominant.
+// ★ FIX: supports a `locked` state (already-saved record) that
+// dims colors and swaps the cursor/feel so it reads as disabled,
+// while still calling onTap so the parent can show a warning message.
 // ============================================================
 class _StatusButton extends StatelessWidget {
   final String label;
@@ -1790,6 +2080,7 @@ class _StatusButton extends StatelessWidget {
   final Color color;
   final Color bg;
   final bool isSelected;
+  final bool locked;
   final VoidCallback onTap;
 
   const _StatusButton({
@@ -1799,30 +2090,42 @@ class _StatusButton extends StatelessWidget {
     required this.bg,
     required this.isSelected,
     required this.onTap,
+    this.locked = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final Color effectiveColor = locked ? color.withOpacity(0.45) : color;
+    final Color effectiveSlate = locked ? _kSlate.withOpacity(0.5) : _kSlate;
+    final Color effectiveBg =
+    isSelected ? (locked ? bg.withOpacity(0.6) : bg) : _kSurface;
+    final Color effectiveBorder = isSelected
+        ? (locked ? color.withOpacity(0.35) : color)
+        : _kBorder;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
+        splashColor: locked ? Colors.transparent : null,
+        highlightColor: locked ? Colors.transparent : null,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           decoration: BoxDecoration(
-            color: isSelected ? bg : _kSurface,
+            color: effectiveBg,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isSelected ? color : _kBorder,
+              color: effectiveBorder,
               width: isSelected ? 1.6 : 1,
             ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 22, color: isSelected ? color : _kSlate),
+              Icon(icon, size: 22,
+                  color: isSelected ? effectiveColor : effectiveSlate),
               const SizedBox(height: 4),
               Text(
                 label,
@@ -1832,7 +2135,7 @@ class _StatusButton extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                  color: isSelected ? color : _kSlate,
+                  color: isSelected ? effectiveColor : effectiveSlate,
                 ),
               ),
             ],
@@ -1847,17 +2150,24 @@ class _StatusButton extends StatelessWidget {
 // Stateful remarks field — keeps its own controller so rebuilds
 // triggered by provider.notifyListeners() (e.g. from other rows'
 // status taps) don't reset cursor position or steal focus.
+// ★ FIX: supports `enabled: false` for already-saved records —
+// field becomes read-only and tapping it shows the "already
+// marked" message via onLockedTap.
 // ============================================================
 class _RemarksField extends StatefulWidget {
   final String initialValue;
   final ValueChanged<String> onChanged;
   final String hint;
+  final bool enabled;
+  final VoidCallback? onLockedTap;
 
   const _RemarksField({
     super.key,
     required this.initialValue,
     required this.onChanged,
     this.hint = 'Remarks',
+    this.enabled = true,
+    this.onLockedTap,
   });
 
   @override
@@ -1881,17 +2191,21 @@ class _RemarksFieldState extends State<_RemarksField> {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    final field = TextField(
       controller: _controller,
-      onChanged: widget.onChanged,
+      onChanged: widget.enabled ? widget.onChanged : null,
+      readOnly: !widget.enabled,
       maxLines: 1,
-      style: const TextStyle(fontSize: 12.5, color: _kInk),
+      style: TextStyle(
+        fontSize: 12.5,
+        color: widget.enabled ? _kInk : _kSlate,
+      ),
       decoration: InputDecoration(
         hintText: widget.hint,
         hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
         isDense: true,
         filled: true,
-        fillColor: _kSurface,
+        fillColor: widget.enabled ? _kSurface : _kBorder.withOpacity(0.3),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(6),
           borderSide: const BorderSide(color: _kBorder),
@@ -1907,6 +2221,16 @@ class _RemarksFieldState extends State<_RemarksField> {
         contentPadding:
         const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       ),
+    );
+
+    if (widget.enabled) return field;
+
+    // Wrap with a tap-catcher so tapping a locked field still shows
+    // the "already marked" warning instead of doing nothing silently.
+    return GestureDetector(
+      onTap: widget.onLockedTap,
+      behavior: HitTestBehavior.opaque,
+      child: AbsorbPointer(child: field),
     );
   }
 }
