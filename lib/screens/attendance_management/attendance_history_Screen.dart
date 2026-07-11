@@ -1,4 +1,5 @@
 //
+//
 // import 'package:flutter/material.dart';
 // import 'package:intl/intl.dart';
 // import 'package:provider/provider.dart';
@@ -263,6 +264,13 @@
 //   OverlayEntry? _overlayEntry;
 //   DateTime? _tempSelectedDate;
 //
+//   // ★ NEW: universal search (name / designation / type) + pagination.
+//   final TextEditingController _searchController = TextEditingController();
+//   String _searchQuery = '';
+//   int _pageSize = 10;
+//   int _currentPage = 1;
+//   static const List<int> _pageSizeOptions = [10, 20, 30];
+//
 //   String get _dateStr => DateFormat('yyyy-MM-dd').format(_selectedDate);
 //
 //   @override
@@ -271,11 +279,32 @@
 //     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
 //   }
 //
+//   @override
+//   void dispose() {
+//     _searchController.dispose();
+//     super.dispose();
+//   }
+//
 //   void _load() {
 //     context.read<AttendanceProvider>().loadHistoryForDate(
 //       _dateStr,
 //       typeFilter: _filterType,
 //     );
+//   }
+//
+//   // ★ Filters by name, designation, or teacher/staff type — the fields
+//   // actually present on AttendanceRecord.
+//   List<AttendanceRecord> _applySearch(List<AttendanceRecord> records) {
+//     if (_searchQuery.trim().isEmpty) return records;
+//     final q = _searchQuery.trim().toLowerCase();
+//     return records.where((r) {
+//       final name = r.staffName.toLowerCase();
+//       final designation = (r.designation ?? '').toLowerCase();
+//       final type = r.type.toLowerCase();
+//       return name.contains(q) ||
+//           designation.contains(q) ||
+//           type.contains(q);
+//     }).toList();
 //   }
 //
 //   void _toggleDatePicker() {
@@ -350,6 +379,7 @@
 //                                 setState(() {
 //                                   _selectedDate = newDate;
 //                                   _selectedRows.clear();
+//                                   _currentPage = 1;
 //                                 });
 //                                 _overlayEntry!.remove();
 //                                 _overlayEntry = null;
@@ -416,6 +446,18 @@
 //   Widget build(BuildContext context) {
 //     final provider = context.watch<AttendanceProvider>();
 //
+//     // ★ Apply search first, then paginate (max _pageSize per page).
+//     final filtered = _applySearch(provider.historyRecords);
+//     final totalEntries = filtered.length;
+//     final totalPages = totalEntries == 0 ? 1 : (totalEntries / _pageSize).ceil();
+//     final safePage = _currentPage > totalPages ? totalPages : _currentPage;
+//     final startIndex = (safePage - 1) * _pageSize;
+//     final endIndex =
+//     (startIndex + _pageSize > totalEntries) ? totalEntries : startIndex + _pageSize;
+//     final pageRows = totalEntries == 0
+//         ? <AttendanceRecord>[]
+//         : filtered.sublist(startIndex, endIndex);
+//
 //     return LayoutBuilder(builder: (context, constraints) {
 //       final isDesktop = constraints.maxWidth >= _kDesktopBreakpoint;
 //       return Column(
@@ -427,6 +469,12 @@
 //           ),
 //           if (!widget.isAdmin) const _ViewOnlyBanner(),
 //           const SizedBox(height: 10),
+//           Padding(
+//             padding: EdgeInsets.fromLTRB(
+//                 isDesktop ? 28 : 16, 0, isDesktop ? 28 : 16, 0),
+//             child: _buildSearchAndPageSizeRow(isDesktop),
+//           ),
+//           const SizedBox(height: 10),
 //           Expanded(
 //             child: provider.historyLoading
 //                 ? const Center(
@@ -435,7 +483,7 @@
 //                 : provider.historyError != null
 //                 ? _ErrorState(
 //                 message: provider.historyError!, onRetry: _load)
-//                 : provider.historyRecords.isEmpty
+//                 : totalEntries == 0
 //                 ? const _EmptyState(
 //                 message: 'No teachers/staff found for this filter.')
 //                 : _AttendanceTable(
@@ -444,7 +492,7 @@
 //               selectedRows: _selectedRows,
 //               onToggleSelection: _toggleSelection,
 //               rowLabelHeader: 'Name',
-//               rows: provider.historyRecords,
+//               rows: pageRows,
 //               rowLabelBuilder: (r) => _NameCell(record: r),
 //               subLabelBuilder: (r) =>
 //                   _subtitle(r.designation, r.type),
@@ -462,6 +510,15 @@
 //               },
 //             ),
 //           ),
+//           if (!provider.historyLoading &&
+//               provider.historyError == null &&
+//               totalEntries > 0)
+//             Padding(
+//               padding: EdgeInsets.fromLTRB(
+//                   isDesktop ? 28 : 16, 8, isDesktop ? 28 : 16, 16),
+//               child: _buildPaginationFooter(
+//                   isDesktop, startIndex, endIndex, totalEntries, totalPages, safePage),
+//             ),
 //         ],
 //       );
 //     });
@@ -495,6 +552,200 @@
 //           _buildUpdateButton(),
 //         ],
 //       ),
+//     );
+//   }
+//
+//   // ★ NEW: "Show [10/20/30] entries" + universal search box.
+//   Widget _buildSearchAndPageSizeRow(bool isDesktop) {
+//     final pageSizeControl = Row(
+//       mainAxisSize: MainAxisSize.min,
+//       children: [
+//         const Text('Show',
+//             style: TextStyle(fontSize: 13, color: _kSlate, fontWeight: FontWeight.w600)),
+//         const SizedBox(width: 8),
+//         Container(
+//           padding: const EdgeInsets.symmetric(horizontal: 10),
+//           decoration: BoxDecoration(
+//             color: _kCard,
+//             borderRadius: BorderRadius.circular(8),
+//             border: Border.all(color: _kBorder),
+//           ),
+//           child: DropdownButtonHideUnderline(
+//             child: DropdownButton<int>(
+//               value: _pageSize,
+//               isDense: true,
+//               items: _pageSizeOptions
+//                   .map((n) => DropdownMenuItem(
+//                   value: n,
+//                   child: Text('$n',
+//                       style: const TextStyle(fontSize: 13, color: _kInk))))
+//                   .toList(),
+//               onChanged: (val) {
+//                 if (val == null) return;
+//                 setState(() {
+//                   _pageSize = val;
+//                   _currentPage = 1;
+//                 });
+//               },
+//               icon: const Icon(Icons.keyboard_arrow_down, size: 18, color: _kSlate),
+//             ),
+//           ),
+//         ),
+//         const SizedBox(width: 8),
+//         const Text('entries',
+//             style: TextStyle(fontSize: 13, color: _kSlate, fontWeight: FontWeight.w600)),
+//       ],
+//     );
+//
+//     final searchBox = Container(
+//       padding: const EdgeInsets.symmetric(horizontal: 12),
+//       decoration: BoxDecoration(
+//         color: _kCard,
+//         borderRadius: BorderRadius.circular(8),
+//         border: Border.all(color: _kBorder),
+//       ),
+//       child: TextField(
+//         controller: _searchController,
+//         onChanged: (val) {
+//           setState(() {
+//             _searchQuery = val;
+//             _currentPage = 1;
+//           });
+//         },
+//         decoration: InputDecoration(
+//           border: InputBorder.none,
+//           isDense: true,
+//           contentPadding: const EdgeInsets.symmetric(vertical: 12),
+//           hintText: 'Search by name, designation, or type...',
+//           hintStyle: const TextStyle(fontSize: 13, color: _kSlate),
+//           prefixIcon: const Icon(Icons.search, size: 20, color: _kSlate),
+//           suffixIcon: _searchQuery.isEmpty
+//               ? null
+//               : IconButton(
+//             icon: const Icon(Icons.close, size: 18, color: _kSlate),
+//             onPressed: () {
+//               setState(() {
+//                 _searchController.clear();
+//                 _searchQuery = '';
+//                 _currentPage = 1;
+//               });
+//             },
+//           ),
+//         ),
+//         style: const TextStyle(fontSize: 13, color: _kInk),
+//       ),
+//     );
+//
+//     if (isDesktop) {
+//       return Row(
+//         children: [
+//           pageSizeControl,
+//           const Spacer(),
+//           SizedBox(width: 340, child: searchBox),
+//         ],
+//       );
+//     }
+//
+//     return Column(
+//       crossAxisAlignment: CrossAxisAlignment.stretch,
+//       children: [
+//         searchBox,
+//         const SizedBox(height: 10),
+//         pageSizeControl,
+//       ],
+//     );
+//   }
+//
+//   // ★ NEW: "Showing X to Y of Z entries" + prev/next/page-number controls.
+//   Widget _buildPaginationFooter(bool isDesktop, int startIndex, int endIndex,
+//       int totalEntries, int totalPages, int currentPage) {
+//     final summary = Text(
+//       'Showing ${totalEntries == 0 ? 0 : startIndex + 1} to $endIndex of $totalEntries entries',
+//       style: const TextStyle(fontSize: 12.5, color: _kSlate),
+//     );
+//
+//     Widget pageButton({required Widget child, VoidCallback? onTap, bool active = false}) {
+//       return InkWell(
+//         borderRadius: BorderRadius.circular(8),
+//         onTap: onTap,
+//         child: Container(
+//           width: 34,
+//           height: 34,
+//           alignment: Alignment.center,
+//           decoration: BoxDecoration(
+//             color: active ? _kPrimary : _kCard,
+//             borderRadius: BorderRadius.circular(8),
+//             border: Border.all(color: active ? _kPrimary : _kBorder),
+//           ),
+//           child: child,
+//         ),
+//       );
+//     }
+//
+//     // Show up to 5 page numbers around the current page.
+//     final pageNumbers = <int>[];
+//     if (totalPages <= 5) {
+//       pageNumbers.addAll(List.generate(totalPages, (i) => i + 1));
+//     } else {
+//       int start = currentPage - 2;
+//       int end = currentPage + 2;
+//       if (start < 1) {
+//         end += (1 - start);
+//         start = 1;
+//       }
+//       if (end > totalPages) {
+//         start -= (end - totalPages);
+//         end = totalPages;
+//       }
+//       if (start < 1) start = 1;
+//       pageNumbers.addAll(List.generate(end - start + 1, (i) => start + i));
+//     }
+//
+//     final controls = Row(
+//       mainAxisSize: MainAxisSize.min,
+//       children: [
+//         pageButton(
+//           child: const Icon(Icons.chevron_left, size: 18, color: _kSlate),
+//           onTap: currentPage <= 1
+//               ? null
+//               : () => setState(() => _currentPage = currentPage - 1),
+//         ),
+//         const SizedBox(width: 6),
+//         ...pageNumbers.expand((p) => [
+//           pageButton(
+//             active: p == currentPage,
+//             child: Text('$p',
+//                 style: TextStyle(
+//                     fontSize: 13,
+//                     fontWeight: FontWeight.w700,
+//                     color: p == currentPage ? Colors.white : _kInk)),
+//             onTap: p == currentPage ? null : () => setState(() => _currentPage = p),
+//           ),
+//           const SizedBox(width: 6),
+//         ]),
+//         pageButton(
+//           child: const Icon(Icons.chevron_right, size: 18, color: _kSlate),
+//           onTap: currentPage >= totalPages
+//               ? null
+//               : () => setState(() => _currentPage = currentPage + 1),
+//         ),
+//       ],
+//     );
+//
+//     if (isDesktop) {
+//       return Row(
+//         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//         children: [summary, controls],
+//       );
+//     }
+//
+//     return Column(
+//       crossAxisAlignment: CrossAxisAlignment.center,
+//       children: [
+//         summary,
+//         const SizedBox(height: 10),
+//         controls,
+//       ],
 //     );
 //   }
 //
@@ -551,6 +802,7 @@
 //             setState(() {
 //               _filterType = val;
 //               _selectedRows.clear();
+//               _currentPage = 1;
 //             });
 //             _load();
 //           },
@@ -1108,7 +1360,6 @@
 //                           _headerChip(staff.designation!),
 //                         _headerChip(
 //                             staff.type.toLowerCase() == 'teacher' ? 'Teacher' : 'Staff'),
-//                         if (staff.id != null) _headerChip('ID: ${staff.id}'),
 //                       ],
 //                     ),
 //                   ],
@@ -1994,6 +2245,7 @@
 //   }
 // }
 
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -2043,6 +2295,7 @@ Map<String, Object> _statusMeta(String key) {
 }
 
 const double _kDesktopBreakpoint = 900;
+const double _kTabletBreakpoint = 620;
 
 // ============================================================
 // ROOT SCREEN
@@ -2258,6 +2511,14 @@ class _ByDateTabState extends State<_ByDateTab> {
   OverlayEntry? _overlayEntry;
   DateTime? _tempSelectedDate;
 
+  // Universal search (name / designation / type) + pagination.
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  // ★ Default page size is now 30 (per request: 1-30 on page 1, 31-60 on page 2, etc.)
+  int _pageSize = 30;
+  int _currentPage = 1;
+  static const List<int> _pageSizeOptions = [10, 20, 30];
+
   String get _dateStr => DateFormat('yyyy-MM-dd').format(_selectedDate);
 
   @override
@@ -2266,11 +2527,32 @@ class _ByDateTabState extends State<_ByDateTab> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   void _load() {
     context.read<AttendanceProvider>().loadHistoryForDate(
       _dateStr,
       typeFilter: _filterType,
     );
+  }
+
+  // Filters by name, designation, or teacher/staff type — the fields
+  // actually present on AttendanceRecord.
+  List<AttendanceRecord> _applySearch(List<AttendanceRecord> records) {
+    if (_searchQuery.trim().isEmpty) return records;
+    final q = _searchQuery.trim().toLowerCase();
+    return records.where((r) {
+      final name = r.staffName.toLowerCase();
+      final designation = (r.designation ?? '').toLowerCase();
+      final type = r.type.toLowerCase();
+      return name.contains(q) ||
+          designation.contains(q) ||
+          type.contains(q);
+    }).toList();
   }
 
   void _toggleDatePicker() {
@@ -2345,6 +2627,7 @@ class _ByDateTabState extends State<_ByDateTab> {
                                 setState(() {
                                   _selectedDate = newDate;
                                   _selectedRows.clear();
+                                  _currentPage = 1;
                                 });
                                 _overlayEntry!.remove();
                                 _overlayEntry = null;
@@ -2411,16 +2694,37 @@ class _ByDateTabState extends State<_ByDateTab> {
   Widget build(BuildContext context) {
     final provider = context.watch<AttendanceProvider>();
 
+    // Apply search first, then paginate (max _pageSize per page).
+    final filtered = _applySearch(provider.historyRecords);
+    final totalEntries = filtered.length;
+    final totalPages = totalEntries == 0 ? 1 : (totalEntries / _pageSize).ceil();
+    final safePage = _currentPage > totalPages ? totalPages : _currentPage;
+    final startIndex = (safePage - 1) * _pageSize;
+    final endIndex =
+    (startIndex + _pageSize > totalEntries) ? totalEntries : startIndex + _pageSize;
+    final pageRows = totalEntries == 0
+        ? <AttendanceRecord>[]
+        : filtered.sublist(startIndex, endIndex);
+
     return LayoutBuilder(builder: (context, constraints) {
-      final isDesktop = constraints.maxWidth >= _kDesktopBreakpoint;
+      final width = constraints.maxWidth;
+      final isDesktop = width >= _kDesktopBreakpoint;
+      final isTablet = width >= _kTabletBreakpoint && width < _kDesktopBreakpoint;
+      final isMobile = width < _kTabletBreakpoint;
+      final horizontalPad = isDesktop ? 28.0 : (isTablet ? 20.0 : 12.0);
+
       return Column(
         children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(
-                isDesktop ? 28 : 16, 16, isDesktop ? 28 : 16, 0),
+            padding: EdgeInsets.fromLTRB(horizontalPad, 14, horizontalPad, 0),
             child: _buildToolbar(isDesktop),
           ),
           if (!widget.isAdmin) const _ViewOnlyBanner(),
+          const SizedBox(height: 10),
+          Padding(
+            padding: EdgeInsets.fromLTRB(horizontalPad, 0, horizontalPad, 0),
+            child: _buildSearchAndPageSizeRow(isDesktop),
+          ),
           const SizedBox(height: 10),
           Expanded(
             child: provider.historyLoading
@@ -2430,19 +2734,17 @@ class _ByDateTabState extends State<_ByDateTab> {
                 : provider.historyError != null
                 ? _ErrorState(
                 message: provider.historyError!, onRetry: _load)
-                : provider.historyRecords.isEmpty
+                : totalEntries == 0
                 ? const _EmptyState(
                 message: 'No teachers/staff found for this filter.')
-                : _AttendanceTable(
-              isDesktop: isDesktop,
+                : (isMobile
+                ? _buildMobileList(pageRows)
+                : _CompactAttendanceTable(
               isAdmin: widget.isAdmin,
               selectedRows: _selectedRows,
               onToggleSelection: _toggleSelection,
-              rowLabelHeader: 'Name',
-              rows: provider.historyRecords,
-              rowLabelBuilder: (r) => _NameCell(record: r),
-              subLabelBuilder: (r) =>
-                  _subtitle(r.designation, r.type),
+              rows: pageRows,
+              horizontalPad: horizontalPad,
               onStatusChanged: (record, status) {
                 context
                     .read<AttendanceProvider>()
@@ -2455,8 +2757,16 @@ class _ByDateTabState extends State<_ByDateTab> {
                     .adminUpdateHistoryRecord(record,
                     newRemarks: remarks);
               },
-            ),
+            )),
           ),
+          if (!provider.historyLoading &&
+              provider.historyError == null &&
+              totalEntries > 0)
+            Padding(
+              padding: EdgeInsets.fromLTRB(horizontalPad, 8, horizontalPad, 14),
+              child: _buildPaginationFooter(
+                  isDesktop, startIndex, endIndex, totalEntries, totalPages, safePage),
+            ),
         ],
       );
     });
@@ -2490,6 +2800,200 @@ class _ByDateTabState extends State<_ByDateTab> {
           _buildUpdateButton(),
         ],
       ),
+    );
+  }
+
+  // "Show [10/20/30] entries" + universal search box.
+  Widget _buildSearchAndPageSizeRow(bool isDesktop) {
+    final pageSizeControl = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text('Show',
+            style: TextStyle(fontSize: 13, color: _kSlate, fontWeight: FontWeight.w600)),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: _kCard,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: _kBorder),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: _pageSize,
+              isDense: true,
+              items: _pageSizeOptions
+                  .map((n) => DropdownMenuItem(
+                  value: n,
+                  child: Text('$n',
+                      style: const TextStyle(fontSize: 13, color: _kInk))))
+                  .toList(),
+              onChanged: (val) {
+                if (val == null) return;
+                setState(() {
+                  _pageSize = val;
+                  _currentPage = 1;
+                });
+              },
+              icon: const Icon(Icons.keyboard_arrow_down, size: 18, color: _kSlate),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        const Text('entries',
+            style: TextStyle(fontSize: 13, color: _kSlate, fontWeight: FontWeight.w600)),
+      ],
+    );
+
+    final searchBox = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: _kCard,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _kBorder),
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (val) {
+          setState(() {
+            _searchQuery = val;
+            _currentPage = 1;
+          });
+        },
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          hintText: 'Search by name, designation, or type...',
+          hintStyle: const TextStyle(fontSize: 13, color: _kSlate),
+          prefixIcon: const Icon(Icons.search, size: 20, color: _kSlate),
+          suffixIcon: _searchQuery.isEmpty
+              ? null
+              : IconButton(
+            icon: const Icon(Icons.close, size: 18, color: _kSlate),
+            onPressed: () {
+              setState(() {
+                _searchController.clear();
+                _searchQuery = '';
+                _currentPage = 1;
+              });
+            },
+          ),
+        ),
+        style: const TextStyle(fontSize: 13, color: _kInk),
+      ),
+    );
+
+    if (isDesktop) {
+      return Row(
+        children: [
+          pageSizeControl,
+          const Spacer(),
+          SizedBox(width: 340, child: searchBox),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        searchBox,
+        const SizedBox(height: 10),
+        pageSizeControl,
+      ],
+    );
+  }
+
+  // "Showing X to Y of Z entries" + prev/next/page-number controls.
+  Widget _buildPaginationFooter(bool isDesktop, int startIndex, int endIndex,
+      int totalEntries, int totalPages, int currentPage) {
+    final summary = Text(
+      'Showing ${totalEntries == 0 ? 0 : startIndex + 1} to $endIndex of $totalEntries entries',
+      style: const TextStyle(fontSize: 12.5, color: _kSlate),
+    );
+
+    Widget pageButton({required Widget child, VoidCallback? onTap, bool active = false}) {
+      return InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active ? _kPrimary : _kCard,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: active ? _kPrimary : _kBorder),
+          ),
+          child: child,
+        ),
+      );
+    }
+
+    // Show up to 5 page numbers around the current page.
+    final pageNumbers = <int>[];
+    if (totalPages <= 5) {
+      pageNumbers.addAll(List.generate(totalPages, (i) => i + 1));
+    } else {
+      int start = currentPage - 2;
+      int end = currentPage + 2;
+      if (start < 1) {
+        end += (1 - start);
+        start = 1;
+      }
+      if (end > totalPages) {
+        start -= (end - totalPages);
+        end = totalPages;
+      }
+      if (start < 1) start = 1;
+      pageNumbers.addAll(List.generate(end - start + 1, (i) => start + i));
+    }
+
+    final controls = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        pageButton(
+          child: const Icon(Icons.chevron_left, size: 18, color: _kSlate),
+          onTap: currentPage <= 1
+              ? null
+              : () => setState(() => _currentPage = currentPage - 1),
+        ),
+        const SizedBox(width: 6),
+        ...pageNumbers.expand((p) => [
+          pageButton(
+            active: p == currentPage,
+            child: Text('$p',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: p == currentPage ? Colors.white : _kInk)),
+            onTap: p == currentPage ? null : () => setState(() => _currentPage = p),
+          ),
+          const SizedBox(width: 6),
+        ]),
+        pageButton(
+          child: const Icon(Icons.chevron_right, size: 18, color: _kSlate),
+          onTap: currentPage >= totalPages
+              ? null
+              : () => setState(() => _currentPage = currentPage + 1),
+        ),
+      ],
+    );
+
+    if (isDesktop) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [summary, controls],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        summary,
+        const SizedBox(height: 10),
+        controls,
+      ],
     );
   }
 
@@ -2546,6 +3050,7 @@ class _ByDateTabState extends State<_ByDateTab> {
             setState(() {
               _filterType = val;
               _selectedRows.clear();
+              _currentPage = 1;
             });
             _load();
           },
@@ -2568,6 +3073,205 @@ class _ByDateTabState extends State<_ByDateTab> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         elevation: 0,
       ),
+    );
+  }
+
+  // ---- Mobile: own compact card layout (not a squeezed table) ----
+  Widget _buildMobileList(List<AttendanceRecord> rows) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
+      itemCount: rows.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
+        final record = rows[i];
+        final isSelected = _selectedRows[record.id] ?? false;
+        return _MobileByDateCard(
+          record: record,
+          isAdmin: widget.isAdmin,
+          isSelected: isSelected,
+          onToggle: (val) => _toggleSelection(record.id, val),
+          onStatusChanged: (s) => context
+              .read<AttendanceProvider>()
+              .adminUpdateHistoryRecord(record, newStatus: s),
+          onRemarksChanged: (r) => context
+              .read<AttendanceProvider>()
+              .adminUpdateHistoryRecord(record, newRemarks: r),
+        );
+      },
+    );
+  }
+}
+
+// ============================================================
+// MOBILE CARD (By Date tab) — compact, own design
+// ============================================================
+class _MobileByDateCard extends StatefulWidget {
+  final AttendanceRecord record;
+  final bool isAdmin;
+  final bool isSelected;
+  final ValueChanged<bool> onToggle;
+  final ValueChanged<String> onStatusChanged;
+  final ValueChanged<String> onRemarksChanged;
+
+  const _MobileByDateCard({
+    required this.record,
+    required this.isAdmin,
+    required this.isSelected,
+    required this.onToggle,
+    required this.onStatusChanged,
+    required this.onRemarksChanged,
+  });
+
+  @override
+  State<_MobileByDateCard> createState() => _MobileByDateCardState();
+}
+
+class _MobileByDateCardState extends State<_MobileByDateCard> {
+  late final TextEditingController _remarksController;
+
+  @override
+  void initState() {
+    super.initState();
+    _remarksController = TextEditingController(text: widget.record.remarks);
+  }
+
+  @override
+  void didUpdateWidget(covariant _MobileByDateCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.record.id != widget.record.id) {
+      _remarksController.text = widget.record.remarks;
+    }
+  }
+
+  @override
+  void dispose() {
+    _remarksController.dispose();
+    super.dispose();
+  }
+
+  void _notifyLocked() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Select the checkbox first to edit this record.'),
+        backgroundColor: _kOrange,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final record = widget.record;
+    final locked = !widget.isAdmin || !widget.isSelected;
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: _kCard,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (widget.isAdmin)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: SizedBox(
+                    width: 30,
+                    height: 30,
+                    child: Checkbox(
+                      value: widget.isSelected,
+                      onChanged: (val) => widget.onToggle(val ?? false),
+                      activeColor: _kPrimary,
+                    ),
+                  ),
+                ),
+              _buildAvatar(record.photoBase64, record.staffName, size: 32),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(record.staffName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: _kInk)),
+                    Text(_subtitle(record.designation, record.type),
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11.5, color: _kSlate)),
+                  ],
+                ),
+              ),
+              if (record.isSaving)
+                const Padding(
+                  padding: EdgeInsets.only(left: 6),
+                  child: SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: _kPrimary),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _StatusDropdown(
+            status: record.status,
+            locked: locked,
+            fullWidth: true,
+            onChanged: (s) {
+              if (locked) {
+                _notifyLocked();
+                return;
+              }
+              widget.onStatusChanged(s);
+            },
+          ),
+          const SizedBox(height: 8),
+          _buildRemarksField(locked),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemarksField(bool locked) {
+    final field = TextField(
+      controller: _remarksController,
+      onChanged: locked ? null : widget.onRemarksChanged,
+      readOnly: locked,
+      maxLines: 1,
+      style: TextStyle(fontSize: 12.5, color: locked ? _kSlate : _kInk),
+      decoration: InputDecoration(
+        hintText: 'Add remarks',
+        hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+        isDense: true,
+        filled: true,
+        fillColor: locked ? _kBorder.withOpacity(0.3) : _kSurface,
+        contentPadding:
+        const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: _kBorder)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: _kBorder)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: _kPrimary, width: 1.4)),
+      ),
+    );
+
+    if (!locked) return field;
+
+    return GestureDetector(
+      onTap: _notifyLocked,
+      behavior: HitTestBehavior.opaque,
+      child: AbsorbPointer(child: field),
     );
   }
 }
@@ -2849,7 +3553,7 @@ class _PickerCell extends StatelessWidget {
 }
 
 // ============================================================
-// TAB 2 — BY PERSON (Enhanced Report)
+// TAB 2 — BY PERSON (Enhanced Report) — UNCHANGED
 // ============================================================
 class _ByPersonTab extends StatefulWidget {
   final bool isAdmin;
@@ -3079,7 +3783,6 @@ class _ByPersonTabState extends State<_ByPersonTab> {
                   color: Colors.white,
                   shape: BoxShape.circle,
                 ),
-                // ★ Increased avatar size per request (matches reference image proportions).
                 child: _buildAvatar(staff.imageBase64, staff.name, size: 96),
               ),
               const SizedBox(width: 16),
@@ -3233,7 +3936,6 @@ class _ByPersonTabState extends State<_ByPersonTab> {
       _SummaryCardData('Attendance %', '${pct.toStringAsFixed(1)}%', Icons.insights_outlined, _kPrimary, _kPrimaryLight),
     ];
 
-    // ★ More columns + smaller card = compact "reference image" style.
     final columns = isDesktop ? 7 : 3;
 
     return LayoutBuilder(builder: (context, constraints) {
@@ -3251,12 +3953,6 @@ class _ByPersonTabState extends State<_ByPersonTab> {
   }
 
   // ---- Report Table ----
-  // ★ Desktop/wide screens: two side-by-side numbered columns like the
-  //   reference image (auto-splits the month roughly in half, and
-  //   shrinks/grows with available width via Expanded — no fixed pixel
-  //   table width, no horizontal scrolling needed).
-  // ★ Mobile: a single stacked list of compact row-cards (own layout,
-  //   not just a squeezed version of the desktop table).
   Widget _buildReportTable(AttendanceProvider provider, bool isDesktop) {
     final rows = [...provider.historyRecords]
       ..sort((a, b) => a.date.compareTo(b.date));
@@ -3293,18 +3989,6 @@ class _ByPersonTabState extends State<_ByPersonTab> {
   }
 
   Widget _buildTableColumn(List<AttendanceRecord> rows, {required int startIndex}) {
-    Widget headerCell(String text, {int flex = 1, TextAlign align = TextAlign.left}) =>
-        Expanded(
-          flex: flex,
-          child: Text(text,
-              textAlign: align,
-              style: const TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  color: _kSlate,
-                  letterSpacing: 0.3)),
-        );
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -3496,162 +4180,151 @@ class _ByPersonTabState extends State<_ByPersonTab> {
 }
 
 // ============================================================
-// SHARED TABLE (For By Date Tab)
+// COMPACT ATTENDANCE TABLE (By Date tab, tablet/desktop)
+// Auto-shrinks columns to fit available width — no fixed pixel
+// widths, no horizontal scrolling, minimal row height so more
+// records are visible. No 3-dot menu (per request).
 // ============================================================
-class _AttendanceTable extends StatelessWidget {
-  final bool isDesktop;
+class _CompactAttendanceTable extends StatelessWidget {
   final bool isAdmin;
   final Map<String, bool> selectedRows;
   final Function(String, bool) onToggleSelection;
-  final String rowLabelHeader;
   final List<AttendanceRecord> rows;
-  final Widget Function(AttendanceRecord) rowLabelBuilder;
-  final String Function(AttendanceRecord) subLabelBuilder;
+  final double horizontalPad;
   final void Function(AttendanceRecord, String) onStatusChanged;
   final void Function(AttendanceRecord, String) onRemarksChanged;
 
-  const _AttendanceTable({
-    required this.isDesktop,
+  const _CompactAttendanceTable({
     required this.isAdmin,
     required this.selectedRows,
     required this.onToggleSelection,
-    required this.rowLabelHeader,
     required this.rows,
-    required this.rowLabelBuilder,
-    required this.subLabelBuilder,
+    required this.horizontalPad,
     required this.onStatusChanged,
     required this.onRemarksChanged,
   });
 
-  static const double _checkboxColWidth = 40;
-  static const double _nameColWidth = 180;
-  static const double _statusColWidth = 190;
-  static const double _remarksColWidth = 220;
-  static const double _typeColWidth = 130;
-
   @override
   Widget build(BuildContext context) {
-    final totalWidth =
-        _checkboxColWidth + _nameColWidth + _statusColWidth + _remarksColWidth + _typeColWidth;
-
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-          isDesktop ? 28 : 16, 4, isDesktop ? 28 : 16, 20),
+      padding: EdgeInsets.fromLTRB(horizontalPad, 4, horizontalPad, 20),
       child: Container(
         decoration: BoxDecoration(
           color: _kCard,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: _kBorder),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         clipBehavior: Clip.antiAlias,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: totalWidth),
-            child: SizedBox(
-              width: isDesktop ? null : totalWidth,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildHeaderRow(),
-                  ...List.generate(rows.length, (i) {
-                    final record = rows[i];
-                    return _TableRow(
-                      record: record,
-                      isAdmin: isAdmin,
-                      isEven: i.isEven,
-                      isSelected: selectedRows[record.id] ?? false,
-                      onToggle: onToggleSelection,
-                      nameColWidth: _nameColWidth,
-                      statusColWidth: _statusColWidth,
-                      remarksColWidth: _remarksColWidth,
-                      typeColWidth: _typeColWidth,
-                      rowLabel: rowLabelBuilder(record),
-                      subLabel: subLabelBuilder(record),
-                      onStatusChanged: (s) => onStatusChanged(record, s),
-                      onRemarksChanged: (r) => onRemarksChanged(record, r),
-                    );
-                  }),
-                ],
-              ),
-            ),
-          ),
+        child: ListView(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            _buildHeaderRow(),
+            ...List.generate(rows.length, (i) {
+              final record = rows[i];
+              return _CompactTableRow(
+                record: record,
+                isAdmin: isAdmin,
+                isEven: i.isEven,
+                isSelected: selectedRows[record.id] ?? false,
+                onToggle: onToggleSelection,
+                onStatusChanged: (s) => onStatusChanged(record, s),
+                onRemarksChanged: (r) => onRemarksChanged(record, r),
+              );
+            }),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildHeaderRow() {
-    Widget cell(String text, double width, {TextAlign align = TextAlign.left}) {
-      return SizedBox(
-        width: width,
-        child: Text(
-          text,
-          textAlign: align,
-          style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-              color: _kSlate,
-              letterSpacing: 0.3),
-        ),
-      );
-    }
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: const BoxDecoration(
-        color: _kSurface,
-        border: Border(bottom: BorderSide(color: _kBorder)),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: _kPrimaryLight,
+        border: const Border(bottom: BorderSide(color: _kBorder)),
       ),
       child: Row(
         children: [
-          cell('', _checkboxColWidth, align: TextAlign.center),
-          cell(rowLabelHeader.toUpperCase(), _nameColWidth),
-          cell('STATUS', _statusColWidth),
-          cell('REMARKS', _remarksColWidth),
-          cell('DESIGNATION/TYPE', _typeColWidth),
+          const SizedBox(
+            width: 30,
+            child: Icon(Icons.check_box_outline_blank,
+                size: 0, color: Colors.transparent),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text('NAME',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: _kPrimaryDark,
+                    letterSpacing: 0.3)),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text('STATUS',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: _kPrimaryDark,
+                    letterSpacing: 0.3)),
+          ),
+          Expanded(
+            flex: 4,
+            child: Text('REMARKS',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: _kPrimaryDark,
+                    letterSpacing: 0.3)),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text('TYPE',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: _kPrimaryDark,
+                    letterSpacing: 0.3)),
+          ),
         ],
       ),
     );
   }
 }
 
-class _TableRow extends StatefulWidget {
+class _CompactTableRow extends StatefulWidget {
   final AttendanceRecord record;
   final bool isAdmin;
   final bool isEven;
   final bool isSelected;
   final Function(String, bool) onToggle;
-  final double nameColWidth;
-  final double statusColWidth;
-  final double remarksColWidth;
-  final double typeColWidth;
-  final Widget rowLabel;
-  final String subLabel;
   final ValueChanged<String> onStatusChanged;
   final ValueChanged<String> onRemarksChanged;
 
-  const _TableRow({
+  const _CompactTableRow({
     required this.record,
     required this.isAdmin,
     required this.isEven,
     required this.isSelected,
     required this.onToggle,
-    required this.nameColWidth,
-    required this.statusColWidth,
-    required this.remarksColWidth,
-    required this.typeColWidth,
-    required this.rowLabel,
-    required this.subLabel,
     required this.onStatusChanged,
     required this.onRemarksChanged,
   });
 
   @override
-  State<_TableRow> createState() => _TableRowState();
+  State<_CompactTableRow> createState() => _CompactTableRowState();
 }
 
-class _TableRowState extends State<_TableRow> {
+class _CompactTableRowState extends State<_CompactTableRow> {
   late final TextEditingController _remarksController;
 
   @override
@@ -3661,7 +4334,7 @@ class _TableRowState extends State<_TableRow> {
   }
 
   @override
-  void didUpdateWidget(covariant _TableRow oldWidget) {
+  void didUpdateWidget(covariant _CompactTableRow oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.record.id != widget.record.id) {
       _remarksController.text = widget.record.remarks;
@@ -3689,7 +4362,7 @@ class _TableRowState extends State<_TableRow> {
     final locked = !widget.isAdmin || !widget.isSelected;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: widget.isEven ? _kCard : _kSurface.withOpacity(0.5),
         border: const Border(bottom: BorderSide(color: _kBorder, width: 0.6)),
@@ -3698,57 +4371,73 @@ class _TableRowState extends State<_TableRow> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            width: 40,
-            child: Checkbox(
-              value: widget.isSelected,
-              onChanged: (val) {
-                widget.onToggle(widget.record.id, val ?? false);
-              },
-              activeColor: _kPrimary,
-            ),
+            width: 30,
+            child: widget.isAdmin
+                ? Transform.scale(
+              scale: 0.85,
+              child: Checkbox(
+                value: widget.isSelected,
+                onChanged: (val) {
+                  widget.onToggle(widget.record.id, val ?? false);
+                },
+                activeColor: _kPrimary,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            )
+                : const SizedBox.shrink(),
           ),
-          SizedBox(
-            width: widget.nameColWidth,
-            child: Row(
-              children: [
-                Expanded(child: widget.rowLabel),
-                if (record.isSaving)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 6),
-                    child: SizedBox(
-                      width: 13,
-                      height: 13,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: _kPrimary),
+          Expanded(
+            flex: 3,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Row(
+                children: [
+                  Expanded(child: _NameCell(record: record)),
+                  if (record.isSaving)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4),
+                      child: SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: _kPrimary),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
-          SizedBox(
-            width: widget.statusColWidth,
-            child: _StatusDropdown(
-              status: record.status,
-              locked: locked,
-              onChanged: (s) {
-                if (locked) {
-                  _notifyLocked();
-                  return;
-                }
-                widget.onStatusChanged(s);
-              },
+          Expanded(
+            flex: 3,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: _StatusDropdown(
+                status: record.status,
+                locked: locked,
+                compact: true,
+                onChanged: (s) {
+                  if (locked) {
+                    _notifyLocked();
+                    return;
+                  }
+                  widget.onStatusChanged(s);
+                },
+              ),
             ),
           ),
-          SizedBox(
-            width: widget.remarksColWidth,
-            child: _buildRemarksField(locked),
+          Expanded(
+            flex: 4,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: _buildRemarksField(locked),
+            ),
           ),
-          SizedBox(
-            width: widget.typeColWidth,
+          Expanded(
+            flex: 2,
             child: Text(
-              widget.subLabel,
+              _subtitle(record.designation, record.type),
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, color: _kSlate),
+              style: const TextStyle(fontSize: 11, color: _kSlate),
             ),
           ),
         ],
@@ -3762,15 +4451,15 @@ class _TableRowState extends State<_TableRow> {
       onChanged: locked ? null : widget.onRemarksChanged,
       readOnly: locked,
       maxLines: 1,
-      style: TextStyle(fontSize: 12.5, color: locked ? _kSlate : _kInk),
+      style: TextStyle(fontSize: 11.5, color: locked ? _kSlate : _kInk),
       decoration: InputDecoration(
         hintText: 'Add remarks',
-        hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+        hintStyle: TextStyle(fontSize: 11, color: Colors.grey.shade400),
         isDense: true,
         filled: true,
         fillColor: locked ? _kBorder.withOpacity(0.3) : _kSurface,
         contentPadding:
-        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
             borderSide: const BorderSide(color: _kBorder)),
@@ -3779,7 +4468,7 @@ class _TableRowState extends State<_TableRow> {
             borderSide: const BorderSide(color: _kBorder)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: const BorderSide(color: _kPrimary, width: 1.4)),
+            borderSide: const BorderSide(color: _kPrimary, width: 1.2)),
       ),
     );
 
@@ -3797,11 +4486,15 @@ class _StatusDropdown extends StatelessWidget {
   final String status;
   final bool locked;
   final ValueChanged<String> onChanged;
+  final bool compact;
+  final bool fullWidth;
 
   const _StatusDropdown({
     required this.status,
     required this.locked,
     required this.onChanged,
+    this.compact = false,
+    this.fullWidth = false,
   });
 
   @override
@@ -3812,9 +4505,42 @@ class _StatusDropdown extends StatelessWidget {
     final icon = meta['icon'] as IconData;
     final label = meta['label'] as String;
 
+    final content = Container(
+      width: fullWidth ? double.infinity : null,
+      padding: EdgeInsets.symmetric(
+          horizontal: compact ? 8 : 10, vertical: compact ? 6 : 7),
+      decoration: BoxDecoration(
+        color: locked ? bg.withOpacity(0.5) : bg,
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: locked ? color.withOpacity(0.3) : color.withOpacity(0.4)),
+      ),
+      child: Row(
+        mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+        mainAxisAlignment:
+        fullWidth ? MainAxisAlignment.center : MainAxisAlignment.start,
+        children: [
+          Icon(icon, size: compact ? 13 : 15, color: locked ? color.withOpacity(0.6) : color),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: compact ? 11 : 12,
+                    fontWeight: FontWeight.w700,
+                    color: locked ? color.withOpacity(0.6) : color)),
+          ),
+          if (!locked) ...[
+            const SizedBox(width: 3),
+            Icon(Icons.arrow_drop_down, size: compact ? 14 : 16, color: color.withOpacity(0.7)),
+          ],
+        ],
+      ),
+    );
+
     return PopupMenuButton<String>(
       enabled: !locked,
       onSelected: onChanged,
+      padding: EdgeInsets.zero,
       itemBuilder: (context) => _kStatuses.map((s) {
         final key = s['key'] as String;
         return PopupMenuItem<String>(
@@ -3830,30 +4556,7 @@ class _StatusDropdown extends StatelessWidget {
           ),
         );
       }).toList(),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: locked ? bg.withOpacity(0.5) : bg,
-          borderRadius: BorderRadius.circular(7),
-          border: Border.all(color: locked ? color.withOpacity(0.3) : color.withOpacity(0.4)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 15, color: locked ? color.withOpacity(0.6) : color),
-            const SizedBox(width: 6),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: locked ? color.withOpacity(0.6) : color)),
-            if (!locked) ...[
-              const SizedBox(width: 4),
-              Icon(Icons.arrow_drop_down, size: 16, color: color.withOpacity(0.7)),
-            ],
-          ],
-        ),
-      ),
+      child: content,
     );
   }
 }
@@ -3875,7 +4578,7 @@ class _NameCell extends StatelessWidget {
     return Row(
       children: [
         CircleAvatar(
-          radius: 14,
+          radius: 12,
           backgroundColor: _kPrimaryLight,
           backgroundImage: image,
           child: image == null
@@ -3884,19 +4587,19 @@ class _NameCell extends StatelessWidget {
                 ? record.staffName[0].toUpperCase()
                 : '?',
             style: const TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: FontWeight.w700,
                 color: _kPrimary),
           )
               : null,
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 7),
         Expanded(
           child: Text(
             record.staffName,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600, color: _kInk),
+                fontSize: 12.5, fontWeight: FontWeight.w600, color: _kInk),
           ),
         ),
       ],
