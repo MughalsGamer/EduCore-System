@@ -1,4 +1,3 @@
-
 class AttendanceRecord {
   final String id; // Combines staffId + date: e.g., STD-001_2026-07-07
   final String staffId;
@@ -10,7 +9,7 @@ class AttendanceRecord {
   String remarks;
   final String? designation; // from StaffMember, shown under name
   bool isSaved; // true if this record already exists in Firestore for this date
-  // ★ NEW: true only while a save/update network call for this specific
+  // ★ true only while a save/update network call for this specific
   // record is in-flight (used by the History screen's per-row spinner).
   bool isSaving;
 
@@ -33,10 +32,12 @@ class AttendanceRecord {
       'id': id,
       'staffId': staffId,
       'staffName': staffName,
+      'photoBase64': photoBase64,
       'type': type,
       'date': date,
       'status': status,
       'remarks': remarks,
+      'designation': designation,
       // 'timestamp' will be added by Firestore service
     };
   }
@@ -51,9 +52,8 @@ class AttendanceRecord {
       date: map['date'] ?? '',
       status: map['status'] ?? 'present',
       remarks: map['remarks'] ?? '',
+      designation: map['designation'],
       isSaved: true, // ★ anything coming FROM Firestore is, by definition, saved
     );
   }
 }
-
-
