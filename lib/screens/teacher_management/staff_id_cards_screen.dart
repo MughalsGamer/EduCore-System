@@ -888,11 +888,20 @@ class _IdCardFlipWidgetState extends State<_IdCardFlipWidget> {
     }
   }
 
+  static const _flipDuration = Duration(milliseconds: 800);
+
   void _toggleFlip() {
     if (_isAnimating) return; // ek waqt me ek hi animation, taake stuck na ho
     setState(() {
       _isAnimating = true;
       _isFlipped = !_isFlipped;
+    });
+    // AnimatedSwitcher has no onEnd callback, so clear the guard flag
+    // manually once the transition duration has elapsed.
+    Future.delayed(_flipDuration, () {
+      if (mounted) {
+        setState(() => _isAnimating = false);
+      }
     });
   }
 
@@ -903,7 +912,7 @@ class _IdCardFlipWidgetState extends State<_IdCardFlipWidget> {
       child: AnimatedSwitcher(
         // Poora flip clearly nazar aaye is liye duration barha di
         // (pehle turant snap ho jata tha).
-        duration: const Duration(milliseconds: 800),
+        duration: _flipDuration,
         switchInCurve: Curves.easeInOutCubic,
         switchOutCurve: Curves.easeInOutCubic,
         transitionBuilder: (Widget child, Animation<double> animation) {
@@ -927,11 +936,6 @@ class _IdCardFlipWidgetState extends State<_IdCardFlipWidget> {
             alignment: Alignment.center,
             children: [...previousChildren, if (currentChild != null) currentChild],
           );
-        },
-        onEnd: () {
-          if (mounted) {
-            setState(() => _isAnimating = false);
-          }
         },
         child: KeyedSubtree(
           key: ValueKey(_isFlipped),
