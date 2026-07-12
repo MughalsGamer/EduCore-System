@@ -74,7 +74,9 @@
 // }
 
 import 'package:educoresystem/providers/admission_provider.dart';
+import 'package:educoresystem/providers/app_user_provider.dart';
 import 'package:educoresystem/providers/attendance_provider.dart';
+import 'package:educoresystem/providers/school_setting_prodvider.dart';
 import 'package:educoresystem/providers/subject_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -115,6 +117,8 @@ class SchoolApp extends StatelessWidget {
         ChangeNotifierProvider<FeeProvider>(create: (_) => FeeProvider()),
         ChangeNotifierProvider<ExpenseProvider>(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => MuddulProvider()..startListening()),
+        ChangeNotifierProvider(create: (_) => SchoolSettingsProvider()),
+        ChangeNotifierProvider(create: (_) => AppUserProvider()),
       ],
       child: MaterialApp(
         title: 'School Management',

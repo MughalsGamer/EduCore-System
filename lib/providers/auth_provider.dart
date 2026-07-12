@@ -113,8 +113,16 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ── Register new user ──
-  Future<void> registerUser(String email, String password, String role) async {
-    await _authService.registerUser(email, password, role);
+  // ★ FIXED: now accepts `name` as the first parameter, matching
+  // AuthService.registerUser(name, email, password, role) and the
+  // 4-argument call made from RegisterUserScreen.
+  Future<void> registerUser(
+      String name,
+      String email,
+      String password,
+      String role,
+      ) async {
+    await _authService.registerUser(name, email, password, role);
     // After registration, you might want to auto-login or just navigate to login.
     // Optionally, you could also save the role if you log them in automatically.
   }

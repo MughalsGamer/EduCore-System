@@ -1,4 +1,5 @@
 import 'package:educoresystem/screens/register_user.dart';
+import 'package:educoresystem/screens/school%20setting/school_setting.dart';
 import 'package:educoresystem/screens/subject_management/subject%20list.dart';
 import 'package:educoresystem/screens/teacher_management/Staff%20Profile.dart';
 import 'package:educoresystem/screens/teacher_management/add_teacher.dart';
@@ -106,6 +107,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       'Expense Report': () => const ExpenseReportScreen(),
       'Profit / Loss': () => const ProfitLossScreen(),
       'Register User': () => const RegisterUserScreen(),
+      'School Settings': () => const SchoolSettingsScreen(showAppBar: false),
 
       // ✅ FIXED: Only our new Premium Attendance Screen
       'Attendance': () => const AttendanceScreen(),
@@ -186,9 +188,12 @@ class _DashboardScreenState extends State<DashboardScreen>
       _NavItem('Fee Report', Icons.receipt_rounded, go('Fee Report')),
       _NavItem('Expense Report', Icons.bar_chart_rounded, go('Expense Report')),
       _NavItem('Profit / Loss', Icons.trending_up_rounded, go('Profit / Loss')),
+      if (role.toLowerCase() == 'admin')
+        _NavItem('School Settings', Icons.settings_rounded, go('School Settings')),
     ];
 
     return all;
+
   }
 
   // ── Quick actions ──
@@ -458,6 +463,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                     .where((n) => [
                   'Fee Report', 'Expense Report', 'Profit / Loss'
                 ].contains(n.label))
+                    .map((e) => _sbTile(e, isDrawer)),
+              ],
+              // ★ NEW — Settings group, appears at the very bottom of the nav list
+              if (items.any((n) => ['School Settings'].contains(n.label))) ...[
+                _sbLabel('Settings'),
+                ...items
+                    .where((n) => ['School Settings'].contains(n.label))
                     .map((e) => _sbTile(e, isDrawer)),
               ],
             ],
