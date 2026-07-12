@@ -1197,6 +1197,7 @@ import 'package:educoresystem/screens/school%20setting/school_setting.dart';
 import 'package:educoresystem/screens/subject_management/subject%20list.dart';
 import 'package:educoresystem/screens/teacher_management/Staff%20Profile.dart';
 import 'package:educoresystem/screens/teacher_management/add_teacher.dart';
+import 'package:educoresystem/screens/teacher_management/staff_id_cards_screen.dart';
 import 'package:educoresystem/screens/teacher_management/staff_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -1312,6 +1313,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       'Profit / Loss': () => const ProfitLossScreen(),
       'Register User': () => const RegisterUserScreen(),
       'School Settings': () => const SchoolSettingsScreen(showAppBar: false),
+      // ⬇️ NEW LINE ADD KAREIN
+      'ID Cards': () => const StaffIdCardsScreen(showAppBar: false),
 
       // ✅ FIXED: Only our new Premium Attendance Screen
       'Attendance': () => const AttendanceScreen(),
@@ -1383,6 +1386,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       _NavItem('Students', Icons.people_rounded, go('Students')),
       _NavItem('Teachers', Icons.person_rounded, go('Teachers')),
       _NavItem('Staff', Icons.badge_rounded, go('Staff')),
+      _NavItem('ID Cards', Icons.credit_card_rounded, go('ID Cards')),
       _NavItem('Attendance', Icons.fact_check_rounded, go('Attendance')),
       _NavItem('Fee Structure', Icons.monetization_on_rounded, go('Fee Structure')),
       _NavItem('Fee Receipts', Icons.receipt_long_rounded, go('Fee Receipts')),
@@ -1654,12 +1658,12 @@ class _DashboardScreenState extends State<DashboardScreen>
               _sbLabel('Main'),
               ...items.where((n) => n.label == 'Dashboard').map((e) => _sbTile(e, isDrawer)),
               if (items.any((n) => [
-                'Students', 'Teachers', 'Staff', 'Family', 'Register User', 'Attendance'
+                'Students', 'Teachers', 'Staff','ID Cards', 'Family', 'Register User', 'Attendance'
               ].contains(n.label))) ...[
                 _sbLabel('People'),
                 ...items
                     .where((n) => [
-                  'Students', 'Teachers', 'Staff', 'Family',
+                  'Students', 'Teachers', 'Staff','ID Cards', 'Family',
                   'Register User', 'Attendance'
                 ].contains(n.label))
                     .map((e) => _sbTile(e, isDrawer)),
