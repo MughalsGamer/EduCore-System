@@ -618,10 +618,11 @@ import '../../providers/school_setting_prodvider.dart';
 // ============================================================
 // THEME
 // ============================================================
-// ✅ FIX (#3): base design size ab sirf "reference" hai, actual size
-// LayoutBuilder se responsive nikala jata hai — mobile pe overflow/oversize nahi hoga.
+// Original desktop card size — ye same rakha hai jo pehle tha.
 const _kBaseCardWidth = 380.0;
 const _kBaseCardHeight = 560.0;
+// Mobile ke liye chhota target width (desktop size wahi purana rahega).
+const _kMobileCardWidth = 300.0;
 const _kBlack = Color(0xFF1A1A1A);
 const _kOrange = Color(0xFFF17A00); // Bright Orange
 const _kSurface = Color(0xFFF8FAFC);
@@ -712,9 +713,7 @@ class _StaffIdCardsScreenState extends State<StaffIdCardsScreen> {
                 : LayoutBuilder(builder: (context, constraints) {
               final maxWidth = constraints.maxWidth;
 
-              // ✅ FIX (#3): responsive column count + responsive card width.
-              // Mobile pe 1 column, lekin card width screen width ke hisab se
-              // clamp hota hai (fixed 380 nahi thopte).
+              // Column count same as before.
               final crossAxisCount = maxWidth < 700
                   ? 1
                   : maxWidth < 1100
@@ -722,12 +721,19 @@ class _StaffIdCardsScreenState extends State<StaffIdCardsScreen> {
                   : 3;
 
               final spacing = 16.0;
-              final usableWidth = maxWidth - (spacing * (crossAxisCount - 1));
-              final rawCardWidth = usableWidth / crossAxisCount;
 
-              // Card ko sensible range me clamp karo: chhota na ho, aur
-              // desktop pe zyada bara na ho (max base width).
-              final cardWidth = rawCardWidth.clamp(260.0, _kBaseCardWidth);
+              // Desktop/tablet: purana fixed size (380) hi use hota hai.
+              // Mobile (1 column, chhoti screen): card ko screen ke hisab
+              // se chhota kiya jata hai taake har phone pe fit ho, lekin
+              // max mobile width se bara na ho.
+              double cardWidth;
+              if (crossAxisCount == 1) {
+                final usableWidth = maxWidth - spacing;
+                cardWidth = usableWidth.clamp(200.0, _kMobileCardWidth);
+              } else {
+                cardWidth = _kBaseCardWidth;
+              }
+
               final aspectRatio = _kBaseCardWidth / _kBaseCardHeight;
 
               // ✅ FIX (#1 & #4): GridView ko perf hints diye —
@@ -746,14 +752,18 @@ class _StaffIdCardsScreenState extends State<StaffIdCardsScreen> {
                 ),
                 itemCount: filteredStaff.length,
                 itemBuilder: (context, index) {
-                  // ✅ FIX (#1/#4): RepaintBoundary isolates each card so
-                  // flipping/scrolling one doesn't force siblings to repaint.
-                  return RepaintBoundary(
-                    child: _IdCardFlipWidget(
-                      key: ValueKey(filteredStaff[index].id),
-                      staff: filteredStaff[index],
-                      schoolSettings: schoolProvider.settings,
-                      cardWidth: cardWidth,
+                  // RepaintBoundary isolates each card so flipping one
+                  // doesn't force siblings/grid to repaint (perf fix).
+                  // Center wrapper so the mobile-shrunk card doesn't get
+                  // stretched to fill the grid cell.
+                  return Center(
+                    child: RepaintBoundary(
+                      child: _IdCardFlipWidget(
+                        key: ValueKey(filteredStaff[index].cnic + filteredStaff[index].name),
+                        staff: filteredStaff[index],
+                        schoolSettings: schoolProvider.settings,
+                        cardWidth: cardWidth,
+                      ),
                     ),
                   );
                 },
@@ -823,15 +833,12 @@ class _StaffIdCardsScreenState extends State<StaffIdCardsScreen> {
 }
 
 // ============================================================
-// FLIP CARD WIDGET (Front + Back) — REAL 3D FLIP
+// FLIP CARD WIDGET (Front + Back)
 // ============================================================
-// ✅ FIX (#2): AnimatedSwitcher/RotationTransition ki jagah ab hum
-// AnimationController + Matrix4 perspective transform use kar rahe hain.
-// Ye asli 3D card-flip hai (jaise physical card palatna), GPU par chalta
-// hai (Transform widget), aur beech me layout jump/stuck nahi hota kyunke
-// dono sides same-sized Container me hain aur sirf ek hi widget tree
-// AnimatedBuilder ke zariye transform hoti hai — dono children rebuild
-// nahi hote baar baar.
+// Original AnimatedSwitcher + RotationTransition style wapas rakha hai
+// (jo pehle theek lag raha tha), bas duration/curve tune ki hai taake
+// flip poori tarah nazar aaye — pehle turant "snap" ho jata tha kyunke
+// duration bohat chhoti thi aur linear curve tha.
 class _IdCardFlipWidget extends StatefulWidget {
   final StaffMember staff;
   final SchoolSettings schoolSettings;
@@ -847,21 +854,16 @@ class _IdCardFlipWidget extends StatefulWidget {
   State<_IdCardFlipWidget> createState() => _IdCardFlipWidgetState();
 }
 
-class _IdCardFlipWidgetState extends State<_IdCardFlipWidget> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _animation;
+class _IdCardFlipWidgetState extends State<_IdCardFlipWidget> {
+  bool _isFlipped = false;
+  bool _isAnimating = false;
 
-  // ✅ FIX (#1): Base64 image ek hi dafa decode hoti hai, har build pe nahi.
+  // Base64 image ek hi dafa decode hoti hai (perf fix), har build pe nahi.
   ImageProvider? _cachedImage;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500), // smooth, not too slow
-    );
-    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic);
     _decodeImage();
   }
 
@@ -886,59 +888,67 @@ class _IdCardFlipWidgetState extends State<_IdCardFlipWidget> with SingleTickerP
     }
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
   void _toggleFlip() {
-    if (_controller.isAnimating) return; // avoid overlapping/stuck animations
-    if (_controller.value == 0) {
-      _controller.forward();
-    } else {
-      _controller.reverse();
-    }
+    if (_isAnimating) return; // ek waqt me ek hi animation, taake stuck na ho
+    setState(() {
+      _isAnimating = true;
+      _isFlipped = !_isFlipped;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: _toggleFlip,
-      child: AnimatedBuilder(
-        animation: _animation,
-        builder: (context, child) {
-          final angle = _animation.value * 3.14159265359; // 0 -> pi
-          final isBack = _animation.value >= 0.5;
-
-          final transform = Matrix4.identity()
-            ..setEntry(3, 2, 0.0012) // perspective
-            ..rotateY(angle);
-
-          Widget content = isBack
-              ? Transform(
-            transform: Matrix4.identity()..rotateY(3.14159265359),
+      child: AnimatedSwitcher(
+        // Poora flip clearly nazar aaye is liye duration barha di
+        // (pehle turant snap ho jata tha).
+        duration: const Duration(milliseconds: 800),
+        switchInCurve: Curves.easeInOutCubic,
+        switchOutCurve: Curves.easeInOutCubic,
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          final rotateAnim = Tween(begin: 1.0, end: 0.0).animate(animation);
+          return AnimatedBuilder(
+            animation: rotateAnim,
+            child: child,
+            builder: (context, child) {
+              return Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.identity()
+                  ..setEntry(3, 2, 0.0015)
+                  ..rotateY((1 - rotateAnim.value) * 3.14159265359 / 2),
+                child: child,
+              );
+            },
+          );
+        },
+        layoutBuilder: (currentChild, previousChildren) {
+          return Stack(
             alignment: Alignment.center,
-            child: _IdCardBack(
-              staff: widget.staff,
-              schoolSettings: widget.schoolSettings,
-              cardWidth: widget.cardWidth,
-              cachedImage: _cachedImage,
-            ),
+            children: [...previousChildren, if (currentChild != null) currentChild],
+          );
+        },
+        onEnd: () {
+          if (mounted) {
+            setState(() => _isAnimating = false);
+          }
+        },
+        child: KeyedSubtree(
+          key: ValueKey(_isFlipped),
+          child: _isFlipped
+              ? _IdCardBack(
+            staff: widget.staff,
+            schoolSettings: widget.schoolSettings,
+            cardWidth: widget.cardWidth,
+            cachedImage: _cachedImage,
           )
               : _IdCardFront(
             staff: widget.staff,
             schoolSettings: widget.schoolSettings,
             cardWidth: widget.cardWidth,
             cachedImage: _cachedImage,
-          );
-
-          return Transform(
-            transform: transform,
-            alignment: Alignment.center,
-            child: content,
-          );
-        },
+          ),
+        ),
       ),
     );
   }
