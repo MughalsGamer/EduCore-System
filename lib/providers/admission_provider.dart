@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../models/admission_model.dart';
+import '../models/family_model.dart';
 import '../services/Admission_firestore_sercice.dart';
+import '../services/family_firestore_service.dart';
 
 class AdmissionProvider extends ChangeNotifier {
   final AdmissionFirestoreService _service = AdmissionFirestoreService();
+  final FamilyFirestoreService _familyService = FamilyFirestoreService();
 
   List<AdmissionModel> _admissions = [];
   bool _isLoading = false;
@@ -70,10 +73,14 @@ class AdmissionProvider extends ChangeNotifier {
       _service.generateAdmissionId(type);
 
   Future<String> generateFamilyId(String familyName) =>
-      _service.generateFamilyId(familyName);
+      _familyService.generateFamilyId(familyName);
 
   Future<String> generateStudentId(String name) =>
       _service.generateStudentId(name);
+
+  // ── Family search (delegates to FamilyFirestoreService) ──
+  Future<List<FamilyModel>> searchFamilies(String query) =>
+      _familyService.searchFamiliesByName(query);
 
   // ── Class/Section Fees ─────────────────────────
   Future<Map<String, double?>> fetchFees(
@@ -85,14 +92,50 @@ class AdmissionProvider extends ChangeNotifier {
   }
 
   // ── Save ───────────────────────────────────────
-  Future<void> saveAdmission(AdmissionModel admission) async {
+  // `family` must always be provided: either a brand-new FamilyModel
+  // (not yet created in Firestore, docId == null) or an existing one
+  // (docId != null) that the user selected via search.
+  Future<void> saveAdmission(
+      AdmissionModel admission, FamilyModel family) async {
     try {
       _isLoading = true;
       notifyListeners();
+
+      // 1. Ensure the family document exists — create if new.
+      String familyDocId = family.docId ?? '';
+      if (familyDocId.isEmpty) {
+        familyDocId = await _familyService.createFamily(family);
+        family.docId = familyDocId;
+      }
+
+      admission.familyDocId = familyDocId;
+      admission.familyId = family.familyId;
+      admission.familyName = family.familyName;
+
+      // 2. Save the admission itself (add or update).
+      String admissionDocId;
       if (admission.id == null) {
-        await _service.addAdmission(admission); // ID return ho rahi hai, idhar ignore kar rahe
+        admissionDocId = await _service.addAdmission(admission);
+        admission.id = admissionDocId;
       } else {
+        admissionDocId = admission.id!;
         await _service.updateAdmission(admission);
+      }
+
+      // 3. Sync every student in this admission into the family's
+      //    students[] array (add new / refresh existing by studentId).
+      for (final s in admission.students) {
+        if (s.studentId.isEmpty) continue;
+        await _familyService.upsertStudentRef(
+          familyDocId: familyDocId,
+          ref: FamilyStudentRef(
+            studentId: s.studentId,
+            name: s.name,
+            admissionId: admissionDocId,
+            inquiryOrRegId: admission.inquiryOrRegId,
+            type: admission.type,
+          ),
+        );
       }
     } catch (e) {
       _error = e.toString();
@@ -105,7 +148,23 @@ class AdmissionProvider extends ChangeNotifier {
 
   Future<void> deleteAdmission(String id) async {
     try {
+      // Find the admission first so we can clean up its family refs.
+      final admission = _admissions.firstWhere(
+            (a) => a.id == id,
+        orElse: () => AdmissionModel(),
+      );
+
       await _service.deleteAdmission(id);
+
+      if (admission.familyDocId.isNotEmpty) {
+        for (final s in admission.students) {
+          if (s.studentId.isEmpty) continue;
+          await _familyService.removeStudentRef(
+            familyDocId: admission.familyDocId,
+            studentId: s.studentId,
+          );
+        }
+      }
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -143,6 +202,7 @@ class AdmissionProvider extends ChangeNotifier {
         motherCnic: preAdmission.motherCnic,
         caste: preAdmission.caste,
         address: preAdmission.address,
+        familyDocId: preAdmission.familyDocId,
         familyId: preAdmission.familyId,
         familyName: preAdmission.familyName,
         previousSchoolName: preAdmission.previousSchoolName,
@@ -169,12 +229,27 @@ class AdmissionProvider extends ChangeNotifier {
 
       // 4. Add new regular admission and get the real Firestore ID
       final newDocId = await _service.addAdmission(converted);
-      converted.id = newDocId; // ✅ Real ID set kar do
+      converted.id = newDocId; // Real ID set kar do
 
       // 5. Delete old pre-admission
       await _service.deleteAdmission(preAdmission.id!);
 
-      // 6. Immediate local update (ab ID valid hai, duplicate nahi hoga)
+      // 6. Update family's student refs: move each student from
+      //    pre-admission -> regular (same studentId, new admissionId/type).
+      if (preAdmission.familyDocId.isNotEmpty) {
+        for (final s in converted.students) {
+          if (s.studentId.isEmpty) continue;
+          await _familyService.updateStudentRefType(
+            familyDocId: preAdmission.familyDocId,
+            studentId: s.studentId,
+            newAdmissionId: newDocId,
+            newInquiryOrRegId: newRegId,
+            newType: AdmissionType.regular,
+          );
+        }
+      }
+
+      // 7. Immediate local update (ab ID valid hai, duplicate nahi hoga)
       _admissions.removeWhere((a) => a.id == preAdmission.id);
       _admissions.insert(0, converted);
       _admissions.sort((a, b) => b.admissionDate.compareTo(a.admissionDate));
@@ -193,8 +268,4 @@ class AdmissionProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
   }
-
-  Future<List<AdmissionModel>> searchFamilies(String query) =>
-      _service.searchFamiliesByName(query);
-
 }
