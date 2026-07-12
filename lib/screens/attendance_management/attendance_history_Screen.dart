@@ -2312,6 +2312,8 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
+
+
   @override
   void initState() {
     super.initState();
@@ -2690,6 +2692,17 @@ class _ByDateTabState extends State<_ByDateTab> {
     }
   }
 
+  void _toggleSelectAll(List<AttendanceRecord> pageRows) {
+    final allCurrentlySelected = pageRows.isNotEmpty &&
+        pageRows.every((r) => _selectedRows[r.id] == true);
+
+    setState(() {
+      for (final r in pageRows) {
+        _selectedRows[r.id] = !allCurrentlySelected;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AttendanceProvider>();
@@ -2745,17 +2758,18 @@ class _ByDateTabState extends State<_ByDateTab> {
               onToggleSelection: _toggleSelection,
               rows: pageRows,
               horizontalPad: horizontalPad,
+              allSelected: pageRows.isNotEmpty &&
+                  pageRows.every((r) => _selectedRows[r.id] == true), // ★ NEW
+              onToggleSelectAll: () => _toggleSelectAll(pageRows), // ★ NEW
               onStatusChanged: (record, status) {
                 context
                     .read<AttendanceProvider>()
-                    .adminUpdateHistoryRecord(record,
-                    newStatus: status);
+                    .adminUpdateHistoryRecord(record, newStatus: status);
               },
               onRemarksChanged: (record, remarks) {
                 context
                     .read<AttendanceProvider>()
-                    .adminUpdateHistoryRecord(record,
-                    newRemarks: remarks);
+                    .adminUpdateHistoryRecord(record, newRemarks: remarks);
               },
             )),
           ),
@@ -4193,6 +4207,8 @@ class _CompactAttendanceTable extends StatelessWidget {
   final double horizontalPad;
   final void Function(AttendanceRecord, String) onStatusChanged;
   final void Function(AttendanceRecord, String) onRemarksChanged;
+  final VoidCallback onToggleSelectAll; // ★ NEW
+  final bool allSelected; // ★ NEW
 
   const _CompactAttendanceTable({
     required this.isAdmin,
@@ -4202,6 +4218,8 @@ class _CompactAttendanceTable extends StatelessWidget {
     required this.horizontalPad,
     required this.onStatusChanged,
     required this.onRemarksChanged,
+    required this.onToggleSelectAll, // ★ NEW
+    required this.allSelected, // ★ NEW
   });
 
   @override
@@ -4254,10 +4272,20 @@ class _CompactAttendanceTable extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const SizedBox(
+          // ★ REPLACED empty invisible box with real Select-All checkbox
+          SizedBox(
             width: 30,
-            child: Icon(Icons.check_box_outline_blank,
-                size: 0, color: Colors.transparent),
+            child: isAdmin
+                ? Transform.scale(
+              scale: 0.85,
+              child: Checkbox(
+                value: allSelected,
+                onChanged: rows.isEmpty ? null : (_) => onToggleSelectAll(),
+                activeColor: _kPrimary,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            )
+                : const SizedBox.shrink(),
           ),
           Expanded(
             flex: 3,
@@ -4300,6 +4328,7 @@ class _CompactAttendanceTable extends StatelessWidget {
     );
   }
 }
+
 
 class _CompactTableRow extends StatefulWidget {
   final AttendanceRecord record;
