@@ -1,6 +1,7 @@
 
 import 'dart:convert';
 import 'package:educoresystem/screens/register_user.dart';
+import 'package:educoresystem/screens/salary_managemnet/salary_management_screen.dart';
 import 'package:educoresystem/screens/school%20setting/school_setting.dart';
 import 'package:educoresystem/screens/subject_management/subject%20list.dart';
 import 'package:educoresystem/screens/teacher_management/Staff%20Profile.dart';
@@ -145,6 +146,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         showAppBar: false,
         onSaved: () => _closeRightPanel(),
       ),
+      'Salary Management': () => const SalaryManagementScreen(),
     };
   }
 
@@ -196,6 +198,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       _NavItem('Staff', Icons.badge_rounded, go('Staff')),
       _NavItem('ID Cards', Icons.credit_card_rounded, go('ID Cards')),
       _NavItem('Attendance', Icons.fact_check_rounded, go('Attendance')),
+      _NavItem('Salary Management', Icons.payments_rounded, go('Salary Management')),
       _NavItem('Fee Structure', Icons.monetization_on_rounded, go('Fee Structure')),
       _NavItem('Fee Receipts', Icons.receipt_long_rounded, go('Fee Receipts')),
       _NavItem('Student Ledger', Icons.book_rounded, go('Student Ledger')),
@@ -486,6 +489,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ].contains(n.label))
                     .map((e) => _sbTile(e, isDrawer)),
               ],
+              if (items.any((n) => ['Salary Management'].contains(n.label))) ...[
+                _sbLabel('Salary'),
+                ...items
+                    .where((n) => ['Salary Management'].contains(n.label))
+                    .map((e) => _sbTile(e, isDrawer)),
+              ],
               if (items.any((n) => [
                 'Classes', 'Subjects'
               ].contains(n.label))) ...[
@@ -525,6 +534,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     .where((n) => ['School Settings'].contains(n.label))
                     .map((e) => _sbTile(e, isDrawer)),
               ],
+
             ],
           ),
         ),
