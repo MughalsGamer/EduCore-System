@@ -6,6 +6,7 @@ import 'package:educoresystem/screens/school%20setting/school_setting.dart';
 import 'package:educoresystem/screens/subject_management/subject%20list.dart';
 import 'package:educoresystem/screens/teacher_management/Staff%20Profile.dart';
 import 'package:educoresystem/screens/teacher_management/add_teacher.dart';
+import 'package:educoresystem/screens/teacher_management/employee_ledger_screen.dart';
 import 'package:educoresystem/screens/teacher_management/staff_id_cards_screen.dart';
 import 'package:educoresystem/screens/teacher_management/staff_list_screen.dart';
 import 'package:flutter/material.dart';
@@ -147,6 +148,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         onSaved: () => _closeRightPanel(),
       ),
       'Salary Management': () => const SalaryManagementScreen(),
+      'Employee Ledger': () => const EmployeeLedgerScreen(showAppBar: false),
     };
   }
 
@@ -207,6 +209,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       _NavItem('Fee Report', Icons.receipt_rounded, go('Fee Report')),
       _NavItem('Expense Report', Icons.bar_chart_rounded, go('Expense Report')),
       _NavItem('Profit / Loss', Icons.trending_up_rounded, go('Profit / Loss')),
+      _NavItem('Employee Ledger', Icons.account_balance_wallet_rounded, go('Employee Ledger')),
       if (role.toLowerCase() == 'admin')
         _NavItem('School Settings', Icons.settings_rounded, go('School Settings')),
     ];

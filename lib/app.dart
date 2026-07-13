@@ -2,7 +2,8 @@
 import 'package:educoresystem/providers/admission_provider.dart';
 import 'package:educoresystem/providers/app_user_provider.dart';
 import 'package:educoresystem/providers/attendance_provider.dart';
-import 'package:educoresystem/providers/salary_history_provider.dart';
+import 'package:educoresystem/providers/employee_transaction_provider.dart';
+import 'package:educoresystem/providers/salary_adjustment_history_provider.dart';
 import 'package:educoresystem/providers/school_setting_prodvider.dart';
 import 'package:educoresystem/providers/subject_provider.dart';
 import 'package:flutter/material.dart';
@@ -47,6 +48,7 @@ class SchoolApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SchoolSettingsProvider()),
         ChangeNotifierProvider(create: (_) => AppUserProvider()),
         ChangeNotifierProvider(create: (_) => SalaryHistoryProvider()),
+        ChangeNotifierProvider(create: (_) => EmployeeTransactionProvider()),
       ],
       child: MaterialApp(
         title: 'School Management',

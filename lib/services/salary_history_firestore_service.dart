@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/salary_history.dart';
+import '../models/salary_adjustment_history.dart';
 import '../models/teacher.dart';
 
 /// Handles all Firestore operations for salary increment/decrement history.

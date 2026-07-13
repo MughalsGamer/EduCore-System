@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/teacher.dart';
-import '../../providers/salary_history_provider.dart';
+import '../../providers/salary_adjustment_history_provider.dart';
 import '../../providers/teacher_provider.dart';
 import 'salary_adjustment_screen.dart';
 

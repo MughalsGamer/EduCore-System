@@ -2,9 +2,9 @@
 // import 'package:intl/intl.dart';
 // import 'package:provider/provider.dart';
 //
-// import '../../models/salary_history.dart';
+// import '../../models/salary_adjustment_history.dart';
 // import '../../models/teacher.dart';
-// import '../../providers/salary_history_provider.dart';
+// import '../../providers/salary_adjustment_history_provider.dart';
 //
 // const _kPurple = Color(0xFF534AB7);
 // const _kPurpleLight = Color(0xFFF0EFFE);
@@ -611,9 +611,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/salary_history.dart';
+import '../../models/salary_adjustment_history.dart';
 import '../../models/teacher.dart';
-import '../../providers/salary_history_provider.dart';
+import '../../providers/salary_adjustment_history_provider.dart';
 
 const _kPurple = Color(0xFF534AB7);
 const _kPurpleLight = Color(0xFFF0EFFE);
