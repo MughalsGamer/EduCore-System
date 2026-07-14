@@ -1,158 +1,98 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// One row in an employee's ledger.
+/// Represents a single Advance / Loan / Expense / Fine / Reimbursement / Other
+/// transaction recorded against a staff member or teacher.
 ///
-/// Collection: `employee_transactions` (top-level, independent from
-/// `teachers` / `staff` / `salary_history` — zero risk of conflicting
-/// with any existing feature).
-///
-/// Supported `type` values (chosen from a single dropdown in one shared
-/// form, as requested):
-///   - 'expense'    : company gave/spent money on the employee, OR a
-///                    deduction from the employee (see [expenseDirection])
-///   - 'loan'       : company gave the employee a loan (debit — employee
-///                    owes the company)
-///   - 'advance'    : company gave the employee an advance salary
-///                    (debit — employee owes the company)
-///   - 'repayment'  : employee paid back part/all of a loan or advance.
-///                    [linkedTransactionId] points at the original
-///                    'loan' or 'advance' entry this repayment reduces.
-///
-/// Ledger math (per employee, running balance):
-///   direction == 'debit'  → increases what the employee owes the company
-///   direction == 'credit' → decreases what the employee owes the company
-///
-/// For 'loan' and 'advance' entries specifically, [status] tracks
-/// repayment progress:
-///   'pending'         → nothing repaid yet
-///   'partially_paid'  → some repayments exist but not fully settled
-///   'settled'         → fully repaid (remainingAmount <= 0)
-/// [status] is null for 'expense' and 'repayment' types.
-class EmployeeTransaction {
-  String? id;
-  final String staffId;
-  final String staffName;
-  final String staffType; // 'teacher' | 'staff' (denormalized)
-  final String type; // 'expense' | 'loan' | 'advance' | 'repayment'
-  final String direction; // 'debit' | 'credit'
+/// Stored in the standalone Firestore collection: `staff_transactions`
+class StaffTransaction {
+  final String? id;
+  final String employeeId;
+  final String employeeName;
+  final String employeeType; // 'teacher' or 'staff'
+  final DateTime date;
+  final String category; // Advance, Loan, Expense, Fine, Reimbursement, Others
+  final String? customCategory; // used only when category == 'Others'
   final double amount;
-  final String description;
-  final String date; // yyyy-MM-dd (effective date, user-editable)
+  final String? note;
+  final DateTime createdAt;
 
-  /// Only meaningful for type == 'expense'. Distinguishes whether the
-  /// company spent FOR the employee (e.g. reimbursement — still a debit
-  /// against the employee if it's something they must account for) or
-  /// this was a deduction. Kept simple: this field is just a label for
-  /// display; [direction] is what actually drives the ledger math.
-  final String? expenseKind; // 'company_expense' | 'deduction' | null
-
-  /// For 'loan' / 'advance': running status as repayments come in.
-  final String? status; // 'pending' | 'partially_paid' | 'settled' | null
-
-  /// For 'repayment': id of the 'loan' or 'advance' transaction this
-  /// repayment is reducing. Null for all other types.
-  final String? linkedTransactionId;
-
-  final DateTime? createdAt;
-
-  EmployeeTransaction({
+  StaffTransaction({
     this.id,
-    required this.staffId,
-    required this.staffName,
-    required this.staffType,
-    required this.type,
-    required this.direction,
-    required this.amount,
-    required this.description,
+    required this.employeeId,
+    required this.employeeName,
+    required this.employeeType,
     required this.date,
-    this.expenseKind,
-    this.status,
-    this.linkedTransactionId,
-    this.createdAt,
-  });
+    required this.category,
+    this.customCategory,
+    required this.amount,
+    this.note,
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
 
-  bool get isDebit => direction == 'debit';
-  bool get isCredit => direction == 'credit';
+  /// Friendly label for UI — shows custom category text when 'Others' is picked.
+  String get displayCategory {
+    if (category == 'Others' &&
+        customCategory != null &&
+        customCategory!.trim().isNotEmpty) {
+      return customCategory!.trim();
+    }
+    return category;
+  }
 
   Map<String, dynamic> toMap() {
     return {
-      'staffId': staffId,
-      'staffName': staffName,
-      'staffType': staffType,
-      'type': type,
-      'direction': direction,
+      'employeeId': employeeId,
+      'employeeName': employeeName,
+      'employeeType': employeeType,
+      'date': Timestamp.fromDate(date),
+      'category': category,
+      'customCategory': customCategory,
       'amount': amount,
-      'description': description,
-      'date': date,
-      'expenseKind': expenseKind,
-      'status': status,
-      'linkedTransactionId': linkedTransactionId,
-      'createdAt': FieldValue.serverTimestamp(),
+      'note': note,
+      'createdAt': Timestamp.fromDate(createdAt),
     };
   }
 
-  /// Used when we need to write createdAt manually is NOT needed for
-  /// updates — Firestore keeps the original createdAt untouched because
-  /// we never overwrite it after creation (see service.updateTransaction).
-  Map<String, dynamic> toUpdateMap() {
-    return {
-      'staffId': staffId,
-      'staffName': staffName,
-      'staffType': staffType,
-      'type': type,
-      'direction': direction,
-      'amount': amount,
-      'description': description,
-      'date': date,
-      'expenseKind': expenseKind,
-      'status': status,
-      'linkedTransactionId': linkedTransactionId,
-      // createdAt intentionally omitted so it never changes on edit
-    };
-  }
-
-  factory EmployeeTransaction.fromMap(Map<String, dynamic> map, String id) {
-    return EmployeeTransaction(
+  factory StaffTransaction.fromMap(Map<String, dynamic> map, String id) {
+    return StaffTransaction(
       id: id,
-      staffId: map['staffId'] ?? '',
-      staffName: map['staffName'] ?? '',
-      staffType: map['staffType'] ?? 'staff',
-      type: map['type'] ?? 'expense',
-      direction: map['direction'] ?? 'debit',
+      employeeId: map['employeeId'] ?? '',
+      employeeName: map['employeeName'] ?? '',
+      employeeType: map['employeeType'] ?? 'staff',
+      date: (map['date'] is Timestamp)
+          ? (map['date'] as Timestamp).toDate()
+          : DateTime.tryParse(map['date']?.toString() ?? '') ?? DateTime.now(),
+      category: map['category'] ?? 'Advance',
+      customCategory: map['customCategory'],
       amount: (map['amount'] ?? 0).toDouble(),
-      description: map['description'] ?? '',
-      date: map['date'] ?? '',
-      expenseKind: map['expenseKind'] as String?,
-      status: map['status'] as String?,
-      linkedTransactionId: map['linkedTransactionId'] as String?,
+      note: map['note'],
       createdAt: (map['createdAt'] is Timestamp)
           ? (map['createdAt'] as Timestamp).toDate()
-          : null,
+          : DateTime.tryParse(map['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 
-  EmployeeTransaction copyWith({
-    String? type,
-    String? direction,
+  StaffTransaction copyWith({
+    String? employeeId,
+    String? employeeName,
+    String? employeeType,
+    DateTime? date,
+    String? category,
+    String? customCategory,
     double? amount,
-    String? description,
-    String? date,
-    String? expenseKind,
-    String? status,
+    String? note,
   }) {
-    return EmployeeTransaction(
+    return StaffTransaction(
       id: id,
-      staffId: staffId,
-      staffName: staffName,
-      staffType: staffType,
-      type: type ?? this.type,
-      direction: direction ?? this.direction,
-      amount: amount ?? this.amount,
-      description: description ?? this.description,
+      employeeId: employeeId ?? this.employeeId,
+      employeeName: employeeName ?? this.employeeName,
+      employeeType: employeeType ?? this.employeeType,
       date: date ?? this.date,
-      expenseKind: expenseKind ?? this.expenseKind,
-      status: status ?? this.status,
-      linkedTransactionId: linkedTransactionId,
+      category: category ?? this.category,
+      customCategory: customCategory ?? this.customCategory,
+      amount: amount ?? this.amount,
+      note: note ?? this.note,
       createdAt: createdAt,
     );
   }

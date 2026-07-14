@@ -48,7 +48,7 @@ class SchoolApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SchoolSettingsProvider()),
         ChangeNotifierProvider(create: (_) => AppUserProvider()),
         ChangeNotifierProvider(create: (_) => SalaryHistoryProvider()),
-        ChangeNotifierProvider(create: (_) => EmployeeTransactionProvider()),
+        ChangeNotifierProvider(create: (_) => StaffTransactionProvider()),
       ],
       child: MaterialApp(
         title: 'School Management',
