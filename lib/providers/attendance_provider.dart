@@ -522,6 +522,267 @@
 // }
 
 
+// import 'package:flutter/material.dart';
+// import '../models/attendance_model.dart';
+// import '../models/teacher.dart';
+// import '../providers/teacher_provider.dart';
+// import '../services/attendance_firestore_service.dart';
+//
+// class AttendanceProvider extends ChangeNotifier {
+//   final StaffProvider _staffProvider;
+//   final AttendanceFirestoreService _service = AttendanceFirestoreService();
+//
+//   List<AttendanceRecord> _records = [];
+//   bool _loading = false;
+//   String _selectedDate = DateTime.now().toIso8601String().split('T')[0];
+//   String _filterType = 'all'; // 'all', 'teacher', 'staff'
+//
+//   List<AttendanceRecord> get records => _records;
+//   bool get loading => _loading;
+//   String get selectedDate => _selectedDate;
+//   String get filterType => _filterType;
+//
+//   // Separate state for the "Attendance History" screen
+//   List<AttendanceRecord> _historyRecords = [];
+//   bool _historyLoading = false;
+//   String? _historyError;
+//
+//   List<AttendanceRecord> get historyRecords => _historyRecords;
+//   bool get historyLoading => _historyLoading;
+//   String? get historyError => _historyError;
+//
+//   // Compute summary statistics for "By Person" report
+//   Map<String, int> get monthSummary {
+//     Map<String, int> counts = {
+//       'total': _historyRecords.length,
+//       'present': 0,
+//       'absent': 0,
+//       'leave': 0,
+//       'late': 0,
+//       'half_day': 0,
+//     };
+//     for (final r in _historyRecords) {
+//       if (counts.containsKey(r.status)) {
+//         counts[r.status] = counts[r.status]! + 1;
+//       }
+//     }
+//     return counts;
+//   }
+//
+//   AttendanceProvider(this._staffProvider);
+//
+//   Future<void> loadData({String? typeFilter}) async {
+//     _loading = true;
+//     _filterType = typeFilter ?? _filterType;
+//     notifyListeners();
+//
+//     await _staffProvider.fetchTeachers();
+//     await _staffProvider.fetchStaffOnly();
+//
+//     final existingRecords = await _service.getAttendanceForDate(_selectedDate);
+//
+//     List<StaffMember> activeStaff = [];
+//     if (_filterType == 'teacher') {
+//       activeStaff = _staffProvider.teachers;
+//     } else if (_filterType == 'staff') {
+//       activeStaff = _staffProvider.staffOnly;
+//     } else {
+//       activeStaff = [..._staffProvider.teachers, ..._staffProvider.staffOnly];
+//     }
+//
+//     _records = activeStaff.map((staff) {
+//       final matchingRecords =
+//       existingRecords.where((r) => r.staffId == staff.id).toList();
+//       final existing = matchingRecords.isNotEmpty ? matchingRecords.first : null;
+//
+//       return AttendanceRecord(
+//         id: existing?.id ?? '${staff.id}_${_selectedDate}',
+//         staffId: staff.id!,
+//         staffName: staff.name,
+//         photoBase64: staff.imageBase64,
+//         type: staff.type,
+//         date: _selectedDate,
+//         status: existing?.status ?? 'present',
+//         remarks: existing?.remarks ?? '',
+//         designation: staff.designation,
+//         isSaved: existing != null,
+//       );
+//     }).toList();
+//
+//     _loading = false;
+//     notifyListeners();
+//   }
+//
+//   void changeDate(DateTime newDate) {
+//     _selectedDate = newDate.toIso8601String().split('T')[0];
+//     loadData();
+//   }
+//
+//   void changeFilter(String newFilter) {
+//     _filterType = newFilter;
+//     loadData();
+//   }
+//
+//   bool updateStatus(String staffId, String status, {bool isAdmin = false}) {
+//     final index = _records.indexWhere((r) => r.staffId == staffId);
+//     if (index == -1) return false;
+//     if (_records[index].isSaved && !isAdmin) return false;
+//     _records[index].status = status;
+//     notifyListeners();
+//     return true;
+//   }
+//
+//   bool updateRemarks(String staffId, String remark, {bool isAdmin = false}) {
+//     final index = _records.indexWhere((r) => r.staffId == staffId);
+//     if (index == -1) return false;
+//     if (_records[index].isSaved && !isAdmin) return false;
+//     _records[index].remarks = remark;
+//     notifyListeners();
+//     return true;
+//   }
+//
+//   int markAll(String status) {
+//     int skipped = 0;
+//     for (final record in _records) {
+//       if (record.isSaved) {
+//         skipped++;
+//         continue;
+//       }
+//       record.status = status;
+//     }
+//     notifyListeners();
+//     return skipped;
+//   }
+//
+//   Future<void> saveAttendance() async {
+//     await _service.saveAttendance(_records);
+//     await loadData();
+//   }
+//
+//   // ============================================================
+//   // ATTENDANCE HISTORY
+//   // ============================================================
+//
+//   // ★ FIXED: Removed improper type casting on results[0] / results[1]
+//   Future<void> loadHistoryForDate(String date, {String typeFilter = 'all'}) async {
+//     _historyLoading = true;
+//     _historyError = null;
+//     notifyListeners();
+//
+//     try {
+//       // 1. Fetch staff & attendance in parallel properly
+//       final attendanceFuture = _service.getAttendanceForDate(date);
+//       final staffFetchFuture = Future.wait([
+//         _staffProvider.fetchTeachers(),
+//         _staffProvider.fetchStaffOnly(),
+//       ]);
+//
+//       await staffFetchFuture; // Wait for staff fetch first
+//       final existingRecords = await attendanceFuture; // Wait for attendance fetch
+//
+//       // 2. Access lists directly from provider (no type-casting errors here)
+//       final teachers = _staffProvider.teachers;
+//       final staffOnly = _staffProvider.staffOnly;
+//
+//       // 3. Build O(1) lookup map for existing records
+//       final existingMap = <String, AttendanceRecord>{};
+//       for (final rec in existingRecords) {
+//         existingMap[rec.staffId] = rec;
+//       }
+//
+//       // 4. Determine active staff list
+//       List<StaffMember> activeStaff = [];
+//       if (typeFilter == 'teacher') {
+//         activeStaff = teachers;
+//       } else if (typeFilter == 'staff') {
+//         activeStaff = staffOnly;
+//       } else {
+//         activeStaff = [...teachers, ...staffOnly];
+//       }
+//
+//       // 5. Map instantly using the lookup map
+//       _historyRecords = activeStaff.map((staff) {
+//         final existing = existingMap[staff.id];
+//         return AttendanceRecord(
+//           id: existing?.id ?? '${staff.id}_$date',
+//           staffId: staff.id!,
+//           staffName: staff.name,
+//           photoBase64: staff.imageBase64,
+//           type: staff.type,
+//           date: date,
+//           status: existing?.status ?? 'absent',
+//           remarks: existing?.remarks ?? '',
+//           designation: staff.designation,
+//           isSaved: existing != null,
+//         );
+//       }).toList();
+//
+//     } catch (e) {
+//       _historyError = 'Failed to load attendance: $e';
+//       _historyRecords = [];
+//     } finally {
+//       _historyLoading = false;
+//       notifyListeners();
+//     }
+//   }
+//
+//   Future<void> loadHistoryForPerson({
+//     required String staffId,
+//     required int year,
+//     required int month,
+//   }) async {
+//     _historyLoading = true;
+//     _historyError = null;
+//     notifyListeners();
+//
+//     try {
+//       final start = DateTime(year, month, 1);
+//       final end = DateTime(year, month + 1, 0);
+//       String fmt(DateTime d) =>
+//           '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+//
+//       final fetched = await _service.getAttendanceForStaffInRange(
+//         staffId: staffId,
+//         startDate: fmt(start),
+//         endDate: fmt(end),
+//       );
+//
+//       _historyRecords = fetched;
+//     } catch (e) {
+//       _historyError = 'Failed to load history. If this is the first time '
+//           'loading "By Person", Firestore may need a composite index '
+//           '(staffId + date) — check console logs for a creation link.\n$e';
+//       _historyRecords = [];
+//     } finally {
+//       _historyLoading = false;
+//       notifyListeners();
+//     }
+//   }
+//
+//   Future<void> adminUpdateHistoryRecord(
+//       AttendanceRecord record, {
+//         String? newStatus,
+//         String? newRemarks,
+//       }) async {
+//     final index = _historyRecords.indexWhere((r) => r.id == record.id);
+//     if (index == -1) return;
+//
+//     if (newStatus != null) _historyRecords[index].status = newStatus;
+//     if (newRemarks != null) _historyRecords[index].remarks = newRemarks;
+//     _historyRecords[index].isSaving = true;
+//     notifyListeners();
+//
+//     try {
+//       await _service.saveSingleRecord(_historyRecords[index]);
+//       _historyRecords[index].isSaved = true;
+//     } finally {
+//       _historyRecords[index].isSaving = false;
+//       notifyListeners();
+//     }
+//   }
+// }
+
+
 import 'package:flutter/material.dart';
 import '../models/attendance_model.dart';
 import '../models/teacher.dart';
@@ -560,6 +821,7 @@ class AttendanceProvider extends ChangeNotifier {
       'leave': 0,
       'late': 0,
       'half_day': 0,
+      'holiday': 0,
     };
     for (final r in _historyRecords) {
       if (counts.containsKey(r.status)) {
@@ -570,6 +832,10 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   AttendanceProvider(this._staffProvider);
+
+  // ★ Small date helper: 'yyyy-MM-dd' with zero-padding.
+  String _fmt(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   Future<void> loadData({String? typeFilter}) async {
     _loading = true;
@@ -590,6 +856,11 @@ class AttendanceProvider extends ChangeNotifier {
       activeStaff = [..._staffProvider.teachers, ..._staffProvider.staffOnly];
     }
 
+    // ★ Is the currently selected day a Sunday? If so, and no explicit
+    // record already exists for a staff member, default their status to
+    // 'holiday' instead of 'present'/'absent'.
+    final isSunday = DateTime.parse(_selectedDate).weekday == DateTime.sunday;
+
     _records = activeStaff.map((staff) {
       final matchingRecords =
       existingRecords.where((r) => r.staffId == staff.id).toList();
@@ -602,7 +873,7 @@ class AttendanceProvider extends ChangeNotifier {
         photoBase64: staff.imageBase64,
         type: staff.type,
         date: _selectedDate,
-        status: existing?.status ?? 'present',
+        status: existing?.status ?? (isSunday ? 'holiday' : 'present'),
         remarks: existing?.remarks ?? '',
         designation: staff.designation,
         isSaved: existing != null,
@@ -664,6 +935,8 @@ class AttendanceProvider extends ChangeNotifier {
   // ============================================================
 
   // ★ FIXED: Removed improper type casting on results[0] / results[1]
+  // ★ FIXED: Sundays with no explicit Firestore record now default to
+  // 'holiday' instead of 'absent'.
   Future<void> loadHistoryForDate(String date, {String typeFilter = 'all'}) async {
     _historyLoading = true;
     _historyError = null;
@@ -700,7 +973,14 @@ class AttendanceProvider extends ChangeNotifier {
         activeStaff = [...teachers, ...staffOnly];
       }
 
-      // 5. Map instantly using the lookup map
+      // 5. ★ Is this particular date a Sunday? If so, and there's no
+      // explicit saved record, default to 'holiday' rather than 'absent'.
+      bool isSunday = false;
+      try {
+        isSunday = DateTime.parse(date).weekday == DateTime.sunday;
+      } catch (_) {}
+
+      // 6. Map instantly using the lookup map
       _historyRecords = activeStaff.map((staff) {
         final existing = existingMap[staff.id];
         return AttendanceRecord(
@@ -710,7 +990,7 @@ class AttendanceProvider extends ChangeNotifier {
           photoBase64: staff.imageBase64,
           type: staff.type,
           date: date,
-          status: existing?.status ?? 'absent',
+          status: existing?.status ?? (isSunday ? 'holiday' : 'absent'),
           remarks: existing?.remarks ?? '',
           designation: staff.designation,
           isSaved: existing != null,
@@ -726,6 +1006,17 @@ class AttendanceProvider extends ChangeNotifier {
     }
   }
 
+  // ★ FIXED / REWRITTEN:
+  // 1. Date range now stops at "today" when the requested month is the
+  //    current month, instead of always going to the end of the month —
+  //    e.g. selecting July 2026 on 16-Jul-2026 shows 1 Jul → 16 Jul only.
+  //    Past months still show the full month (1st → last day).
+  //    Future months yield an empty range (nothing to show yet).
+  // 2. Every day in that range is now included in the result, even if no
+  //    Firestore record exists for it — previously, days with no saved
+  //    attendance were silently skipped instead of showing as "absent".
+  // 3. Sundays with no explicit saved record default to 'holiday' instead
+  //    of 'absent'.
   Future<void> loadHistoryForPerson({
     required String staffId,
     required int year,
@@ -736,18 +1027,81 @@ class AttendanceProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final start = DateTime(year, month, 1);
-      final end = DateTime(year, month + 1, 0);
-      String fmt(DateTime d) =>
-          '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      final now = DateTime.now();
+      final monthStart = DateTime(year, month, 1);
+      final monthEnd = DateTime(year, month + 1, 0); // last day of month
+
+      final isCurrentMonth = year == now.year && month == now.month;
+      final today = DateTime(now.year, now.month, now.day);
+
+      // If it's a future month entirely, there's nothing to show.
+      if (monthStart.isAfter(today)) {
+        _historyRecords = [];
+        _historyLoading = false;
+        notifyListeners();
+        return;
+      }
+
+      // Effective end date: today (if current month) else full month end.
+      final effectiveEnd = isCurrentMonth
+          ? (monthEnd.isBefore(today) ? monthEnd : today)
+          : monthEnd;
+
+      final startStr = _fmt(monthStart);
+      final endStr = _fmt(effectiveEnd);
 
       final fetched = await _service.getAttendanceForStaffInRange(
         staffId: staffId,
-        startDate: fmt(start),
-        endDate: fmt(end),
+        startDate: startStr,
+        endDate: endStr,
       );
 
-      _historyRecords = fetched;
+      // Need staff meta (name/photo/type/designation) to fabricate
+      // placeholder records for days with no saved attendance.
+      final allStaff = [
+        ..._staffProvider.teachers,
+        ..._staffProvider.staffOnly,
+      ];
+      StaffMember? staffMeta;
+      final metaMatches = allStaff.where((s) => s.id == staffId);
+      if (metaMatches.isNotEmpty) staffMeta = metaMatches.first;
+
+      // Lookup map for O(1) access to existing Firestore records by date.
+      final existingByDate = <String, AttendanceRecord>{};
+      for (final rec in fetched) {
+        existingByDate[rec.date] = rec;
+      }
+
+      // Build one record per day in [monthStart, effectiveEnd], filling
+      // gaps with 'holiday' (Sunday) or 'absent' (any other day) when no
+      // explicit record was saved.
+      final results = <AttendanceRecord>[];
+      var cursor = monthStart;
+      while (!cursor.isAfter(effectiveEnd)) {
+        final dateStr = _fmt(cursor);
+        final existing = existingByDate[dateStr];
+        final isSunday = cursor.weekday == DateTime.sunday;
+
+        if (existing != null) {
+          results.add(existing);
+        } else {
+          results.add(AttendanceRecord(
+            id: '${staffId}_$dateStr',
+            staffId: staffId,
+            staffName: staffMeta?.name ?? '',
+            photoBase64: staffMeta?.imageBase64,
+            type: staffMeta?.type ?? 'staff',
+            date: dateStr,
+            status: isSunday ? 'holiday' : 'absent',
+            remarks: '',
+            designation: staffMeta?.designation,
+            isSaved: false,
+          ));
+        }
+        cursor = cursor.add(const Duration(days: 1));
+      }
+
+      _historyRecords = results;
     } catch (e) {
       _historyError = 'Failed to load history. If this is the first time '
           'loading "By Person", Firestore may need a composite index '
