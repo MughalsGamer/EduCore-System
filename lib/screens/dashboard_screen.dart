@@ -1291,6 +1291,7 @@
 import 'dart:convert';
 import 'package:educoresystem/screens/register_user.dart';
 import 'package:educoresystem/screens/salary_managemnet/generate_salary_screen.dart';
+import 'package:educoresystem/screens/salary_managemnet/salary_list_screen.dart';
 import 'package:educoresystem/screens/salary_managemnet/salary_management_screen.dart';
 import 'package:educoresystem/screens/school%20setting/school_setting.dart';
 import 'package:educoresystem/screens/subject_management/subject%20list.dart';
@@ -1438,8 +1439,10 @@ class _DashboardScreenState extends State<DashboardScreen>
         showAppBar: false,
         onSaved: () => _closeRightPanel(),
       ),
-      'Salary Management': () => const SalaryManagementScreen(),
+
       'Generate Salary': () => const GenerateSalaryScreen(showAppBar: false),   // ← NEW
+      'Salary List': () => const SalaryListScreen(),
+      'Salary Adjustment': () => const SalaryManagementScreen(),
       'Add Transaction': () => AddStaffTransactionScreen(
         showAppBar: false,
         onSaved: () => _closeRightPanel(),
@@ -1496,8 +1499,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       _NavItem('Staff', Icons.badge_rounded, go('Staff')),
       _NavItem('ID Cards', Icons.credit_card_rounded, go('ID Cards')),
       _NavItem('Attendance', Icons.fact_check_rounded, go('Attendance')),
-      _NavItem('Salary Management', Icons.payments_rounded, go('Salary Management')),
       _NavItem('Generate Salary', Icons.receipt_long_rounded, go('Generate Salary')),   // ← NEW
+      _NavItem('Salary List', Icons.list_alt_rounded, go('Salary List')),
+      _NavItem('Salary Adjustment', Icons.payments_rounded, go('Salary Adjustment')),
 
       _NavItem('Transaction History', Icons.history_rounded, go('Transaction History')),
 
@@ -1795,12 +1799,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                     .map((e) => _sbTile(e, isDrawer)),
               ],
               if (items.any((n) => [
-                'Salary Management', 'Generate Salary', 'Transaction History'   // ← added
+                'Generate Salary', 'Salary List','Salary Adjustment', 'Transaction History'
               ].contains(n.label))) ...[
                 _sbLabel('Salary'),
                 ...items
                     .where((n) => [
-                  'Salary Management', 'Generate Salary', 'Transaction History'   // ← added
+                   'Generate Salary', 'Salary List','Salary Adjustment', 'Transaction History'
                 ].contains(n.label))
                     .map((e) => _sbTile(e, isDrawer)),
               ],

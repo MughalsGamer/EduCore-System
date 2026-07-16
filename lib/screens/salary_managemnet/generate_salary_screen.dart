@@ -2931,26 +2931,30 @@ const double _kDesktopBreakpoint = 1000;
 // ─────────────────────────────────────────────
 class GenerateSalaryScreen extends StatefulWidget {
   final bool showAppBar;
-  const GenerateSalaryScreen({super.key, this.showAppBar = true});
+  final SalaryRecord? existingRecord; // null = create new, non-null = edit mode
+
+  const GenerateSalaryScreen({super.key, this.showAppBar = true, this.existingRecord});
+
+  // Convenience constructor for editing
+  GenerateSalaryScreen.edit({required SalaryRecord record, super.key, this.showAppBar = true})
+      : existingRecord = record;
 
   @override
   State<GenerateSalaryScreen> createState() => _GenerateSalaryScreenState();
 }
 
 class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
-  String _employeeType = 'teacher'; // 'teacher' or 'staff'
+  String _employeeType = 'teacher';
   StaffMember? _selectedEmployee;
 
   int _selectedYear = DateTime.now().year;
   int _selectedMonth = DateTime.now().month;
 
-  String _mode = 'attendance'; // 'attendance' (Option A) or 'manual' (Option B)
+  String _mode = 'attendance';
 
   final _fineCtrl = TextEditingController();
   final _bonusCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
-
-  // Manual mode inputs
   final _manualWorkingDaysCtrl = TextEditingController(text: '30');
   final _manualLeavesCtrl = TextEditingController(text: '0');
 
@@ -2961,26 +2965,79 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   Map<String, dynamic>? _calcResult;
   bool _isSaving = false;
 
-  // ── Duplicate-check state ──
+  // Duplicate-check state (only used in create mode)
   bool _isCheckingDuplicate = false;
-  SalaryRecord? _existingRecord; // non-null => already generated for this month
-  int _checkToken = 0; // guards against stale async responses
+  SalaryRecord? _existingRecord;
+  int _checkToken = 0;
 
-  bool get _isLocked => _existingRecord != null;
+  bool get _isEditMode => widget.existingRecord != null;
+
+  // In edit mode, the form is locked except for adjustments.
+  bool get _isLocked => _isEditMode ? false : _existingRecord != null; // for create mode duplicate lock
 
   @override
   void initState() {
     super.initState();
+    _initializeFromExisting();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final staffProvider = context.read<StaffProvider>();
-      if (staffProvider.teachers.isEmpty) staffProvider.fetchTeachers();
-      if (staffProvider.staffOnly.isEmpty) staffProvider.fetchStaffOnly();
+      if (!_isEditMode) {
+        final staffProvider = context.read<StaffProvider>();
+        if (staffProvider.teachers.isEmpty) staffProvider.fetchTeachers();
+        if (staffProvider.staffOnly.isEmpty) staffProvider.fetchStaffOnly();
+      }
     });
 
     _fineCtrl.addListener(_recalculateIfManual);
     _bonusCtrl.addListener(_recalculateIfManual);
     _manualWorkingDaysCtrl.addListener(_recalculateIfManual);
     _manualLeavesCtrl.addListener(_recalculateIfManual);
+  }
+
+  void _initializeFromExisting() {
+    if (!_isEditMode) return;
+    final rec = widget.existingRecord!;
+    _selectedYear = rec.year;
+    _selectedMonth = rec.month;
+    _employeeType = rec.employeeType;
+    _mode = rec.mode;
+
+    // Create a minimal StaffMember with all required fields filled with dummy data.
+    _selectedEmployee = StaffMember(
+      id: rec.employeeId,
+      name: rec.employeeName,
+      designation: rec.designation ?? '',
+      salary: rec.baseSalary,
+      type: rec.employeeType,               // ← required field
+      cnic: '',
+      phone: '',
+      address: '',
+      dob: '2000-01-01',
+      gender: 'Male',
+      religion: '',
+      nationality: '',
+      maritalStatus: '',
+      fatherOrHusbandName: '',
+      emergencyPhone: '',
+      employmentType: rec.employeeType == 'teacher' ? 'Teacher' : 'Staff',
+    );
+
+    _searchCtrl.text = rec.employeeName;
+
+    _fineCtrl.text = rec.fine.toStringAsFixed(0);
+    _bonusCtrl.text = rec.bonus.toStringAsFixed(0);
+    _noteCtrl.text = rec.note ?? '';
+    _manualWorkingDaysCtrl.text = rec.workingDays.toString();
+    _manualLeavesCtrl.text = rec.leaves.toString();
+
+    // Run initial calculation after the frame is built.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_mode == 'attendance') {
+        _runAttendanceCalculation();
+      } else {
+        _recalculateManual();
+      }
+    });
   }
 
   @override
@@ -2995,14 +3052,10 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     super.dispose();
   }
 
-  // ───────────────────────────────────────────
-  //  Data helpers
-  // ───────────────────────────────────────────
+  // ── Data helpers ──
   List<StaffMember> get _sourceList {
     final staffProvider = context.watch<StaffProvider>();
-    return _employeeType == 'teacher'
-        ? staffProvider.teachers
-        : staffProvider.staffOnly;
+    return _employeeType == 'teacher' ? staffProvider.teachers : staffProvider.staffOnly;
   }
 
   List<StaffMember> get _filteredEmployees {
@@ -3016,7 +3069,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   double get _bonus => double.tryParse(_bonusCtrl.text.trim()) ?? 0;
 
   void _switchType(String type) {
-    if (_employeeType == type) return;
+    if (_isEditMode || _employeeType == type) return;
     setState(() {
       _employeeType = type;
       _selectedEmployee = null;
@@ -3027,6 +3080,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   }
 
   Future<void> _pickEmployee(StaffMember member) async {
+    if (_isEditMode) return;
     setState(() {
       _selectedEmployee = member;
       _searchCtrl.text = member.name;
@@ -3035,11 +3089,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       _existingRecord = null;
     });
     _searchFocus.unfocus();
-
-    // Smart duplicate check — runs the moment an employee is picked,
-    // for whatever month/year is currently selected.
     await _checkDuplicateForCurrentSelection();
-
     if (!_isLocked && _mode == 'attendance') {
       _runAttendanceCalculation();
     } else if (!_isLocked && _mode == 'manual') {
@@ -3048,7 +3098,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   }
 
   void _switchMode(String mode) {
-    if (_isLocked) return; // locked while duplicate exists
+    if (_isEditMode || _isLocked) return;
     setState(() {
       _mode = mode;
       _calcResult = null;
@@ -3061,6 +3111,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   }
 
   Future<void> _openMonthYearPicker() async {
+    if (_isEditMode) return;
     final result = await _showMonthYearPicker(
       context: context,
       initialYear: _selectedYear,
@@ -3073,10 +3124,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       _calcResult = null;
       _existingRecord = null;
     });
-
     if (_selectedEmployee != null) {
-      // Re-check for the newly selected month — this is what re-enables
-      // the form automatically when the new month has no record yet.
       await _checkDuplicateForCurrentSelection();
       if (!_isLocked && _mode == 'attendance') {
         _runAttendanceCalculation();
@@ -3086,14 +3134,10 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     }
   }
 
-  /// Checks whether a salary record already exists for the currently
-  /// selected employee + month/year. Updates `_existingRecord` which
-  /// drives the lock state of the whole form below the month picker.
   Future<void> _checkDuplicateForCurrentSelection() async {
-    if (_selectedEmployee == null) return;
+    if (_selectedEmployee == null || _isEditMode) return;
     final myToken = ++_checkToken;
     setState(() => _isCheckingDuplicate = true);
-
     try {
       final provider = context.read<SalaryProvider>();
       final existing = await provider.checkAlreadyGenerated(
@@ -3101,7 +3145,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
         _selectedYear,
         _selectedMonth,
       );
-      if (!mounted || myToken != _checkToken) return; // stale response
+      if (!mounted || myToken != _checkToken) return;
       setState(() {
         _existingRecord = existing;
         _isCheckingDuplicate = false;
@@ -3113,7 +3157,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   }
 
   Future<void> _runAttendanceCalculation() async {
-    if (_selectedEmployee == null || _isLocked) return;
+    if (_selectedEmployee == null || (_isLocked && !_isEditMode)) return;
     final provider = context.read<SalaryProvider>();
     try {
       final result = await provider.calculateAttendanceBased(
@@ -3126,14 +3170,12 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       );
       if (mounted) setState(() => _calcResult = result);
     } catch (e) {
-      if (mounted) {
-        _showSnack('Error: $e', isError: true);
-      }
+      if (mounted) _showSnack('Error: $e', isError: true);
     }
   }
 
   void _recalculateManual() {
-    if (_selectedEmployee == null || _isLocked) return;
+    if (_selectedEmployee == null || (_isLocked && !_isEditMode)) return;
     final provider = context.read<SalaryProvider>();
     final workingDays = int.tryParse(_manualWorkingDaysCtrl.text.trim()) ?? 30;
     final leaves = int.tryParse(_manualLeavesCtrl.text.trim()) ?? 0;
@@ -3148,11 +3190,10 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   }
 
   void _recalculateIfManual() {
-    if (_isLocked) return;
+    if (_isLocked && !_isEditMode) return;
     if (_mode == 'manual') {
       _recalculateManual();
     } else if (_mode == 'attendance' && _calcResult != null) {
-      // Fine/bonus changed — re-derive net without re-hitting Firestore.
       final base = _calcResult!['baseSalary'] as double;
       final absentDeduction = _calcResult!['absentDeduction'] as double;
       setState(() {
@@ -3177,80 +3218,84 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     );
   }
 
+  // ── SAVE (handles both create and update) ──
   Future<void> _save() async {
     if (_selectedEmployee == null) {
       _showSnack('Please select an employee first.', isError: true);
       return;
     }
-    if (_isLocked) {
-      _showSnack(
-        'Salary for the selected month has already been generated for this employee.',
-        isError: true,
-      );
-      return;
-    }
     if (_calcResult == null) {
-      _showSnack('Please wait for the salary calculation to complete.',
-          isError: true);
+      _showSnack('Please wait for the salary calculation to complete.', isError: true);
       return;
     }
 
     setState(() => _isSaving = true);
-
     final provider = context.read<SalaryProvider>();
 
     try {
-      // Final safety check right before writing, in case another session
-      // generated this salary in the meantime.
-      final existing = await provider.checkAlreadyGenerated(
-        _selectedEmployee!.id!,
-        _selectedYear,
-        _selectedMonth,
-      );
-
-      if (existing != null) {
+      if (_isEditMode) {
+        // ── Update existing record ──
+        final updateData = {
+          'fine': _fine,
+          'bonus': _bonus,
+          'note': _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+          'leaves': _mode == 'manual'
+              ? int.tryParse(_manualLeavesCtrl.text) ?? 0
+              : _calcResult!['leaves'],
+          'workingDays': _mode == 'manual'
+              ? int.tryParse(_manualWorkingDaysCtrl.text) ?? 30
+              : _calcResult!['workingDays'],
+          'absentDeduction': _calcResult!['absentDeduction'],
+          'netSalary': _calcResult!['netSalary'],
+        };
+        await provider.updateExistingSalary(widget.existingRecord!.id!, updateData);
         if (mounted) {
-          setState(() {
-            _isSaving = false;
-            _existingRecord = existing;
-          });
+          _showSnack('Salary updated successfully!');
+          Navigator.pop(context); // return to list
         }
-        return;
-      }
-
-      final monthName =
-      DateFormat('MMMM').format(DateTime(_selectedYear, _selectedMonth));
-      final totalDaysInMonth =
-          DateTime(_selectedYear, _selectedMonth + 1, 0).day;
-
-      final record = SalaryRecord(
-        employeeId: _selectedEmployee!.id!,
-        employeeName: _selectedEmployee!.name,
-        employeeType: _employeeType,
-        designation: _selectedEmployee!.designation,
-        year: _selectedYear,
-        month: _selectedMonth,
-        mode: _mode,
-        baseSalary: _calcResult!['baseSalary'] as double,
-        totalDaysInMonth: totalDaysInMonth,
-        workingDays: _calcResult!['workingDays'] as int,
-        leaves: _calcResult!['leaves'] as int,
-        perDayRate: _calcResult!['perDayRate'] as double,
-        absentDeduction: _calcResult!['absentDeduction'] as double,
-        fine: _fine,
-        bonus: _bonus,
-        note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
-        netSalary: _calcResult!['netSalary'] as double,
-        status: 'Pending',
-      );
-
-      await provider.saveSalary(record);
-
-      if (mounted) {
-        _showSnack(
-          'Salary of Rs ${NumberFormat('#,##0').format(record.netSalary)} generated for ${record.employeeName} — $monthName $_selectedYear.',
+      } else {
+        // ── Create new record (original logic) ──
+        final existing = await provider.checkAlreadyGenerated(
+          _selectedEmployee!.id!,
+          _selectedYear,
+          _selectedMonth,
         );
-        _resetForm();
+        if (existing != null) {
+          if (mounted) {
+            setState(() {
+              _isSaving = false;
+              _existingRecord = existing;
+            });
+          }
+          return;
+        }
+        final monthName = DateFormat('MMMM').format(DateTime(_selectedYear, _selectedMonth));
+        final totalDaysInMonth = DateTime(_selectedYear, _selectedMonth + 1, 0).day;
+        final record = SalaryRecord(
+          employeeId: _selectedEmployee!.id!,
+          employeeName: _selectedEmployee!.name,
+          employeeType: _employeeType,
+          designation: _selectedEmployee!.designation,
+          year: _selectedYear,
+          month: _selectedMonth,
+          mode: _mode,
+          baseSalary: _calcResult!['baseSalary'] as double,
+          totalDaysInMonth: totalDaysInMonth,
+          workingDays: _calcResult!['workingDays'] as int,
+          leaves: _calcResult!['leaves'] as int,
+          perDayRate: _calcResult!['perDayRate'] as double,
+          absentDeduction: _calcResult!['absentDeduction'] as double,
+          fine: _fine,
+          bonus: _bonus,
+          note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+          netSalary: _calcResult!['netSalary'] as double,
+          status: 'Pending',
+        );
+        await provider.saveSalary(record);
+        if (mounted) {
+          _showSnack('Salary of Rs ${NumberFormat('#,##0').format(record.netSalary)} generated for ${record.employeeName} — $monthName $_selectedYear.');
+          _resetForm();
+        }
       }
     } catch (e) {
       if (mounted) _showSnack('Error: $e', isError: true);
@@ -3282,10 +3327,9 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   }
 
   // ═══════════════════════════════════════════
-  //  UI PIECES
+  //  UI Components
   // ═══════════════════════════════════════════
 
-  // ── Header ──
   Widget _header(bool isDesktop) {
     return Container(
       padding: EdgeInsets.all(isDesktop ? 22 : 18),
@@ -3322,7 +3366,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Generate Salary',
+                  _isEditMode ? 'Edit Salary' : 'Generate Salary',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: isDesktop ? 17 : 15.5,
@@ -3332,7 +3376,9 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Calculate and generate monthly salary',
+                  _isEditMode
+                      ? 'Adjust fine, bonus, or other details'
+                      : 'Calculate and generate monthly salary',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.75),
                     fontSize: isDesktop ? 12.5 : 11.5,
@@ -3346,7 +3392,6 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     );
   }
 
-  // ── Step badge used inside section headers ──
   Widget _stepBadge(int number, {required bool done}) {
     return Container(
       width: 22,
@@ -3365,205 +3410,192 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     );
   }
 
-  // ── Type toggle (Teacher / Staff) ──
   Widget _typeToggle() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: _kSurface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kBorder),
-      ),
-      child: Row(
-        children: ['teacher', 'staff'].map((t) {
-          final selected = _employeeType == t;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => _switchType(t),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                padding: const EdgeInsets.symmetric(vertical: 11),
-                decoration: BoxDecoration(
-                  color: selected ? _kPurple : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                  boxShadow: selected
-                      ? [
-                    BoxShadow(
-                      color: _kPurple.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+    return IgnorePointer(
+      ignoring: _isEditMode,
+      child: Opacity(
+        opacity: _isEditMode ? 0.6 : 1,
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: _kSurface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _kBorder),
+          ),
+          child: Row(
+            children: ['teacher', 'staff'].map((t) {
+              final selected = _employeeType == t;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => _switchType(t),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    decoration: BoxDecoration(
+                      color: selected ? _kPurple : Colors.transparent,
+                      borderRadius: BorderRadius.circular(9),
                     ),
-                  ]
-                      : [],
+                    alignment: Alignment.center,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          t == 'teacher' ? Icons.school_rounded : Icons.badge_rounded,
+                          size: 16,
+                          color: selected ? Colors.white : _kSlate,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          t == 'teacher' ? 'Teacher' : 'Staff',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: selected ? Colors.white : _kSlate,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                alignment: Alignment.center,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      t == 'teacher' ? Icons.school_rounded : Icons.badge_rounded,
-                      size: 16,
-                      color: selected ? Colors.white : _kSlate,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      t == 'teacher' ? 'Teacher' : 'Staff',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: selected ? Colors.white : _kSlate,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }).toList(),
+              );
+            }).toList(),
+          ),
+        ),
       ),
     );
   }
 
-  // ── Employee search field ──
   Widget _employeeSearchField() {
     final staffProvider = context.watch<StaffProvider>();
     final isLoading = staffProvider.loading && _sourceList.isEmpty;
 
-    return TapRegion(
-      onTapOutside: (_) {
-        if (_showSuggestions) setState(() => _showSuggestions = false);
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextFormField(
-            controller: _searchCtrl,
-            focusNode: _searchFocus,
-            onTap: () => setState(() => _showSuggestions = true),
-            onChanged: (v) {
-              setState(() {
-                _showSuggestions = true;
-                if (_selectedEmployee != null && v != _selectedEmployee!.name) {
-                  _selectedEmployee = null;
-                  _calcResult = null;
-                  _existingRecord = null;
-                }
-              });
-            },
-            style: const TextStyle(fontSize: 13.5, color: _kInk),
-            decoration: InputDecoration(
-              labelText:
-              'Search ${_employeeType == 'teacher' ? 'Teacher' : 'Staff'} Name',
-              hintText: 'Start typing a name…',
-              prefixIcon: const Icon(Icons.search_rounded, size: 20, color: _kSlate),
-              suffixIcon: _isCheckingDuplicate
-                  ? const Padding(
-                padding: EdgeInsets.all(14),
-                child: SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: _kPurple),
-                ),
-              )
-                  : (_selectedEmployee != null
-                  ? Icon(Icons.check_circle_rounded,
-                  color: _isLocked ? _kRed : _kGreen, size: 20)
-                  : null),
-              labelStyle: const TextStyle(fontSize: 13, color: _kSlate),
-              filled: true,
-              fillColor: _kSurface,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: _kBorder),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: _kBorder),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: _kPurple, width: 1.5),
-              ),
-              contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            ),
-          ),
-          if (_showSuggestions) ...[
-            const SizedBox(height: 6),
-            Container(
-              constraints: const BoxConstraints(maxHeight: 240),
-              decoration: BoxDecoration(
-                color: _kCard,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _kBorder),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: isLoading
-                  ? const Padding(
-                padding: EdgeInsets.all(18),
-                child: Center(
-                    child:
-                    CircularProgressIndicator(strokeWidth: 2, color: _kPurple)),
-              )
-                  : _filteredEmployees.isEmpty
-                  ? Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Icon(Icons.search_off_rounded,
-                        size: 16, color: _kSlateLight),
-                    const SizedBox(width: 8),
-                    Text(
-                      'No ${_employeeType == 'teacher' ? 'teacher' : 'staff'} found.',
-                      style: const TextStyle(fontSize: 12.5, color: _kSlate),
-                    ),
-                  ],
-                ),
-              )
-                  : ListView.separated(
-                shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                itemCount: _filteredEmployees.length,
-                separatorBuilder: (_, __) =>
-                    Divider(height: 1, color: _kBorder.withOpacity(0.6)),
-                itemBuilder: (context, i) {
-                  final e = _filteredEmployees[i];
-                  return ListTile(
-                    dense: true,
-                    leading: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: _kPurpleLight,
-                      child: Text(
-                        e.name.isNotEmpty ? e.name[0].toUpperCase() : '?',
-                        style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: _kPurple),
-                      ),
-                    ),
-                    title: Text(e.name,
-                        style: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w500)),
-                    subtitle: Text(
-                      'Rs ${NumberFormat('#,##0').format(e.salary)}'
-                          '${(e.designation ?? '').isNotEmpty ? ' · ${e.designation}' : ''}',
-                      style: const TextStyle(fontSize: 11, color: _kSlate),
-                    ),
-                    onTap: () => _pickEmployee(e),
-                  );
+    return IgnorePointer(
+      ignoring: _isEditMode,
+      child: Opacity(
+        opacity: _isEditMode ? 0.6 : 1,
+        child: TapRegion(
+          onTapOutside: (_) {
+            if (_showSuggestions) setState(() => _showSuggestions = false);
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: _searchCtrl,
+                focusNode: _searchFocus,
+                onTap: () => setState(() => _showSuggestions = true),
+                onChanged: (v) {
+                  setState(() {
+                    _showSuggestions = true;
+                    if (_selectedEmployee != null && v != _selectedEmployee!.name) {
+                      _selectedEmployee = null;
+                      _calcResult = null;
+                      _existingRecord = null;
+                    }
+                  });
                 },
+                style: const TextStyle(fontSize: 13.5, color: _kInk),
+                decoration: InputDecoration(
+                  labelText: 'Search ${_employeeType == 'teacher' ? 'Teacher' : 'Staff'} Name',
+                  hintText: 'Start typing a name…',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20, color: _kSlate),
+                  suffixIcon: _isCheckingDuplicate
+                      ? const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: _kPurple),
+                    ),
+                  )
+                      : (_selectedEmployee != null
+                      ? Icon(Icons.check_circle_rounded,
+                      color: _isLocked ? _kRed : _kGreen, size: 20)
+                      : null),
+                  labelStyle: const TextStyle(fontSize: 13, color: _kSlate),
+                  filled: true,
+                  fillColor: _kSurface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: _kBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: _kBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: _kPurple, width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
               ),
-            ),
-          ],
-        ],
+              if (_showSuggestions) ...[
+                const SizedBox(height: 6),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 240),
+                  decoration: BoxDecoration(
+                    color: _kCard,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _kBorder),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: isLoading
+                      ? const Padding(
+                    padding: EdgeInsets.all(18),
+                    child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: _kPurple)),
+                  )
+                      : _filteredEmployees.isEmpty
+                      ? Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Icon(Icons.search_off_rounded, size: 16, color: _kSlateLight),
+                        const SizedBox(width: 8),
+                        Text('No ${_employeeType == 'teacher' ? 'teacher' : 'staff'} found.',
+                            style: const TextStyle(fontSize: 12.5, color: _kSlate)),
+                      ],
+                    ),
+                  )
+                      : ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: _filteredEmployees.length,
+                    separatorBuilder: (_, __) => Divider(height: 1, color: _kBorder.withOpacity(0.6)),
+                    itemBuilder: (context, i) {
+                      final e = _filteredEmployees[i];
+                      return ListTile(
+                        dense: true,
+                        leading: CircleAvatar(
+                          radius: 16,
+                          backgroundColor: _kPurpleLight,
+                          child: Text(
+                            e.name.isNotEmpty ? e.name[0].toUpperCase() : '?',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _kPurple),
+                          ),
+                        ),
+                        title: Text(e.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                        subtitle: Text(
+                          'Rs ${NumberFormat('#,##0').format(e.salary)}'
+                              '${(e.designation ?? '').isNotEmpty ? ' · ${e.designation}' : ''}',
+                          style: const TextStyle(fontSize: 11, color: _kSlate),
+                        ),
+                        onTap: () => _pickEmployee(e),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -3575,21 +3607,17 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: _isLocked ? _kRedBg : _kPurpleLight,
+        color: _isLocked && !_isEditMode ? _kRedBg : _kPurpleLight,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-            color: _isLocked ? _kRedBorder : _kPurple.withOpacity(0.15)),
+        border: Border.all(color: _isLocked && !_isEditMode ? _kRedBorder : _kPurple.withOpacity(0.15)),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: _isLocked ? _kRed : _kPurple,
+            backgroundColor: _isLocked && !_isEditMode ? _kRed : _kPurple,
             child: Text(_initials,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13)),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -3597,10 +3625,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(_selectedEmployee!.name,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: _kInk)),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kInk)),
                 Text(
                   'Base Salary: Rs ${NumberFormat('#,##0').format(_selectedEmployee!.salary)}'
                       '${(_selectedEmployee!.designation ?? '').isNotEmpty ? ' · ${_selectedEmployee!.designation}' : ''}',
@@ -3614,13 +3639,10 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     );
   }
 
-  // ── Duplicate warning banner ──
   Widget _duplicateWarningBanner() {
-    if (!_isLocked) return const SizedBox.shrink();
+    if (!_isLocked || _isEditMode) return const SizedBox.shrink();
     final existing = _existingRecord!;
-    final monthName =
-    DateFormat('MMMM').format(DateTime(existing.year, existing.month));
-
+    final monthName = DateFormat('MMMM').format(DateTime(existing.year, existing.month));
     return Container(
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(14),
@@ -3640,8 +3662,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
               children: [
                 Text(
                   'Salary for $monthName ${existing.year} has already been generated for this employee.',
-                  style: const TextStyle(
-                      fontSize: 12.5, fontWeight: FontWeight.w700, color: _kRed),
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _kRed),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -3661,69 +3682,58 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     );
   }
 
-  // ── Month/Year chip ──
   Widget _monthYearChip() {
-    return InkWell(
-      borderRadius: BorderRadius.circular(10),
-      onTap: _openMonthYearPicker,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(
-          color: _kSurface,
+    return IgnorePointer(
+      ignoring: _isEditMode,
+      child: Opacity(
+        opacity: _isEditMode ? 0.6 : 1,
+        child: InkWell(
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _kBorder),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: _kPurpleLight,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.calendar_month_rounded,
-                  size: 16, color: _kPurple),
+          onTap: _openMonthYearPicker,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            decoration: BoxDecoration(
+              color: _kSurface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _kBorder),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                DateFormat('MMMM yyyy')
-                    .format(DateTime(_selectedYear, _selectedMonth)),
-                style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700, color: _kInk),
-              ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(color: _kPurpleLight, borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.calendar_month_rounded, size: 16, color: _kPurple),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    DateFormat('MMMM yyyy').format(DateTime(_selectedYear, _selectedMonth)),
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _kInk),
+                  ),
+                ),
+                if (!_isEditMode) const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: _kSlate),
+              ],
             ),
-            const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: _kSlate),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  // ── Mode toggle (Option A / Option B) ──
   Widget _modeToggle(bool isDesktop) {
-    final cards = [
-      _modeCard(
-        mode: 'attendance',
-        title: 'Attendance-Based',
-        subtitle: 'Auto-calculated from records',
-        icon: Icons.fact_check_rounded,
+    return IgnorePointer(
+      ignoring: _isEditMode || _isLocked,
+      child: Opacity(
+        opacity: (_isEditMode || _isLocked) ? 0.6 : 1,
+        child: Row(
+          children: [
+            Expanded(child: _modeCard(mode: 'attendance', title: 'Attendance-Based', subtitle: 'Auto-calculated from records', icon: Icons.fact_check_rounded)),
+            const SizedBox(width: 10),
+            Expanded(child: _modeCard(mode: 'manual', title: 'Manual Entry', subtitle: 'Enter working days & leaves', icon: Icons.edit_note_rounded)),
+          ],
+        ),
       ),
-      _modeCard(
-        mode: 'manual',
-        title: 'Manual Entry',
-        subtitle: 'Enter working days & leaves',
-        icon: Icons.edit_note_rounded,
-      ),
-    ];
-
-    return Row(
-      children: [
-        Expanded(child: cards[0]),
-        const SizedBox(width: 10),
-        Expanded(child: cards[1]),
-      ],
     );
   }
 
@@ -3734,21 +3744,17 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     required IconData icon,
   }) {
     final selected = _mode == mode;
-    final disabled = _isLocked;
+    final disabled = _isEditMode || _isLocked;
     return GestureDetector(
       onTap: disabled ? null : () => _switchMode(mode),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: disabled
-              ? _kSurface
-              : (selected ? _kPurpleLight : _kCard),
+          color: disabled ? _kSurface : (selected ? _kPurpleLight : _kCard),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: disabled
-                ? _kBorder
-                : (selected ? _kPurple : _kBorder),
+            color: disabled ? _kBorder : (selected ? _kPurple : _kBorder),
             width: selected && !disabled ? 1.5 : 1,
           ),
         ),
@@ -3757,31 +3763,14 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Icon(icon,
-                      size: 18, color: selected ? _kPurple : _kSlate),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: selected ? _kPurple : _kInk,
-                      ),
-                    ),
-                  ),
-                  if (selected && !disabled)
-                    const Icon(Icons.check_circle_rounded,
-                        size: 16, color: _kPurple),
-                ],
-              ),
+              Row(children: [
+                Icon(icon, size: 18, color: selected ? _kPurple : _kSlate),
+                const SizedBox(width: 8),
+                Expanded(child: Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: selected ? _kPurple : _kInk))),
+                if (selected && !disabled) const Icon(Icons.check_circle_rounded, size: 16, color: _kPurple),
+              ]),
               const SizedBox(height: 6),
-              Text(
-                subtitle,
-                style: const TextStyle(fontSize: 11, color: _kSlate),
-              ),
+              Text(subtitle, style: const TextStyle(fontSize: 11, color: _kSlate)),
             ],
           ),
         ),
@@ -3789,103 +3778,49 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     );
   }
 
-  // ── Manual mode inputs ──
   Widget _manualInputs() {
     return Row(
       children: [
-        Expanded(
-          child: TextFormField(
-            controller: _manualWorkingDaysCtrl,
-            enabled: !_isLocked,
-            keyboardType: TextInputType.number,
-            style: const TextStyle(fontSize: 13.5),
-            decoration: _fieldDeco('Working Days'),
-          ),
-        ),
+        Expanded(child: TextFormField(controller: _manualWorkingDaysCtrl, enabled: !_isLocked, keyboardType: TextInputType.number, style: const TextStyle(fontSize: 13.5), decoration: _fieldDeco('Working Days'))),
         const SizedBox(width: 12),
-        Expanded(
-          child: TextFormField(
-            controller: _manualLeavesCtrl,
-            enabled: !_isLocked,
-            keyboardType: TextInputType.number,
-            style: const TextStyle(fontSize: 13.5),
-            decoration: _fieldDeco('Leaves (Absents)'),
-          ),
-        ),
+        Expanded(child: TextFormField(controller: _manualLeavesCtrl, enabled: !_isLocked, keyboardType: TextInputType.number, style: const TextStyle(fontSize: 13.5), decoration: _fieldDeco('Leaves (Absents)'))),
       ],
     );
   }
 
-  // ── Attendance mode summary ──
   Widget _attendanceSummary() {
     final provider = context.watch<SalaryProvider>();
-
-    if (_isLocked) {
-      return const SizedBox.shrink();
-    }
-
+    if (_isLocked && !_isEditMode) return const SizedBox.shrink();
     if (provider.calculating) {
-      return Container(
-        padding: const EdgeInsets.all(24),
-        alignment: Alignment.center,
-        child: const SizedBox(
-          height: 22,
-          width: 22,
-          child: CircularProgressIndicator(strokeWidth: 2.2, color: _kPurple),
-        ),
-      );
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: _kPurple));
     }
-
     if (_calcResult == null) {
       return Container(
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: _kOrangeBg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _kOrangeBorder),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.info_rounded, size: 16, color: _kOrange),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                _selectedEmployee == null
-                    ? 'Select an employee to auto-calculate attendance-based salary.'
-                    : 'Calculating attendance for the selected month…',
-                style: const TextStyle(fontSize: 12, color: _kOrange, height: 1.3),
-              ),
-            ),
-          ],
-        ),
+        decoration: BoxDecoration(color: _kOrangeBg, borderRadius: BorderRadius.circular(10), border: Border.all(color: _kOrangeBorder)),
+        child: Row(children: [
+          const Icon(Icons.info_rounded, size: 16, color: _kOrange),
+          const SizedBox(width: 8),
+          Expanded(child: Text(_selectedEmployee == null ? 'Select an employee to auto-calculate attendance-based salary.' : 'Calculating attendance for the selected month…', style: const TextStyle(fontSize: 12, color: _kOrange))),
+        ]),
       );
     }
-
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _kSurface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _kBorder),
-      ),
+      decoration: BoxDecoration(color: _kSurface, borderRadius: BorderRadius.circular(10), border: Border.all(color: _kBorder)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              _miniStat('Working Days', '30', _kPurple),
-              _miniStat('Absents', '${_calcResult!['leaves']}', _kRed),
-              _miniStat('Present', '${provider.lastPresentDays}', _kGreen),
-              _miniStat('Holidays', '${provider.lastHolidaysExcluded}', _kOrange),
-            ],
-          ),
+          Row(children: [
+            _miniStat('Working Days', '30', _kPurple),
+            _miniStat('Absents', '${_calcResult!['leaves']}', _kRed),
+            _miniStat('Present', '${provider.lastPresentDays}', _kGreen),
+            _miniStat('Holidays', '${provider.lastHolidaysExcluded}', _kOrange),
+          ]),
           const SizedBox(height: 10),
           Container(height: 1, color: _kBorder),
           const SizedBox(height: 10),
-          Text(
-            'Month treated as 30 days · Sundays/holidays excluded · unmarked or "absent" days deducted at Rs ${NumberFormat('#,##0').format(_calcResult!['perDayRate'])}/day.',
-            style: const TextStyle(fontSize: 11, color: _kSlate, height: 1.4),
-          ),
+          Text('Month treated as 30 days · Sundays/holidays excluded · unmarked or "absent" days deducted at Rs ${NumberFormat('#,##0').format(_calcResult!['perDayRate'])}/day.', style: const TextStyle(fontSize: 11, color: _kSlate)),
         ],
       ),
     );
@@ -3893,152 +3828,53 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
 
   Widget _miniStat(String label, String value, Color color) {
     return Expanded(
-      child: Column(
-        children: [
-          Text(value,
-              style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w800, color: color)),
-          const SizedBox(height: 2),
-          Text(label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 10.5, color: _kSlate)),
-        ],
-      ),
+      child: Column(children: [
+        Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+        const SizedBox(height: 2),
+        Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10.5, color: _kSlate)),
+      ]),
     );
   }
 
-  // ── Fine / Bonus / Note ──
   Widget _fineAndBonusFields(bool stacked) {
-    final fineField = TextFormField(
-      controller: _fineCtrl,
-      enabled: !_isLocked,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      style: const TextStyle(fontSize: 13.5),
-      decoration: _fieldDeco('Fine / Deduction').copyWith(
-        prefixText: 'Rs  ',
-        prefixIcon: const Icon(Icons.remove_circle_outline, size: 18, color: _kRed),
-      ),
-    );
-    final bonusField = TextFormField(
-      controller: _bonusCtrl,
-      enabled: !_isLocked,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      style: const TextStyle(fontSize: 13.5),
-      decoration: _fieldDeco('Bonus / Addition').copyWith(
-        prefixText: 'Rs  ',
-        prefixIcon: const Icon(Icons.add_circle_outline, size: 18, color: _kGreen),
-      ),
-    );
-
-    if (stacked) {
-      return Column(
-        children: [
-          fineField,
-          const SizedBox(height: 12),
-          bonusField,
-        ],
-      );
-    }
-    return Row(
-      children: [
-        Expanded(child: fineField),
-        const SizedBox(width: 12),
-        Expanded(child: bonusField),
-      ],
-    );
+    final fineField = TextFormField(controller: _fineCtrl, enabled: true, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: const TextStyle(fontSize: 13.5), decoration: _fieldDeco('Fine / Deduction').copyWith(prefixText: 'Rs  ', prefixIcon: const Icon(Icons.remove_circle_outline, size: 18, color: _kRed)));
+    final bonusField = TextFormField(controller: _bonusCtrl, enabled: true, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: const TextStyle(fontSize: 13.5), decoration: _fieldDeco('Bonus / Addition').copyWith(prefixText: 'Rs  ', prefixIcon: const Icon(Icons.add_circle_outline, size: 18, color: _kGreen)));
+    if (stacked) return Column(children: [fineField, const SizedBox(height: 12), bonusField]);
+    return Row(children: [Expanded(child: fineField), const SizedBox(width: 12), Expanded(child: bonusField)]);
   }
 
   Widget _noteField() {
-    return TextFormField(
-      controller: _noteCtrl,
-      enabled: !_isLocked,
-      maxLines: 2,
-      style: const TextStyle(fontSize: 13.5),
-      decoration: _fieldDeco('Note (Optional)').copyWith(
-        hintText: 'Any remarks about this salary…',
-        alignLabelWithHint: true,
-      ),
-    );
+    return TextFormField(controller: _noteCtrl, maxLines: 2, style: const TextStyle(fontSize: 13.5), decoration: _fieldDeco('Note (Optional)').copyWith(hintText: 'Any remarks about this salary…', alignLabelWithHint: true));
   }
 
-  InputDecoration _fieldDeco(String label, {String? hint}) {
+  InputDecoration _fieldDeco(String label) {
     return InputDecoration(
       labelText: label,
-      hintText: hint,
       labelStyle: const TextStyle(fontSize: 13, color: _kSlate),
       filled: true,
       fillColor: _kSurface,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: _kBorder),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: _kBorder),
-      ),
-      disabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: _kBorder.withOpacity(0.6)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: _kPurple, width: 1.5),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorder)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorder)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kPurple, width: 1.5)),
     );
   }
 
-  // ── Net salary preview card ──
   Widget _netSalaryPreview() {
-    if (_calcResult == null || _isLocked) return const SizedBox.shrink();
-
+    if (_calcResult == null || (_isLocked && !_isEditMode)) return const SizedBox.shrink();
     final base = _calcResult!['baseSalary'] as double;
     final deduction = _calcResult!['absentDeduction'] as double;
     final fine = _calcResult!['fine'] as double;
     final bonus = _calcResult!['bonus'] as double;
     final net = _calcResult!['netSalary'] as double;
-
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [_kPurple, _kPurpleMid],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: _kPurple.withOpacity(0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
+      decoration: BoxDecoration(gradient: const LinearGradient(colors: [_kPurple, _kPurpleMid], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.account_balance_wallet_rounded,
-                  color: Colors.white.withOpacity(0.8), size: 16),
-              const SizedBox(width: 6),
-              const Text('Net Salary',
-                  style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600)),
-            ],
-          ),
+          Row(children: [Icon(Icons.account_balance_wallet_rounded, color: Colors.white.withOpacity(0.8), size: 16), const SizedBox(width: 6), const Text('Net Salary', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600))]),
           const SizedBox(height: 6),
-          Text(
-            'Rs ${NumberFormat('#,##0').format(net)}',
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5),
-          ),
+          Text('Rs ${NumberFormat('#,##0').format(net)}', style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800)),
           const SizedBox(height: 14),
           Container(height: 1, color: Colors.white.withOpacity(0.18)),
           const SizedBox(height: 10),
@@ -4054,106 +3890,43 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   Widget _breakdownRow(String label, double value, {bool positive = false}) {
     final sign = value < 0 ? '- ' : '';
     final displayVal = value.abs();
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3.5),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
-          Text(
-            '$sign Rs ${NumberFormat('#,##0').format(displayVal)}',
-            style: const TextStyle(
-                color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
+    return Padding(padding: const EdgeInsets.symmetric(vertical: 3.5), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12.5)), Text('$sign Rs ${NumberFormat('#,##0').format(displayVal)}', style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600))]));
   }
 
-  // ── Save button ──
   Widget _saveButton({double? width, double height = 52}) {
-    final disabled = _isSaving || _isLocked || _selectedEmployee == null;
+    final disabled = _isSaving || (!_isEditMode && (_isLocked || _selectedEmployee == null));
     return SizedBox(
       width: width,
       height: height,
       child: ElevatedButton.icon(
         onPressed: disabled ? null : _save,
         style: ElevatedButton.styleFrom(
-          backgroundColor: _isLocked ? _kSlateLight : _kPurple,
+          backgroundColor: _isLocked && !_isEditMode ? _kSlateLight : _kPurple,
           disabledBackgroundColor: _kSlateLight.withOpacity(0.5),
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        icon: _isSaving
-            ? const SizedBox(
-          height: 18,
-          width: 18,
-          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-        )
-            : Icon(_isLocked ? Icons.lock_rounded : Icons.save_rounded, size: 18),
-        label: Text(
-          _isSaving
-              ? 'Generating…'
-              : (_isLocked ? 'Already Generated' : 'Generate Salary'),
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
-        ),
+        icon: _isSaving ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(_isEditMode ? Icons.save_rounded : (_isLocked ? Icons.lock_rounded : Icons.save_rounded), size: 18),
+        label: Text(_isSaving ? 'Saving…' : (_isEditMode ? 'Update Salary' : (_isLocked ? 'Already Generated' : 'Generate Salary')), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
       ),
     );
   }
 
-  Widget _sectionCard({
-    required String title,
-    required IconData icon,
-    required int step,
-    required bool stepDone,
-    required List<Widget> children,
-    bool dimmed = false,
-  }) {
+  Widget _sectionCard({required String title, required IconData icon, required int step, required bool stepDone, required List<Widget> children, bool dimmed = false}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _kCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kBorder.withOpacity(0.7)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _stepBadge(step, done: stepDone),
-              const SizedBox(width: 10),
-              Text(title,
-                  style: const TextStyle(
-                      fontSize: 13.5, fontWeight: FontWeight.w700, color: _kInk)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Opacity(
-            opacity: dimmed ? 0.55 : 1,
-            child: IgnorePointer(
-              ignoring: dimmed,
-              child: Column(children: children),
-            ),
-          ),
-        ],
-      ),
+      decoration: BoxDecoration(color: _kCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: _kBorder.withOpacity(0.7))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [_stepBadge(step, done: stepDone), const SizedBox(width: 10), Text(title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _kInk))]),
+        const SizedBox(height: 14),
+        Opacity(opacity: dimmed ? 0.55 : 1, child: IgnorePointer(ignoring: dimmed, child: Column(children: children))),
+      ]),
     );
   }
 
-  // ═══════════════════════════════════════════
-  //  BUILD
-  // ═══════════════════════════════════════════
+  // ── BUILD ──
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
@@ -4161,184 +3934,85 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     final isTablet = width >= _kTabletBreakpoint && width < _kDesktopBreakpoint;
 
     final employeeSection = _sectionCard(
-      title: 'Select Employee',
-      icon: Icons.person_search_rounded,
-      step: 1,
+      title: 'Select Employee', icon: Icons.person_search_rounded, step: 1,
       stepDone: _selectedEmployee != null,
-      children: [
-        _typeToggle(),
-        const SizedBox(height: 12),
-        _employeeSearchField(),
-        _selectedEmployeeCard(),
-      ],
+      children: [_typeToggle(), const SizedBox(height: 12), _employeeSearchField(), _selectedEmployeeCard()],
     );
-
     final monthSection = _sectionCard(
-      title: 'Salary Month',
-      icon: Icons.calendar_month_rounded,
-      step: 2,
+      title: 'Salary Month', icon: Icons.calendar_month_rounded, step: 2,
       stepDone: _selectedEmployee != null && !_isCheckingDuplicate,
-      children: [
-        _monthYearChip(),
-        _duplicateWarningBanner(),
-      ],
+      children: [_monthYearChip(), _duplicateWarningBanner()],
     );
-
     final methodSection = _sectionCard(
-      title: 'Calculation Method',
-      icon: Icons.calculate_rounded,
-      step: 3,
-      stepDone: _calcResult != null,
-      dimmed: _isLocked,
-      children: [
-        _modeToggle(isDesktop),
-        const SizedBox(height: 14),
-        if (_mode == 'manual') _manualInputs(),
-        if (_mode == 'attendance') _attendanceSummary(),
-      ],
+      title: 'Calculation Method', icon: Icons.calculate_rounded, step: 3,
+      stepDone: _calcResult != null, dimmed: _isLocked && !_isEditMode,
+      children: [_modeToggle(isDesktop), const SizedBox(height: 14), if (_mode == 'manual') _manualInputs(), if (_mode == 'attendance') _attendanceSummary()],
     );
-
     final adjustmentsSection = _sectionCard(
-      title: 'Adjustments',
-      icon: Icons.tune_rounded,
-      step: 4,
-      stepDone: false,
-      dimmed: _isLocked,
-      children: [
-        _fineAndBonusFields(!isDesktop && !isTablet && width < 420),
-        const SizedBox(height: 14),
-        _noteField(),
-      ],
+      title: 'Adjustments', icon: Icons.tune_rounded, step: 4, stepDone: false,
+      dimmed: _isLocked && !_isEditMode,
+      children: [_fineAndBonusFields(!isDesktop && !isTablet && width < 420), const SizedBox(height: 14), _noteField()],
     );
 
     Widget body;
-
     if (isDesktop) {
-      // ── Desktop layout: two columns — form on the left, live summary on the right ──
       body = SingleChildScrollView(
         padding: const EdgeInsets.all(28),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1180),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _header(true),
-              const SizedBox(height: 22),
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          employeeSection,
-                          monthSection,
-                          methodSection,
-                          adjustmentsSection,
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: const Text(
-                              'Summary',
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: _kSlate),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          if (_calcResult != null && !_isLocked)
-                            _netSalaryPreview()
-                          else
-                            Container(
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                color: _kCard,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: _kBorder),
-                              ),
-                              child: Column(
-                                children: [
-                                  Icon(Icons.calculate_outlined,
-                                      size: 32, color: _kSlateLight),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    _isLocked
-                                        ? 'This month is already generated.\nPick another month to continue.'
-                                        : 'Fill in the details on the left\nto see the salary breakdown.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                        fontSize: 12.5,
-                                        color: _kSlateLight,
-                                        height: 1.5),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          const SizedBox(height: 20),
-                          _saveButton(width: double.infinity),
-                        ],
-                      ),
-                    ),
-                  ],
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _header(true),
+            const SizedBox(height: 22),
+            IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(flex: 3, child: Column(children: [employeeSection, monthSection, methodSection, adjustmentsSection])),
+              const SizedBox(width: 20),
+              Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Summary', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kSlate)),
+                const SizedBox(height: 10),
+                if (_calcResult != null && !_isLocked) _netSalaryPreview() else Container(
+                  padding: const EdgeInsets.all(24), decoration: BoxDecoration(color: _kCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: _kBorder)),
+                  child: Column(children: [
+                    Icon(Icons.calculate_outlined, size: 32, color: _kSlateLight),
+                    const SizedBox(height: 10),
+                    Text(_isLocked && !_isEditMode ? 'This month is already generated.' : 'Fill in the details to see salary breakdown.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: _kSlateLight)),
+                  ]),
                 ),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
+                const SizedBox(height: 20),
+                _saveButton(width: double.infinity),
+              ])),
+            ])),
+            const SizedBox(height: 20),
+          ]),
         ),
       );
     } else {
-      // ── Mobile / tablet layout: single scrollable column ──
       body = SingleChildScrollView(
         padding: EdgeInsets.all(isTablet ? 22 : 14),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isTablet ? 640 : double.infinity),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _header(false),
-              const SizedBox(height: 16),
-              employeeSection,
-              monthSection,
-              methodSection,
-              adjustmentsSection,
-              if (_calcResult != null && !_isLocked) ...[
-                _netSalaryPreview(),
-                const SizedBox(height: 18),
-              ] else if (_isLocked) ...[
-                const SizedBox(height: 2),
-              ],
-              _saveButton(width: double.infinity),
-              const SizedBox(height: 20),
-            ],
-          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _header(false),
+            const SizedBox(height: 16),
+            employeeSection,
+            monthSection,
+            methodSection,
+            adjustmentsSection,
+            if (_calcResult != null && !_isLocked) ...[_netSalaryPreview(), const SizedBox(height: 18)],
+            _saveButton(width: double.infinity),
+            const SizedBox(height: 20),
+          ]),
         ),
       );
     }
 
-    if (!widget.showAppBar) {
-      return Container(color: _kSurface, child: body);
-    }
-
+    if (!widget.showAppBar) return Container(color: _kSurface, child: body);
     return Scaffold(
       backgroundColor: _kSurface,
       appBar: AppBar(
         backgroundColor: _kPurple,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text('Generate Salary',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 17)),
+        title: Text(_isEditMode ? 'Edit Salary' : 'Generate Salary', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 17)),
       ),
       body: body,
     );
@@ -4346,7 +4020,9 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Month/Year picker (same Windows-style dialog used in Attendance History)
+//  Month/Year picker (unchanged)
+// ═══════════════════════════════════════════════════════════════════════
+// (Keep your existing _showMonthYearPicker dialog code here)
 // ═══════════════════════════════════════════════════════════════════════
 class _MonthYearPickerResult {
   final int year;
