@@ -1441,7 +1441,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
 
       'Generate Salary': () => const GenerateSalaryScreen(showAppBar: false),   // ← NEW
-      'Salary List': () => const SalaryListScreen(),
+      // 'Salary List': () => const SalaryListScreen(),
       'Salary Adjustment': () => const SalaryManagementScreen(),
       'Add Transaction': () => AddStaffTransactionScreen(
         showAppBar: false,
