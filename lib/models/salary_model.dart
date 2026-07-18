@@ -1,3 +1,6 @@
+//
+// import 'package:cloud_firestore/cloud_firestore.dart';
+//
 // class SalaryRecord {
 //   String? id;
 //   final String employeeId;
@@ -27,6 +30,7 @@
 //   final String status;
 //
 //   final DateTime? createdAt;
+//   final DateTime? paidAt;   // timestamp when marked as Paid
 //
 //   SalaryRecord({
 //     this.id,
@@ -49,10 +53,11 @@
 //     required this.netSalary,
 //     this.status = 'Pending',
 //     this.createdAt,
+//     this.paidAt,
 //   });
 //
 //   Map<String, dynamic> toMap() {
-//     return {
+//     final map = <String, dynamic>{
 //       'employeeId': employeeId,
 //       'employeeName': employeeName,
 //       'employeeType': employeeType,
@@ -71,12 +76,24 @@
 //       'note': note,
 //       'netSalary': netSalary,
 //       'status': status,
-//       // createdAt is set server-side via FieldValue.serverTimestamp()
-//       // by the Firestore service, matching the rest of the app's pattern.
+//       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
 //     };
+//
+//     if (paidAt != null) {
+//       map['paidAt'] = Timestamp.fromDate(paidAt!);
+//     }
+//
+//     return map;
 //   }
 //
 //   factory SalaryRecord.fromMap(Map<String, dynamic> map, String id) {
+//     DateTime? paid;
+//     if (map['paidAt'] != null) {
+//       if (map['paidAt'] is Timestamp) {
+//         paid = (map['paidAt'] as Timestamp).toDate();
+//       }
+//     }
+//
 //     return SalaryRecord(
 //       id: id,
 //       employeeId: map['employeeId'] ?? '',
@@ -97,14 +114,14 @@
 //       note: map['note'] as String?,
 //       netSalary: (map['netSalary'] ?? 0).toDouble(),
 //       status: map['status'] ?? 'Pending',
-//       createdAt: map['createdAt'] != null && map['createdAt'] is! String
-//           ? (map['createdAt'].toDate())
+//       createdAt: map['createdAt'] != null && map['createdAt'] is Timestamp
+//           ? (map['createdAt'] as Timestamp).toDate()
 //           : null,
+//       paidAt: paid,
 //     );
 //   }
 // }
-//
-//
+
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -136,6 +153,12 @@ class SalaryRecord {
   // 'Pending' | 'Paid' | 'Unpaid'
   final String status;
 
+  // ★ NEW – true when this salary was generated as (or marked as) the
+  // employee's termination salary. Used to highlight/badge the record in
+  // the Salary List, and to know that deleting this record should
+  // automatically reinstate the employee.
+  final bool isTerminated;
+
   final DateTime? createdAt;
   final DateTime? paidAt;   // timestamp when marked as Paid
 
@@ -159,6 +182,7 @@ class SalaryRecord {
     this.note,
     required this.netSalary,
     this.status = 'Pending',
+    this.isTerminated = false,   // ★ NEW default: not a termination record
     this.createdAt,
     this.paidAt,
   });
@@ -183,6 +207,7 @@ class SalaryRecord {
       'note': note,
       'netSalary': netSalary,
       'status': status,
+      'isTerminated': isTerminated, // ★ NEW
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
     };
 
@@ -221,6 +246,8 @@ class SalaryRecord {
       note: map['note'] as String?,
       netSalary: (map['netSalary'] ?? 0).toDouble(),
       status: map['status'] ?? 'Pending',
+      // ★ NEW – default false so existing old records stay non-terminated
+      isTerminated: map['isTerminated'] ?? false,
       createdAt: map['createdAt'] != null && map['createdAt'] is Timestamp
           ? (map['createdAt'] as Timestamp).toDate()
           : null,

@@ -5,6 +5,7 @@
 //
 // import '../../models/salary_model.dart';
 // import '../../providers/salary_provider.dart';
+// import 'generate_salary_screen.dart';
 //
 // // ────────────────────────────────────────────────────────────
 // //  Design Tokens — Modern Palette
@@ -108,6 +109,89 @@
 //         ScaffoldMessenger.of(context).showSnackBar(
 //           SnackBar(content: Text('Error: $e'), backgroundColor: _kRed, behavior: SnackBarBehavior.floating),
 //         );
+//       }
+//     }
+//   }
+//
+//   void _openEdit(SalaryRecord record) {
+//     Navigator.of(context)
+//         .push(MaterialPageRoute(builder: (_) => GenerateSalaryScreen(existingRecord: record)))
+//         .then((_) => _loadData());
+//   }
+//
+//   Future<void> _confirmDelete(SalaryRecord record) async {
+//     final confirm = await showDialog<bool>(
+//       context: context,
+//       builder: (ctx) => Dialog(
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+//         child: Padding(
+//           padding: const EdgeInsets.all(24),
+//           child: Column(
+//             mainAxisSize: MainAxisSize.min,
+//             children: [
+//               Container(
+//                 padding: const EdgeInsets.all(14),
+//                 decoration: const BoxDecoration(color: _kRedBg, shape: BoxShape.circle),
+//                 child: const Icon(Icons.delete_outline, color: _kRed, size: 28),
+//               ),
+//               const SizedBox(height: 16),
+//               const Text('Delete this salary?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _kInk)),
+//               const SizedBox(height: 8),
+//               Text(
+//                 'This will permanently remove the salary record for ${record.employeeName}.',
+//                 style: TextStyle(fontSize: 13, color: _kSlate),
+//                 textAlign: TextAlign.center,
+//               ),
+//               const SizedBox(height: 22),
+//               Row(
+//                 children: [
+//                   Expanded(
+//                     child: OutlinedButton(
+//                       onPressed: () => Navigator.pop(ctx, false),
+//                       style: OutlinedButton.styleFrom(
+//                         padding: const EdgeInsets.symmetric(vertical: 13),
+//                         side: const BorderSide(color: _kBorder),
+//                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//                       ),
+//                       child: const Text('Cancel', style: TextStyle(color: _kInk, fontWeight: FontWeight.w600)),
+//                     ),
+//                   ),
+//                   const SizedBox(width: 12),
+//                   Expanded(
+//                     child: ElevatedButton(
+//                       onPressed: () => Navigator.pop(ctx, true),
+//                       style: ElevatedButton.styleFrom(
+//                         backgroundColor: _kRed,
+//                         foregroundColor: Colors.white,
+//                         elevation: 0,
+//                         padding: const EdgeInsets.symmetric(vertical: 13),
+//                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//                       ),
+//                       child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//
+//     if (confirm == true) {
+//       try {
+//         await context.read<SalaryProvider>().deleteSalary(record.id!);
+//         if (mounted) {
+//           ScaffoldMessenger.of(context).showSnackBar(
+//             const SnackBar(content: Text('Record deleted.'), backgroundColor: _kGreen, behavior: SnackBarBehavior.floating),
+//           );
+//         }
+//       } catch (e) {
+//         if (mounted) {
+//           ScaffoldMessenger.of(context).showSnackBar(
+//             SnackBar(content: Text('Error: $e'), backgroundColor: _kRed, behavior: SnackBarBehavior.floating),
+//           );
+//         }
 //       }
 //     }
 //   }
@@ -417,6 +501,7 @@
 //                     const Expanded(flex: 2, child: Text('Base Salary', style: _headerStyle)),
 //                     const Expanded(flex: 2, child: Text('Net Salary', style: _headerStyle)),
 //                     const Expanded(flex: 2, child: Text('Status', style: _headerStyle)),
+//                     const SizedBox(width: 96, child: Text('Actions', style: _headerStyle)),
 //                   ],
 //                 ),
 //               ),
@@ -470,6 +555,26 @@
 //                           child: Align(
 //                             alignment: Alignment.centerLeft,
 //                             child: _statusDropdownChip(s, onChanged: (v) => _changeStatusInline(s, v)),
+//                           ),
+//                         ),
+//                         SizedBox(
+//                           width: 96,
+//                           child: Row(
+//                             mainAxisSize: MainAxisSize.min,
+//                             children: [
+//                               IconButton(
+//                                 icon: const Icon(Icons.edit_outlined, size: 18, color: _kPurple),
+//                                 tooltip: 'Edit',
+//                                 onPressed: () => _openEdit(s),
+//                                 visualDensity: VisualDensity.compact,
+//                               ),
+//                               IconButton(
+//                                 icon: const Icon(Icons.delete_outline, size: 18, color: _kRed),
+//                                 tooltip: 'Delete',
+//                                 onPressed: () => _confirmDelete(s),
+//                                 visualDensity: VisualDensity.compact,
+//                               ),
+//                             ],
 //                           ),
 //                         ),
 //                       ],
@@ -534,10 +639,21 @@
 //                         ],
 //                       ),
 //                     ),
-//                     const Icon(Icons.chevron_right, color: _kSlateLight, size: 20),
+//                     IconButton(
+//                       icon: const Icon(Icons.edit_outlined, size: 18, color: _kPurple),
+//                       tooltip: 'Edit',
+//                       visualDensity: VisualDensity.compact,
+//                       onPressed: () => _openEdit(s),
+//                     ),
+//                     IconButton(
+//                       icon: const Icon(Icons.delete_outline, size: 18, color: _kRed),
+//                       tooltip: 'Delete',
+//                       visualDensity: VisualDensity.compact,
+//                       onPressed: () => _confirmDelete(s),
+//                     ),
 //                   ],
 //                 ),
-//                 const SizedBox(height: 12),
+//                 const SizedBox(height: 8),
 //                 Container(height: 1, color: _kBorder),
 //                 const SizedBox(height: 12),
 //                 Row(
@@ -625,163 +741,12 @@
 // const TextStyle _headerStyle = TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: _kPurpleDark, letterSpacing: 0.2);
 //
 // // ────────────────────────────────────────────────────────────
-// //  Salary Detail / Edit Screen
+// //  Salary Detail Screen (read-only view — editing happens via
+// //  GenerateSalaryScreen's edit mode, opened from the list)
 // // ────────────────────────────────────────────────────────────
-// class SalaryDetailScreen extends StatefulWidget {
+// class SalaryDetailScreen extends StatelessWidget {
 //   final SalaryRecord record;
 //   const SalaryDetailScreen({super.key, required this.record});
-//
-//   @override
-//   State<SalaryDetailScreen> createState() => _SalaryDetailScreenState();
-// }
-//
-// class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
-//   late TextEditingController _fineCtrl;
-//   late TextEditingController _bonusCtrl;
-//   late TextEditingController _noteCtrl;
-//   bool _isEditing = false;
-//   bool _isSaving = false;
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     _fineCtrl = TextEditingController(text: widget.record.fine.toStringAsFixed(0));
-//     _bonusCtrl = TextEditingController(text: widget.record.bonus.toStringAsFixed(0));
-//     _noteCtrl = TextEditingController(text: widget.record.note ?? '');
-//   }
-//
-//   @override
-//   void dispose() {
-//     _fineCtrl.dispose();
-//     _bonusCtrl.dispose();
-//     _noteCtrl.dispose();
-//     super.dispose();
-//   }
-//
-//   Future<void> _saveEdits() async {
-//     final fine = double.tryParse(_fineCtrl.text.trim()) ?? widget.record.fine;
-//     final bonus = double.tryParse(_bonusCtrl.text.trim()) ?? widget.record.bonus;
-//     final note = _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim();
-//
-//     setState(() => _isSaving = true);
-//     try {
-//       await context.read<SalaryProvider>().updateSalaryFields(widget.record.id!, fine: fine, bonus: bonus, note: note);
-//       if (mounted) {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(
-//             content: const Text('Salary updated successfully'),
-//             backgroundColor: _kGreen,
-//             behavior: SnackBarBehavior.floating,
-//             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-//           ),
-//         );
-//         Navigator.pop(context);
-//       }
-//     } catch (e) {
-//       if (mounted) {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(content: Text('Error: $e'), backgroundColor: _kRed, behavior: SnackBarBehavior.floating),
-//         );
-//         setState(() => _isSaving = false);
-//       }
-//     }
-//   }
-//
-//   Future<void> _changeStatus(String newStatus) async {
-//     try {
-//       await context.read<SalaryProvider>().updateSalaryStatus(widget.record.id!, newStatus);
-//       if (mounted) {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(
-//             content: Text('Status changed to $newStatus'),
-//             backgroundColor: _kGreen,
-//             behavior: SnackBarBehavior.floating,
-//             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-//           ),
-//         );
-//         Navigator.pop(context);
-//       }
-//     } catch (e) {
-//       if (mounted) {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(content: Text('Error: $e'), backgroundColor: _kRed, behavior: SnackBarBehavior.floating),
-//         );
-//       }
-//     }
-//   }
-//
-//   Future<void> _deleteRecord() async {
-//     final confirm = await showDialog<bool>(
-//       context: context,
-//       builder: (ctx) => Dialog(
-//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-//         child: Padding(
-//           padding: const EdgeInsets.all(24),
-//           child: Column(
-//             mainAxisSize: MainAxisSize.min,
-//             children: [
-//               Container(
-//                 padding: const EdgeInsets.all(14),
-//                 decoration: const BoxDecoration(color: _kRedBg, shape: BoxShape.circle),
-//                 child: const Icon(Icons.delete_outline, color: _kRed, size: 28),
-//               ),
-//               const SizedBox(height: 16),
-//               const Text('Delete this salary?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _kInk)),
-//               const SizedBox(height: 8),
-//               Text('This action cannot be undone.', style: TextStyle(fontSize: 13, color: _kSlate), textAlign: TextAlign.center),
-//               const SizedBox(height: 22),
-//               Row(
-//                 children: [
-//                   Expanded(
-//                     child: OutlinedButton(
-//                       onPressed: () => Navigator.pop(ctx, false),
-//                       style: OutlinedButton.styleFrom(
-//                         padding: const EdgeInsets.symmetric(vertical: 13),
-//                         side: const BorderSide(color: _kBorder),
-//                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//                       ),
-//                       child: const Text('Cancel', style: TextStyle(color: _kInk, fontWeight: FontWeight.w600)),
-//                     ),
-//                   ),
-//                   const SizedBox(width: 12),
-//                   Expanded(
-//                     child: ElevatedButton(
-//                       onPressed: () => Navigator.pop(ctx, true),
-//                       style: ElevatedButton.styleFrom(
-//                         backgroundColor: _kRed,
-//                         foregroundColor: Colors.white,
-//                         elevation: 0,
-//                         padding: const EdgeInsets.symmetric(vertical: 13),
-//                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//                       ),
-//                       child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//     if (confirm == true) {
-//       try {
-//         await context.read<SalaryProvider>().deleteSalary(widget.record.id!);
-//         if (mounted) {
-//           Navigator.pop(context);
-//           ScaffoldMessenger.of(context).showSnackBar(
-//             const SnackBar(content: Text('Record deleted.'), backgroundColor: _kGreen, behavior: SnackBarBehavior.floating),
-//           );
-//         }
-//       } catch (e) {
-//         if (mounted) {
-//           ScaffoldMessenger.of(context).showSnackBar(
-//             SnackBar(content: Text('Error: $e'), backgroundColor: _kRed, behavior: SnackBarBehavior.floating),
-//           );
-//         }
-//       }
-//     }
-//   }
 //
 //   Widget _statusChip(String status) {
 //     final isPaid = status == 'Paid';
@@ -804,7 +769,7 @@
 //
 //   @override
 //   Widget build(BuildContext context) {
-//     final rec = widget.record;
+//     final rec = record;
 //     final isDesktop = MediaQuery.of(context).size.width >= _kDesktopBreakpoint;
 //
 //     return Scaffold(
@@ -835,24 +800,28 @@
 //         bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(height: 1, color: _kBorder)),
 //         actions: [
 //           IconButton(
-//             icon: Icon(_isEditing ? Icons.close : Icons.edit_outlined, color: _isEditing ? _kRed : _kPurple),
-//             tooltip: _isEditing ? 'Cancel Edit' : 'Edit',
-//             onPressed: () => setState(() => _isEditing = !_isEditing),
+//             icon: const Icon(Icons.edit_outlined, color: _kPurple),
+//             tooltip: 'Edit',
+//             onPressed: () {
+//               Navigator.of(context)
+//                   .push(MaterialPageRoute(builder: (_) => GenerateSalaryScreen(existingRecord: rec)))
+//                   .then((_) => Navigator.of(context).pop());
+//             },
 //           ),
-//           IconButton(icon: const Icon(Icons.delete_outline, color: _kRed), tooltip: 'Delete', onPressed: _deleteRecord),
 //           const SizedBox(width: 4),
 //         ],
 //       ),
 //       body: SingleChildScrollView(
 //         padding: EdgeInsets.all(isDesktop ? 24 : 16),
 //         child: isDesktop
-//             ? Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 700), child: _buildDetailContent(rec)))
-//             : _buildDetailContent(rec),
+//             ? Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 700), child: _buildDetailContent()))
+//             : _buildDetailContent(),
 //       ),
 //     );
 //   }
 //
-//   Widget _buildDetailContent(SalaryRecord rec) {
+//   Widget _buildDetailContent() {
+//     final rec = record;
 //     return Column(
 //       crossAxisAlignment: CrossAxisAlignment.start,
 //       children: [
@@ -872,48 +841,20 @@
 //               Text('Rs ${NumberFormat('#,##0').format(rec.netSalary)}', style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800)),
 //               const SizedBox(height: 14),
 //               _statusChip(rec.status),
+//               if (rec.paidAt != null) ...[
+//                 const SizedBox(height: 8),
+//                 Text(
+//                   'Paid on ${DateFormat('dd MMM yyyy').format(rec.paidAt!)}',
+//                   style: const TextStyle(color: Colors.white70, fontSize: 11.5),
+//                 ),
+//               ],
 //             ],
 //           ),
 //         ),
 //         const SizedBox(height: 16),
 //
-//         // Status actions
-//         _buildCard('Payment Status', icon: Icons.payments_outlined, children: [
-//           if (rec.createdAt != null) _detailRow('Generated At', Text(DateFormat('dd MMM yyyy, hh:mm a').format(rec.createdAt!))),
-//           if (rec.paidAt != null) _detailRow('Paid At', Text(DateFormat('dd MMM yyyy, hh:mm a').format(rec.paidAt!))),
-//           const SizedBox(height: 10),
-//           SizedBox(
-//             width: double.infinity,
-//             child: rec.status == 'Pending'
-//                 ? ElevatedButton.icon(
-//               onPressed: () => _changeStatus('Paid'),
-//               icon: const Icon(Icons.check_circle, size: 18),
-//               label: const Text('Mark as Paid'),
-//               style: ElevatedButton.styleFrom(
-//                 backgroundColor: _kGreen,
-//                 foregroundColor: Colors.white,
-//                 elevation: 0,
-//                 padding: const EdgeInsets.symmetric(vertical: 14),
-//                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//               ),
-//             )
-//                 : OutlinedButton.icon(
-//               onPressed: () => _changeStatus('Pending'),
-//               icon: const Icon(Icons.undo, size: 18),
-//               label: const Text('Mark as Pending'),
-//               style: OutlinedButton.styleFrom(
-//                 foregroundColor: _kOrange,
-//                 side: const BorderSide(color: _kOrangeBorder),
-//                 padding: const EdgeInsets.symmetric(vertical: 14),
-//                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//               ),
-//             ),
-//           ),
-//         ]),
-//         const SizedBox(height: 16),
-//
-//         // Employee info card — LOCKED (read-only, no edit even in edit mode)
-//         _buildCard('Employee Information', icon: Icons.badge_outlined, locked: true, children: [
+//         // Employee info card
+//         _buildCard('Employee Information', icon: Icons.badge_outlined, children: [
 //           _detailRow('Employee', Text(rec.employeeName)),
 //           _detailRow('Type', Text(rec.employeeType == 'teacher' ? 'Teacher' : 'Staff')),
 //           if (rec.designation != null) _detailRow('Designation', Text(rec.designation!)),
@@ -924,79 +865,23 @@
 //         // Salary breakdown card
 //         _buildCard('Salary Breakdown', icon: Icons.calculate_outlined, children: [
 //           _detailRow('Base Salary', Text('Rs ${NumberFormat('#,##0').format(rec.baseSalary)}')),
-//           _detailRow('Working Days', Text('${rec.workingDays} of ${rec.totalDaysInMonth}')),
 //           _detailRow('Leaves (Absents)', Text('${rec.leaves}')),
-//           _detailRow('Per Day Rate', Text('Rs ${NumberFormat('#,##0').format(rec.perDayRate)}')),
 //           _detailRow('Absent Deduction', Text('- Rs ${NumberFormat('#,##0').format(rec.absentDeduction)}', style: const TextStyle(color: _kRed, fontWeight: FontWeight.w600))),
 //         ]),
 //         const SizedBox(height: 16),
 //
-//         // Adjustments card (editable)
+//         // Adjustments card
 //         _buildCard('Adjustments & Note', icon: Icons.tune, children: [
-//           if (!_isEditing) ...[
-//             _detailRow('Fine / Deduction', Text('Rs ${NumberFormat('#,##0').format(rec.fine)}', style: const TextStyle(color: _kRed, fontWeight: FontWeight.w600))),
-//             _detailRow('Bonus / Addition', Text('Rs ${NumberFormat('#,##0').format(rec.bonus)}', style: const TextStyle(color: _kGreen, fontWeight: FontWeight.w600))),
-//             if (rec.note != null && rec.note!.isNotEmpty) _detailRow('Note', Text(rec.note!)),
-//           ] else ...[
-//             _editField(controller: _fineCtrl, label: 'Fine / Deduction', icon: Icons.remove_circle_outline, color: _kRed),
-//             const SizedBox(height: 12),
-//             _editField(controller: _bonusCtrl, label: 'Bonus / Addition', icon: Icons.add_circle_outline, color: _kGreen),
-//             const SizedBox(height: 12),
-//             TextFormField(
-//               controller: _noteCtrl,
-//               maxLines: 2,
-//               decoration: InputDecoration(
-//                 labelText: 'Note (optional)',
-//                 filled: true,
-//                 fillColor: _kSurface,
-//                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kBorder)),
-//                 enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kBorder)),
-//                 focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kPurple, width: 1.5)),
-//               ),
-//             ),
-//             const SizedBox(height: 16),
-//             SizedBox(
-//               width: double.infinity,
-//               child: ElevatedButton.icon(
-//                 onPressed: _isSaving ? null : _saveEdits,
-//                 icon: _isSaving
-//                     ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-//                     : const Icon(Icons.save_outlined, size: 18),
-//                 label: Text(_isSaving ? 'Saving…' : 'Save Changes'),
-//                 style: ElevatedButton.styleFrom(
-//                   backgroundColor: _kPurple,
-//                   foregroundColor: Colors.white,
-//                   elevation: 0,
-//                   padding: const EdgeInsets.symmetric(vertical: 14),
-//                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//                 ),
-//               ),
-//             ),
-//           ],
+//           _detailRow('Fine / Deduction', Text('Rs ${NumberFormat('#,##0').format(rec.fine)}', style: const TextStyle(color: _kRed, fontWeight: FontWeight.w600))),
+//           _detailRow('Bonus / Addition', Text('Rs ${NumberFormat('#,##0').format(rec.bonus)}', style: const TextStyle(color: _kGreen, fontWeight: FontWeight.w600))),
+//           if (rec.note != null && rec.note!.isNotEmpty) _detailRow('Note', Text(rec.note!)),
 //         ]),
 //         const SizedBox(height: 24),
 //       ],
 //     );
 //   }
 //
-//   Widget _editField({required TextEditingController controller, required String label, required IconData icon, required Color color}) {
-//     return TextFormField(
-//       controller: controller,
-//       keyboardType: TextInputType.number,
-//       decoration: InputDecoration(
-//         labelText: label,
-//         prefixIcon: Icon(icon, size: 20, color: color),
-//         prefixText: 'Rs ',
-//         filled: true,
-//         fillColor: _kSurface,
-//         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kBorder)),
-//         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kBorder)),
-//         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: color, width: 1.5)),
-//       ),
-//     );
-//   }
-//
-//   Widget _buildCard(String title, {required List<Widget> children, IconData? icon, bool locked = false}) {
+//   Widget _buildCard(String title, {required List<Widget> children, IconData? icon}) {
 //     return Container(
 //       width: double.infinity,
 //       padding: const EdgeInsets.all(18),
@@ -1016,18 +901,6 @@
 //                 const SizedBox(width: 8),
 //               ],
 //               Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _kInk)),
-//               if (locked) ...[
-//                 const SizedBox(width: 8),
-//                 Container(
-//                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-//                   decoration: BoxDecoration(color: _kSurface, borderRadius: BorderRadius.circular(20), border: Border.all(color: _kBorder)),
-//                   child: Row(mainAxisSize: MainAxisSize.min, children: [
-//                     Icon(Icons.lock_outline, size: 11, color: _kSlateLight),
-//                     const SizedBox(width: 4),
-//                     Text('Locked', style: TextStyle(fontSize: 10.5, color: _kSlateLight, fontWeight: FontWeight.w600)),
-//                   ]),
-//                 ),
-//               ],
 //             ],
 //           ),
 //           const SizedBox(height: 12),
@@ -1115,7 +988,6 @@
 //   String capitalize() => isEmpty ? this : '${this[0].toUpperCase()}${substring(1)}';
 // }
 
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -1136,6 +1008,7 @@ const _kGreenBg = Color(0xFFECFDF3);
 const _kGreenBorder = Color(0xFFBBF7D0);
 const _kRed = Color(0xFFDC2626);
 const _kRedBg = Color(0xFFFEF2F2);
+const _kRedBorder = Color(0xFFFCA5A5); // ★ NEW – used for terminated highlight border
 const _kOrange = Color(0xFFD97706);
 const _kOrangeBg = Color(0xFFFFFBEB);
 const _kOrangeBorder = Color(0xFFFDE68A);
@@ -1236,6 +1109,9 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
         .then((_) => _loadData());
   }
 
+  // ★ CHANGED — delete confirmation now warns when the record is a
+  // termination record, since deleting it will reinstate the employee
+  // (handled automatically inside SalaryProvider.deleteSalary).
   Future<void> _confirmDelete(SalaryRecord record) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -1259,6 +1135,29 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
                 style: TextStyle(fontSize: 13, color: _kSlate),
                 textAlign: TextAlign.center,
               ),
+              if (record.isTerminated) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: _kOrangeBg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _kOrangeBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: _kOrange, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${record.employeeName} will be reinstated (un-terminated) automatically.',
+                          style: const TextStyle(fontSize: 11.5, color: _kOrange),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 22),
               Row(
                 children: [
@@ -1297,10 +1196,17 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
 
     if (confirm == true) {
       try {
+        final wasTerminated = record.isTerminated;
         await context.read<SalaryProvider>().deleteSalary(record.id!);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Record deleted.'), backgroundColor: _kGreen, behavior: SnackBarBehavior.floating),
+            SnackBar(
+              content: Text(wasTerminated
+                  ? 'Record deleted. ${record.employeeName} has been reinstated.'
+                  : 'Record deleted.'),
+              backgroundColor: _kGreen,
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
       } catch (e) {
@@ -1625,12 +1531,16 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
               ...List.generate(records.length, (i) {
                 final s = records[i];
                 final isLast = i == records.length - 1;
+                // ★ NEW — terminated rows get a soft red tint background so
+                // they stand out immediately in the list.
+                final rowColor = s.isTerminated ? _kRedBg.withOpacity(0.5) : null;
                 return InkWell(
                   onTap: () => _openDetail(s),
                   borderRadius: isLast ? const BorderRadius.vertical(bottom: Radius.circular(16)) : BorderRadius.zero,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                     decoration: BoxDecoration(
+                      color: rowColor,
                       border: isLast ? null : const Border(bottom: BorderSide(color: _kBorder)),
                     ),
                     child: Row(
@@ -1642,15 +1552,25 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
                             children: [
                               CircleAvatar(
                                 radius: 16,
-                                backgroundColor: _kPurpleSoft,
+                                backgroundColor: s.isTerminated ? _kRedBg : _kPurpleSoft,
                                 child: Text(
                                   s.employeeName.isNotEmpty ? s.employeeName[0].toUpperCase() : '?',
-                                  style: const TextStyle(color: _kPurple, fontWeight: FontWeight.w700, fontSize: 12),
+                                  style: TextStyle(color: s.isTerminated ? _kRed : _kPurple, fontWeight: FontWeight.w700, fontSize: 12),
                                 ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
-                                child: Text(s.employeeName, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: _kInk)),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(s.employeeName, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: _kInk)),
+                                    if (s.isTerminated) ...[
+                                      const SizedBox(height: 2),
+                                      _terminatedBadge(),
+                                    ],
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -1719,9 +1639,11 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              // ★ NEW — terminated cards get a soft red tint + red border
+              // so they're highlighted in the mobile list too.
+              color: s.isTerminated ? _kRedBg.withOpacity(0.4) : Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _kBorder),
+              border: Border.all(color: s.isTerminated ? _kRedBorder : _kBorder),
               boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 3))],
             ),
             child: Column(
@@ -1739,10 +1661,10 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
                     const SizedBox(width: 10),
                     CircleAvatar(
                       radius: 19,
-                      backgroundColor: _kPurpleSoft,
+                      backgroundColor: s.isTerminated ? _kRedBg : _kPurpleSoft,
                       child: Text(
                         s.employeeName.isNotEmpty ? s.employeeName[0].toUpperCase() : '?',
-                        style: const TextStyle(color: _kPurple, fontWeight: FontWeight.w700, fontSize: 13),
+                        style: TextStyle(color: s.isTerminated ? _kRed : _kPurple, fontWeight: FontWeight.w700, fontSize: 13),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -1770,6 +1692,10 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
                     ),
                   ],
                 ),
+                if (s.isTerminated) ...[
+                  const SizedBox(height: 8),
+                  _terminatedBadge(),
+                ],
                 const SizedBox(height: 8),
                 Container(height: 1, color: _kBorder),
                 const SizedBox(height: 12),
@@ -1801,6 +1727,29 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
         const SizedBox(height: 2),
         Text(value, style: TextStyle(fontSize: 14, fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600, color: _kInk)),
       ],
+    );
+  }
+
+  // ★ NEW — small red "Terminated" badge, reused in both desktop & mobile.
+  Widget _terminatedBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: _kRedBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _kRedBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.person_off_rounded, size: 10, color: _kRed),
+          const SizedBox(width: 4),
+          Text(
+            'Terminated',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _kRed),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1884,6 +1833,26 @@ class SalaryDetailScreen extends StatelessWidget {
     );
   }
 
+  // ★ NEW — terminated chip for the detail screen hero card.
+  Widget _terminatedChip() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.4)),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.person_off_rounded, size: 14, color: Colors.white),
+          SizedBox(width: 6),
+          Text('Terminated', style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rec = record;
@@ -1902,10 +1871,10 @@ class SalaryDetailScreen extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 16,
-              backgroundColor: _kPurpleSoft,
+              backgroundColor: rec.isTerminated ? _kRedBg : _kPurpleSoft,
               child: Text(
                 rec.employeeName.isNotEmpty ? rec.employeeName[0].toUpperCase() : '?',
-                style: const TextStyle(color: _kPurple, fontWeight: FontWeight.w700, fontSize: 13),
+                style: TextStyle(color: rec.isTerminated ? _kRed : _kPurple, fontWeight: FontWeight.w700, fontSize: 13),
               ),
             ),
             const SizedBox(width: 10),
@@ -1947,17 +1916,29 @@ class SalaryDetailScreen extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [_kPurple, _kPurpleDark], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            // ★ NEW — red gradient when this is a termination record
+            gradient: LinearGradient(
+              colors: rec.isTerminated ? [_kRed, const Color(0xFF7F1D1D)] : [_kPurple, _kPurpleDark],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: _kPurple.withOpacity(0.25), blurRadius: 20, offset: const Offset(0, 8))],
+            boxShadow: [BoxShadow(color: (rec.isTerminated ? _kRed : _kPurple).withOpacity(0.25), blurRadius: 20, offset: const Offset(0, 8))],
           ),
           child: Column(
             children: [
-              const Text('Net Salary', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
+              Text(rec.isTerminated ? 'Final Net Salary' : 'Net Salary', style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
               const SizedBox(height: 8),
               Text('Rs ${NumberFormat('#,##0').format(rec.netSalary)}', style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800)),
               const SizedBox(height: 14),
-              _statusChip(rec.status),
+              Wrap(
+                spacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  _statusChip(rec.status),
+                  if (rec.isTerminated) _terminatedChip(),
+                ],
+              ),
               if (rec.paidAt != null) ...[
                 const SizedBox(height: 8),
                 Text(
@@ -1969,6 +1950,32 @@ class SalaryDetailScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
+
+        // ★ NEW — termination info banner
+        if (rec.isTerminated) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: _kRedBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _kRedBorder),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, color: _kRed, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'This salary was generated as the final settlement for ${rec.employeeName}. The employee has been removed from the active list.',
+                    style: const TextStyle(fontSize: 12.5, color: _kRed, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
 
         // Employee info card
         _buildCard('Employee Information', icon: Icons.badge_outlined, children: [

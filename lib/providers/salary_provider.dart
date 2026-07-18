@@ -110,7 +110,7 @@
 //   }
 //
 //   // ────────────────────────────────────────────────────────────
-//   //  Manual calculation (unchanged)
+//   //  Manual calculation — always uses fixed 30-day month
 //   // ────────────────────────────────────────────────────────────
 //   Map<String, dynamic> calculateManual({
 //     required double baseSalary,
@@ -119,7 +119,9 @@
 //     double fine = 0,
 //     double bonus = 0,
 //   }) {
-//     final safeWorkingDays = workingDays <= 0 ? 30 : workingDays;
+//     // Working days denominator is always fixed at 30, regardless of the
+//     // actual calendar month length (28/29/30/31).
+//     const safeWorkingDays = _kFixedMonthDays;
 //     final perDayRate = baseSalary / safeWorkingDays;
 //     final absentDeduction = perDayRate * leaves;
 //     final netSalary = baseSalary - absentDeduction - fine + bonus;
@@ -137,7 +139,7 @@
 //   }
 //
 //   // ────────────────────────────────────────────────────────────
-//   //  Duplicate check & save (unchanged)
+//   //  Duplicate check & save
 //   // ────────────────────────────────────────────────────────────
 //   Future<SalaryRecord?> checkAlreadyGenerated(
 //       String employeeId, int year, int month) {
@@ -239,6 +241,70 @@
 //     }
 //   }
 //
+//   /// Full record update — used by GenerateSalaryScreen's Edit Mode.
+//   /// Recalculates workingDays/leaves/perDayRate/absentDeduction/netSalary
+//   /// from the freshly-provided calculation result, but preserves the
+//   /// original doc id, employee identity, month, status and createdAt.
+//   Future<void> updateFullSalary({
+//     required String docId,
+//     required double baseSalary,
+//     required int totalDaysInMonth,
+//     required int workingDays,
+//     required int leaves,
+//     required double perDayRate,
+//     required double absentDeduction,
+//     required double fine,
+//     required double bonus,
+//     required double netSalary,
+//     String? note,
+//     required String mode,
+//   }) async {
+//     final updates = <String, dynamic>{
+//       'baseSalary': baseSalary,
+//       'totalDaysInMonth': totalDaysInMonth,
+//       'workingDays': workingDays,
+//       'leaves': leaves,
+//       'perDayRate': perDayRate,
+//       'absentDeduction': absentDeduction,
+//       'fine': fine,
+//       'bonus': bonus,
+//       'note': note,
+//       'netSalary': netSalary,
+//       'mode': mode,
+//     };
+//     await _service.updateFullSalary(docId, updates);
+//
+//     // Update local list if present
+//     final index = _salaries.indexWhere((s) => s.id == docId);
+//     if (index != -1) {
+//       final current = _salaries[index];
+//       _salaries[index] = SalaryRecord(
+//         id: docId,
+//         employeeId: current.employeeId,
+//         employeeName: current.employeeName,
+//         employeeType: current.employeeType,
+//         designation: current.designation,
+//         year: current.year,
+//         month: current.month,
+//         mode: mode,
+//         baseSalary: baseSalary,
+//         totalDaysInMonth: totalDaysInMonth,
+//         workingDays: workingDays,
+//         leaves: leaves,
+//         perDayRate: perDayRate,
+//         absentDeduction: absentDeduction,
+//         fine: fine,
+//         bonus: bonus,
+//         note: note,
+//         netSalary: netSalary,
+//         status: current.status,
+//         createdAt: current.createdAt,
+//         paidAt: current.paidAt,
+//       );
+//       notifyListeners();
+//     }
+//   }
+//
 //   /// Delete a salary record permanently.
 //   Future<void> deleteSalary(String docId) async {
 //     await _service.deleteSalary(docId);
@@ -256,13 +322,18 @@
 
 import 'package:flutter/foundation.dart';
 import '../models/salary_model.dart';
+import '../models/teacher.dart';
 import '../services/salary_firestore_service.dart';
 import '../services/attendance_firestore_service.dart';
+import '../services/firestore_service.dart';
 
 class SalaryProvider extends ChangeNotifier {
   final SalaryFirestoreService _service = SalaryFirestoreService();
   final AttendanceFirestoreService _attendanceService =
   AttendanceFirestoreService();
+  // ★ NEW – used to reinstate an employee (flip isTerminated back to false)
+  // when their termination salary record is deleted from the Salary List.
+  final StaffFirestoreService _staffService = StaffFirestoreService();
 
   // ───── Current calculation states (used by GenerateSalaryScreen) ─────
   bool _calculating = false;
@@ -403,6 +474,13 @@ class SalaryProvider extends ChangeNotifier {
 
   Future<void> saveSalary(SalaryRecord record) async {
     await _service.saveSalary(record);
+
+    // ★ NEW – if this salary was generated with termination marked on,
+    // flip the employee's isTerminated flag in Firestore so they
+    // immediately disappear from the regular Teachers/Staff lists.
+    if (record.isTerminated) {
+      await _markEmployeeTerminated(record.employeeId, true);
+    }
   }
 
   // ────────────────────────────────────────────────────────────
@@ -488,6 +566,7 @@ class SalaryProvider extends ChangeNotifier {
         note: note ?? current.note,
         netSalary: newNet,
         status: status ?? current.status,
+        isTerminated: current.isTerminated,
         createdAt: current.createdAt,
         paidAt: status == 'Paid' ? DateTime.now() : current.paidAt,
       );
@@ -513,6 +592,7 @@ class SalaryProvider extends ChangeNotifier {
     required double netSalary,
     String? note,
     required String mode,
+    bool? isTerminated, // ★ NEW – optional, only passed when edit screen allows toggling it
   }) async {
     final updates = <String, dynamic>{
       'baseSalary': baseSalary,
@@ -527,12 +607,22 @@ class SalaryProvider extends ChangeNotifier {
       'netSalary': netSalary,
       'mode': mode,
     };
+    if (isTerminated != null) {
+      updates['isTerminated'] = isTerminated;
+    }
     await _service.updateFullSalary(docId, updates);
 
     // Update local list if present
     final index = _salaries.indexWhere((s) => s.id == docId);
     if (index != -1) {
       final current = _salaries[index];
+
+      // ★ NEW – keep the employee's termination flag in Firestore in sync
+      // with what was just saved on this record.
+      if (isTerminated != null && isTerminated != current.isTerminated) {
+        await _markEmployeeTerminated(current.employeeId, isTerminated);
+      }
+
       _salaries[index] = SalaryRecord(
         id: docId,
         employeeId: current.employeeId,
@@ -553,6 +643,7 @@ class SalaryProvider extends ChangeNotifier {
         note: note,
         netSalary: netSalary,
         status: current.status,
+        isTerminated: isTerminated ?? current.isTerminated,
         createdAt: current.createdAt,
         paidAt: current.paidAt,
       );
@@ -561,10 +652,51 @@ class SalaryProvider extends ChangeNotifier {
   }
 
   /// Delete a salary record permanently.
+  /// ★ CHANGED — if the record being deleted was a termination record,
+  /// the employee is automatically reinstated (isTerminated -> false),
+  /// exactly like they were before termination.
   Future<void> deleteSalary(String docId) async {
+    final index = _salaries.indexWhere((s) => s.id == docId);
+    final record = index != -1 ? _salaries[index] : null;
+
     await _service.deleteSalary(docId);
     _salaries.removeWhere((s) => s.id == docId);
     notifyListeners();
+
+    if (record != null && record.isTerminated) {
+      await _markEmployeeTerminated(record.employeeId, false);
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────
+  //  Helper: flip the employee's isTerminated flag in Firestore.
+  //  Uses whichever collection (teachers/staff) currently holds the doc,
+  //  same as StaffFirestoreService.updateStaff already does internally.
+  // ────────────────────────────────────────────────────────────
+  Future<void> _markEmployeeTerminated(String employeeId, bool terminated) async {
+    try {
+      final teachers = await _staffService.getTeachers();
+      final staff = await _staffService.getStaffOnly();
+      final all = [...teachers, ...staff];
+
+      StaffMember? member;
+      for (final m in all) {
+        if (m.id == employeeId) {
+          member = m;
+          break;
+        }
+      }
+      if (member == null) return;
+
+      member.isTerminated = terminated;
+      if (!terminated) {
+        member.terminationDate = null;
+        member.terminationNote = null;
+      }
+      await _staffService.updateStaff(employeeId, member);
+    } catch (e) {
+      debugPrint('Error syncing employee termination status: $e');
+    }
   }
 
   // ────────────────────────────────────────────────────────────

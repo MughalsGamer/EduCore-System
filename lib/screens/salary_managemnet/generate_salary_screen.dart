@@ -29,33 +29,45 @@
 // const _kSlate = Color(0xFF64748B);
 //
 // const double _kDesktopBreakpoint = 900;
+// const int _kFixedMonthDays = 30;
 //
 // // ─────────────────────────────────────────────
 // //  Screen
 // // ─────────────────────────────────────────────
 // class GenerateSalaryScreen extends StatefulWidget {
 //   final bool showAppBar;
-//   const GenerateSalaryScreen({super.key, this.showAppBar = true});
+//
+//   /// When provided, the screen opens in EDIT MODE for this existing
+//   /// salary record: employee/type/month are locked & pre-filled, and
+//   /// Save performs an update instead of creating a new record.
+//   final SalaryRecord? existingRecord;
+//
+//   const GenerateSalaryScreen({
+//     super.key,
+//     this.showAppBar = true,
+//     this.existingRecord,
+//   });
+//
+//   bool get isEditMode => existingRecord != null;
 //
 //   @override
 //   State<GenerateSalaryScreen> createState() => _GenerateSalaryScreenState();
 // }
 //
 // class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
-//   String _employeeType = 'teacher'; // 'teacher' or 'staff'
+//   late String _employeeType; // 'teacher' or 'staff'
 //   StaffMember? _selectedEmployee;
 //
-//   int _selectedYear = DateTime.now().year;
-//   int _selectedMonth = DateTime.now().month;
+//   late int _selectedYear;
+//   late int _selectedMonth;
 //
-//   String _mode = 'attendance'; // 'attendance' (Option A) or 'manual' (Option B)
+//   late String _mode; // 'attendance' (Option A) or 'manual' (Option B)
 //
 //   final _fineCtrl = TextEditingController();
 //   final _bonusCtrl = TextEditingController();
 //   final _noteCtrl = TextEditingController();
 //
 //   // Manual mode inputs
-//   final _manualWorkingDaysCtrl = TextEditingController(text: '30');
 //   final _manualLeavesCtrl = TextEditingController(text: '0');
 //
 //   final _searchCtrl = TextEditingController();
@@ -65,23 +77,47 @@
 //   Map<String, dynamic>? _calcResult;
 //   bool _isSaving = false;
 //
-//   // ───── Duplicate check state ─────
+//   // ───── Duplicate check state (skipped entirely in edit mode) ─────
 //   bool _alreadyGenerated = false;
 //   SalaryRecord? _existingRecord;
-//   bool _isCheckingDuplicate = false; // optional: show small loader while checking
+//   bool _isCheckingDuplicate = false;
+//
+//   bool get _isEditMode => widget.isEditMode;
 //
 //   @override
 //   void initState() {
 //     super.initState();
+//
+//     final rec = widget.existingRecord;
+//     _employeeType = rec?.employeeType ?? 'teacher';
+//     _selectedYear = rec?.year ?? DateTime.now().year;
+//     _selectedMonth = rec?.month ?? DateTime.now().month;
+//     _mode = rec?.mode ?? 'attendance';
+//
+//     if (rec != null) {
+//       _fineCtrl.text = rec.fine == rec.fine.roundToDouble()
+//           ? rec.fine.toStringAsFixed(0)
+//           : rec.fine.toString();
+//       _bonusCtrl.text = rec.bonus == rec.bonus.roundToDouble()
+//           ? rec.bonus.toStringAsFixed(0)
+//           : rec.bonus.toString();
+//       _noteCtrl.text = rec.note ?? '';
+//       _manualLeavesCtrl.text = '${rec.leaves}';
+//       _searchCtrl.text = rec.employeeName;
+//     }
+//
 //     WidgetsBinding.instance.addPostFrameCallback((_) {
 //       final staffProvider = context.read<StaffProvider>();
 //       if (staffProvider.teachers.isEmpty) staffProvider.fetchTeachers();
 //       if (staffProvider.staffOnly.isEmpty) staffProvider.fetchStaffOnly();
+//
+//       if (_isEditMode) {
+//         _hydrateSelectedEmployeeForEdit();
+//       }
 //     });
 //
 //     _fineCtrl.addListener(_recalculateIfManual);
 //     _bonusCtrl.addListener(_recalculateIfManual);
-//     _manualWorkingDaysCtrl.addListener(_recalculateIfManual);
 //     _manualLeavesCtrl.addListener(_recalculateIfManual);
 //   }
 //
@@ -90,11 +126,74 @@
 //     _fineCtrl.dispose();
 //     _bonusCtrl.dispose();
 //     _noteCtrl.dispose();
-//     _manualWorkingDaysCtrl.dispose();
 //     _manualLeavesCtrl.dispose();
 //     _searchCtrl.dispose();
 //     _searchFocus.dispose();
 //     super.dispose();
+//   }
+//
+//   // ───────────────────────────────────────────
+//   //  Edit-mode helpers
+//   // ───────────────────────────────────────────
+//
+//   /// Try to find the matching StaffMember from the provider lists so the
+//   /// "selected employee" card + base salary are available for recalculation.
+//   /// Falls back to a synthetic StaffMember built from the salary record if
+//   /// the live staff list doesn't contain it (e.g. deactivated employee).
+//   void _hydrateSelectedEmployeeForEdit() {
+//     final rec = widget.existingRecord;
+//     if (rec == null) return;
+//
+//     final staffProvider = context.read<StaffProvider>();
+//     final list =
+//     _employeeType == 'teacher' ? staffProvider.teachers : staffProvider.staffOnly;
+//
+//     StaffMember? match;
+//     for (final e in list) {
+//       if (e.id == rec.employeeId) {
+//         match = e;
+//         break;
+//       }
+//     }
+//
+//     setState(() {
+//       _selectedEmployee = match ??
+//           StaffMember(
+//             id: rec.employeeId,
+//             name: rec.employeeName,
+//             salary: rec.baseSalary,
+//             designation: rec.designation,
+//             // All other required fields get dummy/placeholder values
+//             // because they are never used on this screen.
+//             address: '',
+//             cnic: '',
+//             dob: '2000-01-01',
+//             emergencyPhone: '',
+//             employmentType: '',
+//             fatherOrHusbandName: '',
+//             gender: '',
+//             maritalStatus: '',
+//             nationality: '',
+//             phone: '',
+//             religion: '',
+//             type: _employeeType,
+//           );
+//       _searchCtrl.text = _selectedEmployee!.name;
+//     });
+//
+//     // Populate the read-only calc summary from the existing record
+//     setState(() {
+//       _calcResult = {
+//         'baseSalary': rec.baseSalary,
+//         'workingDays': _kFixedMonthDays,
+//         'leaves': rec.leaves,
+//         'perDayRate': rec.baseSalary / _kFixedMonthDays,
+//         'absentDeduction': (rec.baseSalary / _kFixedMonthDays) * rec.leaves,
+//         'fine': rec.fine,
+//         'bonus': rec.bonus,
+//         'netSalary': rec.netSalary,
+//       };
+//     });
 //   }
 //
 //   // ───────────────────────────────────────────
@@ -118,6 +217,7 @@
 //   double get _bonus => double.tryParse(_bonusCtrl.text.trim()) ?? 0;
 //
 //   void _switchType(String type) {
+//     if (_isEditMode) return; // locked in edit mode
 //     setState(() {
 //       _employeeType = type;
 //       _selectedEmployee = null;
@@ -128,6 +228,7 @@
 //   }
 //
 //   void _pickEmployee(StaffMember member) {
+//     if (_isEditMode) return; // locked in edit mode
 //     setState(() {
 //       _selectedEmployee = member;
 //       _searchCtrl.text = member.name;
@@ -142,7 +243,7 @@
 //       _mode = mode;
 //       _calcResult = null;
 //     });
-//     if (!_alreadyGenerated && _selectedEmployee != null) {
+//     if (_selectedEmployee != null && (!_alreadyGenerated || _isEditMode)) {
 //       if (mode == 'attendance') {
 //         _runAttendanceCalculation();
 //       } else {
@@ -152,6 +253,7 @@
 //   }
 //
 //   Future<void> _openMonthYearPicker() async {
+//     if (_isEditMode) return; // locked in edit mode
 //     final result = await _showMonthYearPicker(
 //       context: context,
 //       initialYear: _selectedYear,
@@ -167,9 +269,10 @@
 //   }
 //
 //   // ───────────────────────────────────────────
-//   //  Duplicate check
+//   //  Duplicate check — skipped entirely in edit mode
 //   // ───────────────────────────────────────────
 //   Future<void> _checkDuplicate() async {
+//     if (_isEditMode) return;
 //     if (_selectedEmployee == null) return;
 //
 //     setState(() => _isCheckingDuplicate = true);
@@ -187,12 +290,10 @@
 //         _alreadyGenerated = existing != null;
 //         _isCheckingDuplicate = false;
 //         if (existing != null) {
-//           // clear any previous calculation
 //           _calcResult = null;
 //         }
 //       });
 //
-//       // If not generated, recalculate based on current mode
 //       if (!_alreadyGenerated && _mode == 'attendance') {
 //         _runAttendanceCalculation();
 //       } else if (!_alreadyGenerated && _mode == 'manual') {
@@ -216,7 +317,7 @@
 //   }
 //
 //   // ───────────────────────────────────────────
-//   //  Calculation methods (unchanged)
+//   //  Calculation methods — fixed 30-day month always
 //   // ───────────────────────────────────────────
 //   Future<void> _runAttendanceCalculation() async {
 //     if (_selectedEmployee == null) return;
@@ -243,11 +344,10 @@
 //   void _recalculateManual() {
 //     if (_selectedEmployee == null) return;
 //     final provider = context.read<SalaryProvider>();
-//     final workingDays = int.tryParse(_manualWorkingDaysCtrl.text.trim()) ?? 30;
 //     final leaves = int.tryParse(_manualLeavesCtrl.text.trim()) ?? 0;
 //     final result = provider.calculateManual(
 //       baseSalary: _selectedEmployee!.salary,
-//       workingDays: workingDays,
+//       workingDays: _kFixedMonthDays,
 //       leaves: leaves,
 //       fine: _fine,
 //       bonus: _bonus,
@@ -256,7 +356,7 @@
 //   }
 //
 //   void _recalculateIfManual() {
-//     if (_alreadyGenerated) return;
+//     if (_alreadyGenerated && !_isEditMode) return;
 //     if (_mode == 'manual') {
 //       _recalculateManual();
 //     } else if (_mode == 'attendance' && _calcResult != null) {
@@ -275,6 +375,68 @@
 //   }
 //
 //   Future<void> _save() async {
+//     if (_isEditMode) {
+//       await _saveEdit();
+//     } else {
+//       await _saveNew();
+//     }
+//   }
+//
+//   Future<void> _saveEdit() async {
+//     final rec = widget.existingRecord!;
+//     if (_calcResult == null) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(
+//           content: Text('Calculation not ready yet.'),
+//           backgroundColor: Colors.red,
+//         ),
+//       );
+//       return;
+//     }
+//
+//     setState(() => _isSaving = true);
+//     final provider = context.read<SalaryProvider>();
+//
+//     try {
+//       final totalDaysInMonth = DateTime(_selectedYear, _selectedMonth + 1, 0).day;
+//
+//       await provider.updateFullSalary(
+//         docId: rec.id!,
+//         baseSalary: _calcResult!['baseSalary'] as double,
+//         totalDaysInMonth: totalDaysInMonth,
+//         workingDays: _calcResult!['workingDays'] as int,
+//         leaves: _calcResult!['leaves'] as int,
+//         perDayRate: _calcResult!['perDayRate'] as double,
+//         absentDeduction: _calcResult!['absentDeduction'] as double,
+//         fine: _fine,
+//         bonus: _bonus,
+//         netSalary: _calcResult!['netSalary'] as double,
+//         note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+//         mode: _mode,
+//       );
+//
+//       if (mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           SnackBar(
+//             content: Text(
+//                 'Salary updated for ${rec.employeeName} — Rs ${NumberFormat('#,##0').format(_calcResult!['netSalary'])}.'),
+//             backgroundColor: Colors.green,
+//           ),
+//         );
+//         Navigator.pop(context);
+//       }
+//     } catch (e) {
+//       if (mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+//         );
+//       }
+//     } finally {
+//       if (mounted) setState(() => _isSaving = false);
+//     }
+//   }
+//
+//   Future<void> _saveNew() async {
 //     if (_selectedEmployee == null) {
 //       ScaffoldMessenger.of(context).showSnackBar(
 //         const SnackBar(
@@ -294,7 +456,6 @@
 //       return;
 //     }
 //     if (_alreadyGenerated) {
-//       // Extra safety, though button is already disabled
 //       return;
 //     }
 //
@@ -303,7 +464,6 @@
 //     final provider = context.read<SalaryProvider>();
 //
 //     try {
-//       // ── Duplicate check one last time before saving ──
 //       final existing = await provider.checkAlreadyGenerated(
 //         _selectedEmployee!.id!,
 //         _selectedYear,
@@ -413,7 +573,6 @@
 //       _fineCtrl.clear();
 //       _bonusCtrl.clear();
 //       _noteCtrl.clear();
-//       _manualWorkingDaysCtrl.text = '30';
 //       _manualLeavesCtrl.text = '0';
 //       _calcResult = null;
 //       _resetDuplicateState();
@@ -429,7 +588,7 @@
 //   }
 //
 //   // ───────────────────────────────────────────
-//   //  UI: Warning card when already generated
+//   //  UI: Warning card when already generated (new-record mode only)
 //   // ───────────────────────────────────────────
 //   Widget _buildAlreadyGeneratedWarning() {
 //     if (_existingRecord == null) return const SizedBox.shrink();
@@ -486,57 +645,118 @@
 //   }
 //
 //   // ───────────────────────────────────────────
-//   //  UI components (most unchanged, added disabled states)
+//   //  UI: Edit-mode banner
 //   // ───────────────────────────────────────────
-//   Widget _typeToggle() {
+//   Widget _buildEditModeBanner() {
+//     final rec = widget.existingRecord!;
+//     final monthName = DateFormat('MMMM').format(DateTime(rec.year, rec.month));
 //     return Container(
-//       padding: const EdgeInsets.all(4),
+//       margin: const EdgeInsets.only(bottom: 16),
+//       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
 //       decoration: BoxDecoration(
-//         color: Colors.grey.shade100,
+//         color: _kPurpleLight,
 //         borderRadius: BorderRadius.circular(12),
+//         border: Border.all(color: _kPurple.withOpacity(0.3)),
 //       ),
 //       child: Row(
-//         children: ['teacher', 'staff'].map((t) {
-//           final selected = _employeeType == t;
-//           return Expanded(
-//             child: GestureDetector(
-//               onTap: () => _switchType(t),
-//               child: AnimatedContainer(
-//                 duration: const Duration(milliseconds: 180),
-//                 padding: const EdgeInsets.symmetric(vertical: 11),
-//                 decoration: BoxDecoration(
-//                   color: selected ? _kPurple : Colors.transparent,
-//                   borderRadius: BorderRadius.circular(9),
-//                 ),
-//                 alignment: Alignment.center,
-//                 child: Row(
-//                   mainAxisAlignment: MainAxisAlignment.center,
-//                   children: [
-//                     Icon(
-//                       t == 'teacher' ? Icons.school_rounded : Icons.badge_rounded,
-//                       size: 16,
-//                       color: selected ? Colors.white : Colors.grey.shade600,
-//                     ),
-//                     const SizedBox(width: 6),
-//                     Text(
-//                       t == 'teacher' ? 'Teacher' : 'Staff',
-//                       style: TextStyle(
-//                         fontSize: 13,
-//                         fontWeight: FontWeight.w600,
-//                         color: selected ? Colors.white : Colors.grey.shade700,
-//                       ),
-//                     ),
-//                   ],
-//                 ),
-//               ),
+//         children: [
+//           const Icon(Icons.edit_note_rounded, color: _kPurple, size: 20),
+//           const SizedBox(width: 10),
+//           Expanded(
+//             child: Text(
+//               'Editing salary of ${rec.employeeName} — $monthName ${rec.year}',
+//               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _kPurpleDark),
 //             ),
-//           );
-//         }).toList(),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   // ───────────────────────────────────────────
+//   //  UI components
+//   // ───────────────────────────────────────────
+//   Widget _typeToggle() {
+//     final locked = _isEditMode;
+//     return Opacity(
+//       opacity: locked ? 0.6 : 1.0,
+//       child: IgnorePointer(
+//         ignoring: locked,
+//         child: Container(
+//           padding: const EdgeInsets.all(4),
+//           decoration: BoxDecoration(
+//             color: Colors.grey.shade100,
+//             borderRadius: BorderRadius.circular(12),
+//           ),
+//           child: Row(
+//             children: ['teacher', 'staff'].map((t) {
+//               final selected = _employeeType == t;
+//               return Expanded(
+//                 child: GestureDetector(
+//                   onTap: () => _switchType(t),
+//                   child: AnimatedContainer(
+//                     duration: const Duration(milliseconds: 180),
+//                     padding: const EdgeInsets.symmetric(vertical: 11),
+//                     decoration: BoxDecoration(
+//                       color: selected ? _kPurple : Colors.transparent,
+//                       borderRadius: BorderRadius.circular(9),
+//                     ),
+//                     alignment: Alignment.center,
+//                     child: Row(
+//                       mainAxisAlignment: MainAxisAlignment.center,
+//                       children: [
+//                         Icon(
+//                           t == 'teacher' ? Icons.school_rounded : Icons.badge_rounded,
+//                           size: 16,
+//                           color: selected ? Colors.white : Colors.grey.shade600,
+//                         ),
+//                         const SizedBox(width: 6),
+//                         Text(
+//                           t == 'teacher' ? 'Teacher' : 'Staff',
+//                           style: TextStyle(
+//                             fontSize: 13,
+//                             fontWeight: FontWeight.w600,
+//                             color: selected ? Colors.white : Colors.grey.shade700,
+//                           ),
+//                         ),
+//                       ],
+//                     ),
+//                   ),
+//                 ),
+//               );
+//             }).toList(),
+//           ),
+//         ),
 //       ),
 //     );
 //   }
 //
 //   Widget _employeeSearchField() {
+//     if (_isEditMode) {
+//       // Locked, read-only display of the employee — no search/suggestions.
+//       return TextFormField(
+//         controller: _searchCtrl,
+//         enabled: false,
+//         decoration: InputDecoration(
+//           labelText: '${_employeeType == 'teacher' ? 'Teacher' : 'Staff'} (locked)',
+//           prefixIcon: const Icon(Icons.person_outline, size: 20),
+//           suffixIcon: const Icon(Icons.lock_outline, size: 18, color: _kSlate),
+//           labelStyle: const TextStyle(fontSize: 13),
+//           filled: true,
+//           fillColor: Colors.grey.shade100,
+//           border: OutlineInputBorder(
+//             borderRadius: BorderRadius.circular(10),
+//             borderSide: BorderSide(color: Colors.grey.shade300),
+//           ),
+//           disabledBorder: OutlineInputBorder(
+//             borderRadius: BorderRadius.circular(10),
+//             borderSide: BorderSide(color: Colors.grey.shade300),
+//           ),
+//           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+//         ),
+//       );
+//     }
+//
 //     final staffProvider = context.watch<StaffProvider>();
 //     final isLoading = staffProvider.loading && _sourceList.isEmpty;
 //
@@ -700,36 +920,43 @@
 //   }
 //
 //   Widget _monthYearChip() {
-//     return InkWell(
-//       borderRadius: BorderRadius.circular(8),
-//       onTap: _openMonthYearPicker,
-//       child: Container(
-//         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-//         decoration: BoxDecoration(
-//           color: _kSurface,
-//           borderRadius: BorderRadius.circular(8),
-//           border: Border.all(color: _kBorder),
-//         ),
-//         child: Row(
-//           mainAxisSize: MainAxisSize.min,
-//           children: [
-//             const Icon(Icons.calendar_month_outlined, size: 16, color: _kSlate),
-//             const SizedBox(width: 10),
-//             Text(
-//               DateFormat('MMMM yyyy').format(DateTime(_selectedYear, _selectedMonth)),
-//               style: const TextStyle(
-//                   fontSize: 13.5, fontWeight: FontWeight.w600, color: _kInk),
-//             ),
-//             const SizedBox(width: 6),
-//             const Icon(Icons.keyboard_arrow_down, size: 18, color: _kSlate),
-//           ],
+//     final locked = _isEditMode;
+//     return Opacity(
+//       opacity: locked ? 0.6 : 1.0,
+//       child: InkWell(
+//         borderRadius: BorderRadius.circular(8),
+//         onTap: locked ? null : _openMonthYearPicker,
+//         child: Container(
+//           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+//           decoration: BoxDecoration(
+//             color: _kSurface,
+//             borderRadius: BorderRadius.circular(8),
+//             border: Border.all(color: _kBorder),
+//           ),
+//           child: Row(
+//             mainAxisSize: MainAxisSize.min,
+//             children: [
+//               const Icon(Icons.calendar_month_outlined, size: 16, color: _kSlate),
+//               const SizedBox(width: 10),
+//               Text(
+//                 DateFormat('MMMM yyyy').format(DateTime(_selectedYear, _selectedMonth)),
+//                 style: const TextStyle(
+//                     fontSize: 13.5, fontWeight: FontWeight.w600, color: _kInk),
+//               ),
+//               const SizedBox(width: 6),
+//               if (locked)
+//                 const Icon(Icons.lock_outline, size: 15, color: _kSlate)
+//               else
+//                 const Icon(Icons.keyboard_arrow_down, size: 18, color: _kSlate),
+//             ],
+//           ),
 //         ),
 //       ),
 //     );
 //   }
 //
 //   Widget _modeToggle() {
-//     final disabled = _alreadyGenerated;
+//     final disabled = _alreadyGenerated && !_isEditMode;
 //     return Opacity(
 //       opacity: disabled ? 0.6 : 1.0,
 //       child: IgnorePointer(
@@ -749,7 +976,7 @@
 //               child: _modeCard(
 //                 mode: 'manual',
 //                 title: 'Manual Entry',
-//                 subtitle: 'You enter working days & leaves yourself',
+//                 subtitle: 'You enter leaves yourself',
 //                 icon: Icons.edit_note_rounded,
 //               ),
 //             ),
@@ -812,33 +1039,21 @@
 //   }
 //
 //   Widget _manualInputs() {
-//     final disabled = _alreadyGenerated;
-//     return Row(
-//       children: [
-//         Expanded(
-//           child: TextFormField(
-//             controller: _manualWorkingDaysCtrl,
-//             keyboardType: TextInputType.number,
-//             enabled: !disabled,
-//             decoration: _fieldDeco('Working Days *'),
-//           ),
-//         ),
-//         const SizedBox(width: 12),
-//         Expanded(
-//           child: TextFormField(
-//             controller: _manualLeavesCtrl,
-//             keyboardType: TextInputType.number,
-//             enabled: !disabled,
-//             decoration: _fieldDeco('Leaves (Absents) *'),
-//           ),
-//         ),
-//       ],
+//     final disabled = _alreadyGenerated && !_isEditMode;
+//     return TextFormField(
+//       controller: _manualLeavesCtrl,
+//       keyboardType: TextInputType.number,
+//       enabled: !disabled,
+//       decoration: _fieldDeco('Leaves (Absents) *').copyWith(
+//         helperText: 'Month is always treated as $_kFixedMonthDays days',
+//         helperStyle: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+//       ),
 //     );
 //   }
 //
 //   Widget _attendanceSummary() {
 //     final provider = context.watch<SalaryProvider>();
-//     if (_alreadyGenerated) return const SizedBox.shrink(); // hide when already generated
+//     if (_alreadyGenerated && !_isEditMode) return const SizedBox.shrink();
 //
 //     if (provider.calculating) {
 //       return Container(
@@ -883,7 +1098,7 @@
 //         children: [
 //           Row(
 //             children: [
-//               _miniStat('Working Days', '30', _kPurple),
+//               _miniStat('Working Days', '$_kFixedMonthDays', _kPurple),
 //               _miniStat('Absents', '${_calcResult!['leaves']}', _kRed),
 //               _miniStat('Present', '${provider.lastPresentDays}', _kGreen),
 //               _miniStat('Holidays', '${provider.lastHolidaysExcluded}', _kOrange),
@@ -891,7 +1106,7 @@
 //           ),
 //           const SizedBox(height: 8),
 //           Text(
-//             'Rule: month treated as 30 days · Sundays/holidays excluded · '
+//             'Rule: month treated as $_kFixedMonthDays days · Sundays/holidays excluded · '
 //                 'unmarked or "absent" days deducted at Rs ${NumberFormat('#,##0').format(_calcResult!['perDayRate'])}/day.',
 //             style: TextStyle(fontSize: 11, color: Colors.grey.shade600, height: 1.4),
 //           ),
@@ -916,7 +1131,7 @@
 //   }
 //
 //   Widget _fineAndBonusFields() {
-//     final disabled = _alreadyGenerated;
+//     final disabled = _alreadyGenerated && !_isEditMode;
 //     return Row(
 //       children: [
 //         Expanded(
@@ -949,10 +1164,11 @@
 //   }
 //
 //   Widget _noteField() {
+//     final disabled = _alreadyGenerated && !_isEditMode;
 //     return TextFormField(
 //       controller: _noteCtrl,
 //       maxLines: 2,
-//       enabled: !_alreadyGenerated,
+//       enabled: !disabled,
 //       decoration: _fieldDeco('Note (Optional)').copyWith(
 //         hintText: 'Any remarks about this salary…',
 //         alignLabelWithHint: true,
@@ -982,7 +1198,9 @@
 //   }
 //
 //   Widget _netSalaryPreview() {
-//     if (_alreadyGenerated || _calcResult == null) return const SizedBox.shrink();
+//     if ((_alreadyGenerated && !_isEditMode) || _calcResult == null) {
+//       return const SizedBox.shrink();
+//     }
 //
 //     final base = _calcResult!['baseSalary'] as double;
 //     final deduction = _calcResult!['absentDeduction'] as double;
@@ -1047,7 +1265,7 @@
 //   }
 //
 //   Widget _saveButton({double? width, double height = 50}) {
-//     if (_alreadyGenerated) {
+//     if (_alreadyGenerated && !_isEditMode) {
 //       return SizedBox(
 //         width: width,
 //         height: height,
@@ -1070,7 +1288,7 @@
 //       width: width,
 //       height: height,
 //       child: ElevatedButton.icon(
-//         onPressed: _isSaving || _alreadyGenerated ? null : _save,
+//         onPressed: _isSaving ? null : _save,
 //         style: ElevatedButton.styleFrom(
 //           backgroundColor: _kPurple,
 //           foregroundColor: Colors.white,
@@ -1084,9 +1302,11 @@
 //           child:
 //           CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
 //         )
-//             : const Icon(Icons.save_rounded, size: 18),
+//             : Icon(_isEditMode ? Icons.save_rounded : Icons.save_rounded, size: 18),
 //         label: Text(
-//           _isSaving ? 'Generating…' : 'Generate Salary',
+//           _isSaving
+//               ? (_isEditMode ? 'Updating…' : 'Generating…')
+//               : (_isEditMode ? 'Update Salary' : 'Generate Salary'),
 //           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
 //         ),
 //       ),
@@ -1160,14 +1380,15 @@
 //                     color: Colors.white.withOpacity(0.2),
 //                     borderRadius: BorderRadius.circular(10),
 //                   ),
-//                   child: const Icon(Icons.payments_rounded,
+//                   child: Icon(
+//                       _isEditMode ? Icons.edit_rounded : Icons.payments_rounded,
 //                       color: Colors.white, size: 22),
 //                 ),
 //                 const SizedBox(width: 12),
-//                 const Expanded(
+//                 Expanded(
 //                   child: Text(
-//                     'Generate Salary',
-//                     style: TextStyle(
+//                     _isEditMode ? 'Edit Salary' : 'Generate Salary',
+//                     style: const TextStyle(
 //                         color: Colors.white,
 //                         fontSize: 15,
 //                         fontWeight: FontWeight.w600),
@@ -1177,6 +1398,8 @@
 //             ),
 //           ),
 //           const SizedBox(height: 16),
+//
+//           if (_isEditMode) _buildEditModeBanner(),
 //
 //           _sectionCard('Select Employee', Icons.person_search_outlined, [
 //             _typeToggle(),
@@ -1189,8 +1412,8 @@
 //             _monthYearChip(),
 //           ]),
 //
-//           // Duplicate warning (inserted before the method section)
-//           if (_alreadyGenerated) _buildAlreadyGeneratedWarning(),
+//           // Duplicate warning (new-record mode only)
+//           if (!_isEditMode && _alreadyGenerated) _buildAlreadyGeneratedWarning(),
 //
 //           _sectionCard('Calculation Method', Icons.calculate_outlined, [
 //             _modeToggle(),
@@ -1199,8 +1422,9 @@
 //             if (_mode == 'attendance') _attendanceSummary(),
 //           ]),
 //
-//           // If not already generated, show adjustments and preview
-//           if (!_alreadyGenerated) ...[
+//           // Adjustments + preview: shown in edit mode always, and in
+//           // new-record mode only when not already generated.
+//           if (_isEditMode || !_alreadyGenerated) ...[
 //             _sectionCard('Adjustments', Icons.tune_rounded, [
 //               _fineAndBonusFields(),
 //               const SizedBox(height: 14),
@@ -1250,8 +1474,8 @@
 //         backgroundColor: _kPurple,
 //         foregroundColor: Colors.white,
 //         elevation: 0,
-//         title: const Text('Generate Salary',
-//             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 17)),
+//         title: Text(_isEditMode ? 'Edit Salary' : 'Generate Salary',
+//             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 17)),
 //       ),
 //       body: bodyWidget,
 //     );
@@ -1523,9 +1747,6 @@
 //     );
 //   }
 // }
-//
-//
-
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -1605,6 +1826,9 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   Map<String, dynamic>? _calcResult;
   bool _isSaving = false;
 
+  // ★ NEW — termination toggle state for this salary generation.
+  bool _markTerminated = false;
+
   // ───── Duplicate check state (skipped entirely in edit mode) ─────
   bool _alreadyGenerated = false;
   SalaryRecord? _existingRecord;
@@ -1632,6 +1856,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       _noteCtrl.text = rec.note ?? '';
       _manualLeavesCtrl.text = '${rec.leaves}';
       _searchCtrl.text = rec.employeeName;
+      _markTerminated = rec.isTerminated; // ★ NEW — pre-fill from existing record in edit mode
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1667,14 +1892,20 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   /// Try to find the matching StaffMember from the provider lists so the
   /// "selected employee" card + base salary are available for recalculation.
   /// Falls back to a synthetic StaffMember built from the salary record if
-  /// the live staff list doesn't contain it (e.g. deactivated employee).
+  /// the live staff list doesn't contain it (e.g. deactivated/terminated employee).
   void _hydrateSelectedEmployeeForEdit() {
     final rec = widget.existingRecord;
     if (rec == null) return;
 
     final staffProvider = context.read<StaffProvider>();
-    final list =
-    _employeeType == 'teacher' ? staffProvider.teachers : staffProvider.staffOnly;
+    // ★ CHANGED – search allStaff too, since a terminated employee is
+    // excluded from the regular teachers/staffOnly getters.
+    final list = [
+      ...staffProvider.teachers,
+      ...staffProvider.staffOnly,
+      ...staffProvider.deactivatedMembers,
+      ...staffProvider.terminatedMembers,
+    ];
 
     StaffMember? match;
     for (final e in list) {
@@ -1751,6 +1982,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       _selectedEmployee = null;
       _searchCtrl.clear();
       _calcResult = null;
+      _markTerminated = false; // ★ NEW — reset on employee-type switch
       _resetDuplicateState();
     });
   }
@@ -1761,6 +1993,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       _selectedEmployee = member;
       _searchCtrl.text = member.name;
       _showSuggestions = false;
+      _markTerminated = false; // ★ NEW — reset per new selection
     });
     _searchFocus.unfocus();
     _checkDuplicate(); // checks after employee & month are both set
@@ -1941,6 +2174,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
         netSalary: _calcResult!['netSalary'] as double,
         note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
         mode: _mode,
+        isTerminated: _markTerminated, // ★ NEW
       );
 
       if (mounted) {
@@ -1985,6 +2219,13 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     }
     if (_alreadyGenerated) {
       return;
+    }
+
+    // ★ NEW — extra confirmation before generating a termination salary,
+    // since it will immediately remove the employee from active lists.
+    if (_markTerminated) {
+      final confirmed = await _confirmTerminationDialog();
+      if (confirmed != true) return;
     }
 
     setState(() => _isSaving = true);
@@ -2032,6 +2273,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
         note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
         netSalary: _calcResult!['netSalary'] as double,
         status: 'Pending',
+        isTerminated: _markTerminated, // ★ NEW
       );
 
       await provider.saveSalary(record);
@@ -2040,7 +2282,9 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                'Salary of Rs ${NumberFormat('#,##0').format(record.netSalary)} generated for ${record.employeeName} — $monthName $_selectedYear.'),
+                _markTerminated
+                    ? 'Final salary of Rs ${NumberFormat('#,##0').format(record.netSalary)} generated for ${record.employeeName} — $monthName $_selectedYear. Employee marked as Terminated.'
+                    : 'Salary of Rs ${NumberFormat('#,##0').format(record.netSalary)} generated for ${record.employeeName} — $monthName $_selectedYear.'),
             backgroundColor: Colors.green,
           ),
         );
@@ -2055,6 +2299,45 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  // ★ NEW — confirmation dialog shown before generating a termination salary.
+  Future<bool?> _confirmTerminationDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Row(
+          children: const [
+            Icon(Icons.person_off_rounded, color: _kRed),
+            SizedBox(width: 10),
+            Text('Terminate Employee?',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        content: Text(
+          '${_selectedEmployee?.name} will be marked as Terminated once this salary is generated. '
+              'They will be removed from the regular Teachers/Staff list.\n\n'
+              'You can undo this later by deleting this salary record, or by reinstating them from the Terminated Employees list.',
+          style: const TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _kRed,
+              foregroundColor: Colors.white,
+              elevation: 0,
+            ),
+            child: const Text('Yes, Terminate'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showAlreadyGeneratedDialog(SalaryRecord existing) {
@@ -2103,6 +2386,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       _noteCtrl.clear();
       _manualLeavesCtrl.text = '0';
       _calcResult = null;
+      _markTerminated = false; // ★ NEW
       _resetDuplicateState();
     });
   }
@@ -2305,6 +2589,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
                 if (_selectedEmployee != null && v != _selectedEmployee!.name) {
                   _selectedEmployee = null;
                   _calcResult = null;
+                  _markTerminated = false;
                   _resetDuplicateState();
                 }
               });
@@ -2443,6 +2728,76 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ★ NEW — the termination toggle card. Shown once an employee is selected
+  // (or always visible & pre-filled in edit mode). Placed right after the
+  // "Select Employee" section since termination is a property of the
+  // employee, not of the pay calculation.
+  Widget _terminationToggleCard() {
+    final disabled = _alreadyGenerated && !_isEditMode;
+    return Opacity(
+      opacity: disabled ? 0.6 : 1.0,
+      child: IgnorePointer(
+        ignoring: disabled,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: _markTerminated ? _kRedBg : _kSurface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _markTerminated ? _kRed.withOpacity(0.4) : _kBorder,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _markTerminated ? _kRed.withOpacity(0.12) : Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.person_off_rounded,
+                  size: 18,
+                  color: _markTerminated ? _kRed : Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Mark as Terminated',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: _markTerminated ? _kRed : _kInk,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _markTerminated
+                          ? 'This will be treated as their final salary. Employee will move to Terminated list.'
+                          : 'Turn on if this employee is leaving the school.',
+                      style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _markTerminated,
+                activeColor: _kRed,
+                onChanged: _selectedEmployee == null
+                    ? null
+                    : (v) => setState(() => _markTerminated = v),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -2739,8 +3094,8 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [_kPurple, _kPurpleMid],
+        gradient: LinearGradient(
+          colors: _markTerminated ? [_kRed, const Color(0xFF7F1D1D)] : [_kPurple, _kPurpleMid],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -2749,11 +3104,31 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Net Salary',
-              style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600)),
+          Row(
+            children: [
+              Text(_markTerminated ? 'Final Net Salary' : 'Net Salary',
+                  style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
+              if (_markTerminated) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text('TERMINATED',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.4)),
+                ),
+              ],
+            ],
+          ),
           const SizedBox(height: 4),
           Text(
             'Rs ${NumberFormat('#,##0').format(net)}',
@@ -2818,7 +3193,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       child: ElevatedButton.icon(
         onPressed: _isSaving ? null : _save,
         style: ElevatedButton.styleFrom(
-          backgroundColor: _kPurple,
+          backgroundColor: _markTerminated ? _kRed : _kPurple,
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -2830,11 +3205,17 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
           child:
           CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
         )
-            : Icon(_isEditMode ? Icons.save_rounded : Icons.save_rounded, size: 18),
+            : Icon(
+            _markTerminated
+                ? Icons.person_off_rounded
+                : (_isEditMode ? Icons.save_rounded : Icons.save_rounded),
+            size: 18),
         label: Text(
           _isSaving
               ? (_isEditMode ? 'Updating…' : 'Generating…')
-              : (_isEditMode ? 'Update Salary' : 'Generate Salary'),
+              : (_markTerminated
+              ? (_isEditMode ? 'Update Final Salary' : 'Generate Final Salary')
+              : (_isEditMode ? 'Update Salary' : 'Generate Salary')),
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
       ),
@@ -2935,6 +3316,16 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
             _employeeSearchField(),
             _selectedEmployeeCard(),
           ]),
+
+          // ★ NEW — Termination section, shown once an employee is
+          // selected (or always in edit mode). Placed right after employee
+          // selection since it's a property of the employee, not the pay
+          // calculation itself.
+          if (_selectedEmployee != null) ...[
+            _sectionCard('Employment Status', Icons.badge_outlined, [
+              _terminationToggleCard(),
+            ]),
+          ],
 
           _sectionCard('Salary Month', Icons.calendar_month_outlined, [
             _monthYearChip(),
