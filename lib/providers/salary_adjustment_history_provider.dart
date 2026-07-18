@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/salary_adjustment_history.dart';
 import '../models/teacher.dart';
-import '../services/salary_history_firestore_service.dart';
+import '../services/salary_adjustment_history_service.dart';
 import '../services/firestore_service.dart';
 
 /// Groups all salary_history records for one employee, together with
