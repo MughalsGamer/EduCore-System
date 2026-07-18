@@ -177,7 +177,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (_) => const DeactivatedStaffScreen(initialTypeFilter: 'staff')),
+          builder: (_) => const TerminatedStaffScreen(initialTypeFilter: 'staff')),
     );
   }
 

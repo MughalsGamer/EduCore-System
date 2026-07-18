@@ -24,7 +24,10 @@
 //   List<String> subjects;                // ★ existing
 //   final String? designation;
 //   final String? joiningDate;            // format "yyyy-MM-dd"
-//   bool isActive;                        // ★ NEW – false = deactivated
+//   bool isActive;                        // false = deactivated
+//   bool isTerminated;                    // ★ NEW – true = terminated from school
+//   String? terminationDate;              // ★ NEW – format "yyyy-MM-dd", set when terminated
+//   String? terminationNote;              // ★ NEW – optional reason/remark
 //
 //   StaffMember({
 //     this.id,
@@ -51,7 +54,10 @@
 //     this.subjects = const [],
 //     this.designation,
 //     this.joiningDate,
-//     this.isActive = true,               // ★ NEW default: active
+//     this.isActive = true,
+//     this.isTerminated = false,          // ★ NEW default: not terminated
+//     this.terminationDate,
+//     this.terminationNote,
 //   });
 //
 //   Map<String, dynamic> toMap() {
@@ -79,7 +85,10 @@
 //       'subjects': subjects,
 //       'designation': designation,
 //       'joiningDate': joiningDate,
-//       'isActive': isActive,             // ★ NEW
+//       'isActive': isActive,
+//       'isTerminated': isTerminated,     // ★ NEW
+//       'terminationDate': terminationDate, // ★ NEW
+//       'terminationNote': terminationNote, // ★ NEW
 //     };
 //   }
 //
@@ -109,12 +118,42 @@
 //       subjects: List<String>.from(map['subjects'] ?? []),
 //       designation: map['designation'] as String?,
 //       joiningDate: map['joiningDate'] as String?,
-//       // ★ NEW – default true so existing old records (without this field) stay Active
+//       // default true so existing old records (without this field) stay Active
 //       isActive: map['isActive'] ?? true,
+//       // ★ NEW – default false so existing old records stay non-terminated
+//       isTerminated: map['isTerminated'] ?? false,
+//       terminationDate: map['terminationDate'] as String?,
+//       terminationNote: map['terminationNote'] as String?,
 //     );
 //   }
 // }
 
+//2nd code
+/// A single entry in a staff member's employment history —
+/// e.g. Joined / Terminated / Rejoined — with the date and an optional note.
+class StatusEvent {
+  final String type;   // 'joined' | 'terminated' | 'rejoined'
+  final String date;   // format "yyyy-MM-dd"
+  final String? note;
+
+  StatusEvent({
+    required this.type,
+    required this.date,
+    this.note,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'type': type,
+    'date': date,
+    'note': note,
+  };
+
+  factory StatusEvent.fromMap(Map<String, dynamic> map) => StatusEvent(
+    type: map['type'] ?? '',
+    date: map['date'] ?? '',
+    note: map['note'] as String?,
+  );
+}
 
 class StaffMember {
   String? id;
@@ -142,9 +181,10 @@ class StaffMember {
   final String? designation;
   final String? joiningDate;            // format "yyyy-MM-dd"
   bool isActive;                        // false = deactivated
-  bool isTerminated;                    // ★ NEW – true = terminated from school
-  String? terminationDate;              // ★ NEW – format "yyyy-MM-dd", set when terminated
-  String? terminationNote;              // ★ NEW – optional reason/remark
+  bool isTerminated;                    // ★ true = terminated from school
+  String? terminationDate;              // ★ format "yyyy-MM-dd", set when terminated (most recent)
+  String? terminationNote;              // ★ optional reason/remark (most recent)
+  List<StatusEvent> statusHistory;      // ★ NEW – full employment history log
 
   StaffMember({
     this.id,
@@ -172,10 +212,11 @@ class StaffMember {
     this.designation,
     this.joiningDate,
     this.isActive = true,
-    this.isTerminated = false,          // ★ NEW default: not terminated
+    this.isTerminated = false,
     this.terminationDate,
     this.terminationNote,
-  });
+    List<StatusEvent>? statusHistory,
+  }) : statusHistory = statusHistory ?? [];
 
   Map<String, dynamic> toMap() {
     return {
@@ -203,9 +244,10 @@ class StaffMember {
       'designation': designation,
       'joiningDate': joiningDate,
       'isActive': isActive,
-      'isTerminated': isTerminated,     // ★ NEW
-      'terminationDate': terminationDate, // ★ NEW
-      'terminationNote': terminationNote, // ★ NEW
+      'isTerminated': isTerminated,
+      'terminationDate': terminationDate,
+      'terminationNote': terminationNote,
+      'statusHistory': statusHistory.map((e) => e.toMap()).toList(), // ★ NEW
     };
   }
 
@@ -237,10 +279,14 @@ class StaffMember {
       joiningDate: map['joiningDate'] as String?,
       // default true so existing old records (without this field) stay Active
       isActive: map['isActive'] ?? true,
-      // ★ NEW – default false so existing old records stay non-terminated
+      // default false so existing old records stay non-terminated
       isTerminated: map['isTerminated'] ?? false,
       terminationDate: map['terminationDate'] as String?,
       terminationNote: map['terminationNote'] as String?,
+      // ★ NEW – parse history log; defaults to empty list for old records
+      statusHistory: (map['statusHistory'] as List<dynamic>? ?? [])
+          .map((e) => StatusEvent.fromMap(Map<String, dynamic>.from(e)))
+          .toList(),
     );
   }
 }
