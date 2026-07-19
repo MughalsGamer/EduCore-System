@@ -870,12 +870,14 @@ class SalaryProvider extends ChangeNotifier {
   //  since it gets cleared anyway).
   // ────────────────────────────────────────────────────────────
 
+  // In SalaryProvider, update the _markEmployeeTerminated method:
+
   Future<void> _markEmployeeTerminated(
       String employeeId,
       bool terminated, {
         int? year,
         int? month,
-        DateTime? generatedDate,  // ★ NEW - pass the salary generation date
+        DateTime? generatedDate,
       }) async {
     try {
       final teachers = await _staffService.getTeachers();
@@ -891,25 +893,63 @@ class SalaryProvider extends ChangeNotifier {
       }
       if (member == null) return;
 
-      member.isTerminated = terminated;
+      final String dateStr = generatedDate != null
+          ? _fmt(generatedDate)
+          : DateTime.now().toIso8601String().split('T').first;
+
       if (terminated) {
-        // ★ FIX 2: Use generatedDate if provided, otherwise fallback to now
-        final DateTime effectiveDate = generatedDate ?? DateTime.now();
-        member.terminationDate = _fmt(effectiveDate);
+        // ★ FIX: Add termination event to history
+        // Backfill 'joined' if history is empty
+        if (member.statusHistory.isEmpty) {
+          member.statusHistory.add(
+            StatusEvent(
+              type: 'joined',
+              date: (member.joiningDate != null && member.joiningDate!.isNotEmpty)
+                  ? member.joiningDate!
+                  : dateStr,
+            ),
+          );
+        }
+
+        member.isTerminated = true;
+        member.isActive = false;
+        member.terminationDate = dateStr;
+
+        // Remove any existing 'terminated' event with same date to avoid duplicates
+        member.statusHistory.removeWhere((e) =>
+        e.type == 'terminated' && e.date == dateStr
+        );
+        member.statusHistory.add(
+          StatusEvent(type: 'terminated', date: dateStr, note: 'Terminated via salary generation'),
+        );
       } else {
+        // ★ FIX: When reinstating, add 'rejoined' event
+        member.isTerminated = false;
+        member.isActive = true;
         member.terminationDate = null;
         member.terminationNote = null;
+
+        // Remove any existing 'rejoined' event with same date to avoid duplicates
+        member.statusHistory.removeWhere((e) =>
+        e.type == 'rejoined' && e.date == dateStr
+        );
+        member.statusHistory.add(
+          StatusEvent(type: 'rejoined', date: dateStr, note: 'Reinstated from salary record deletion'),
+        );
       }
+
       await _staffService.updateStaff(employeeId, member);
     } catch (e) {
       debugPrint('Error syncing employee termination status: $e');
     }
   }
+
   // Future<void> _markEmployeeTerminated(
   //     String employeeId,
   //     bool terminated, {
   //       int? year,
   //       int? month,
+  //       DateTime? generatedDate,  // ★ NEW - pass the salary generation date
   //     }) async
   // {
   //   try {
@@ -928,9 +968,8 @@ class SalaryProvider extends ChangeNotifier {
   //
   //     member.isTerminated = terminated;
   //     if (terminated) {
-  //       final DateTime effectiveDate = (year != null && month != null)
-  //           ? DateTime(year, month + 1, 0) // last calendar day of that month
-  //           : DateTime.now();
+  //       // ★ FIX 2: Use generatedDate if provided, otherwise fallback to now
+  //       final DateTime effectiveDate = generatedDate ?? DateTime.now();
   //       member.terminationDate = _fmt(effectiveDate);
   //     } else {
   //       member.terminationDate = null;
@@ -942,9 +981,6 @@ class SalaryProvider extends ChangeNotifier {
   //   }
   // }
 
-  // ────────────────────────────────────────────────────────────
-  //  Helper
-  // ────────────────────────────────────────────────────────────
   String _fmt(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 }
