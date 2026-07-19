@@ -1,4 +1,5 @@
 //
+// //2nd code
 // import 'package:flutter/material.dart';
 // import 'package:intl/intl.dart';
 // import 'package:provider/provider.dart';
@@ -81,9 +82,18 @@
 //
 //   // ★ NEW — termination toggle state for this salary generation.
 //   bool _markTerminated = false;
+//
+//   // ★ NEW — ledger/transaction deduction (optional)
 //   bool _recordInLedger = true;
 //   double? _currentLedgerBalance;
 //   bool _loadingLedgerBalance = false;
+//
+//   // ★ NEW — user-editable ledger deduction amount. Defaults to net salary,
+//   // but the user can override it to deduct any custom amount (partial,
+//   // full, or even more than the current balance — plain ledger arithmetic,
+//   // no cap: newBalance = currentBalance - deductionAmount).
+//   final _deductionAmountCtrl = TextEditingController();
+//   bool _deductionAmountManuallyEdited = false;
 //
 //   // ───── Duplicate check state (skipped entirely in edit mode) ─────
 //   bool _alreadyGenerated = false;
@@ -128,6 +138,13 @@
 //     _fineCtrl.addListener(_recalculateIfManual);
 //     _bonusCtrl.addListener(_recalculateIfManual);
 //     _manualLeavesCtrl.addListener(_recalculateIfManual);
+//
+//     // ★ NEW — once the user types in the deduction field themselves, stop
+//     // auto-overwriting it whenever net salary is recalculated.
+//     _deductionAmountCtrl.addListener(() {
+//       if (!_deductionAmountManuallyEdited) return;
+//       setState(() {}); // refresh "balance after deduction" preview
+//     });
 //   }
 //
 //   @override
@@ -138,6 +155,7 @@
 //     _manualLeavesCtrl.dispose();
 //     _searchCtrl.dispose();
 //     _searchFocus.dispose();
+//     _deductionAmountCtrl.dispose(); // ★ NEW
 //     super.dispose();
 //   }
 //
@@ -197,7 +215,6 @@
 //     });
 //
 //     // Populate the read-only calc summary from the existing record
-//     // Populate the read-only calc summary from the existing record
 //     setState(() {
 //       _calcResult = {
 //         'baseSalary': rec.baseSalary,
@@ -233,6 +250,14 @@
 //   double get _fine => double.tryParse(_fineCtrl.text.trim()) ?? 0;
 //   double get _bonus => double.tryParse(_bonusCtrl.text.trim()) ?? 0;
 //
+//   // ★ NEW — the amount that will actually be deducted from the ledger.
+//   // Falls back to net salary if the field is empty/invalid.
+//   double get _deductionAmount {
+//     final parsed = double.tryParse(_deductionAmountCtrl.text.trim());
+//     if (parsed != null) return parsed;
+//     return (_calcResult?['netSalary'] as double?) ?? 0;
+//   }
+//
 //   void _switchType(String type) {
 //     if (_isEditMode) return; // locked in edit mode
 //     setState(() {
@@ -242,9 +267,9 @@
 //       _calcResult = null;
 //       _markTerminated = false; // ★ NEW — reset on employee-type switch
 //       _resetDuplicateState();
+//       _resetDeductionAmount(); // ★ NEW
 //     });
 //   }
-//
 //
 //   void _pickEmployee(StaffMember member) {
 //     if (_isEditMode) return; // locked in edit mode
@@ -254,10 +279,27 @@
 //       _showSuggestions = false;
 //       _markTerminated = false; // ★ NEW — reset per new selection
 //       _currentLedgerBalance = null;
+//       _resetDeductionAmount(); // ★ NEW
 //     });
 //     _searchFocus.unfocus();
 //     _checkDuplicate(); // checks after employee & month are both set
 //     _fetchLedgerBalance(); // ★ NEW
+//   }
+//
+//   // ★ NEW — reset the deduction field back to "auto = net salary" mode.
+//   void _resetDeductionAmount() {
+//     _deductionAmountManuallyEdited = false;
+//     _deductionAmountCtrl.text = '';
+//   }
+//
+//   // ★ NEW — keep the deduction field synced to net salary UNTIL the user
+//   // manually edits it. Call this any time _calcResult changes.
+//   void _syncDeductionAmountWithNetSalary() {
+//     if (_deductionAmountManuallyEdited) return;
+//     final net = (_calcResult?['netSalary'] as double?) ?? 0;
+//     _deductionAmountCtrl.text = net > 0
+//         ? (net == net.roundToDouble() ? net.toStringAsFixed(0) : net.toStringAsFixed(2))
+//         : '';
 //   }
 //
 //   // ★ NEW — fetch current ledger balance for the selected employee
@@ -266,7 +308,8 @@
 //     setState(() => _loadingLedgerBalance = true);
 //     try {
 //       final txnProvider = context.read<StaffTransactionProvider>();
-//       final balance = await txnProvider.getEmployeeBalance(_selectedEmployee!.id!);
+//       final balance =
+//       await txnProvider.getEmployeeBalance(_selectedEmployee!.id!);
 //       if (mounted) setState(() => _currentLedgerBalance = balance);
 //     } catch (e) {
 //       debugPrint('Error fetching ledger balance: $e');
@@ -274,17 +317,6 @@
 //       if (mounted) setState(() => _loadingLedgerBalance = false);
 //     }
 //   }
-//   // void _pickEmployee(StaffMember member) {
-//   //   if (_isEditMode) return; // locked in edit mode
-//   //   setState(() {
-//   //     _selectedEmployee = member;
-//   //     _searchCtrl.text = member.name;
-//   //     _showSuggestions = false;
-//   //     _markTerminated = false; // ★ NEW — reset per new selection
-//   //   });
-//   //   _searchFocus.unfocus();
-//   //   _checkDuplicate(); // checks after employee & month are both set
-//   // }
 //
 //   void _switchMode(String mode) {
 //     setState(() {
@@ -379,7 +411,10 @@
 //         fine: _fine,
 //         bonus: _bonus,
 //       );
-//       if (mounted) setState(() => _calcResult = result);
+//       if (mounted) {
+//         setState(() => _calcResult = result);
+//         _syncDeductionAmountWithNetSalary(); // ★ NEW
+//       }
 //     } catch (e) {
 //       if (mounted) {
 //         ScaffoldMessenger.of(context).showSnackBar(
@@ -401,6 +436,7 @@
 //       bonus: _bonus,
 //     );
 //     setState(() => _calcResult = result);
+//     _syncDeductionAmountWithNetSalary(); // ★ NEW
 //   }
 //
 //   void _recalculateIfManual() {
@@ -419,6 +455,7 @@
 //           'netSalary': base - absentDeduction - _fine + _bonus,
 //         };
 //       });
+//       _syncDeductionAmountWithNetSalary(); // ★ NEW
 //     }
 //   }
 //
@@ -566,12 +603,15 @@
 //         generatedDate: generatedDate, // ★ NEW - set to current date
 //       );
 //
-//       // await provider.saveSalary(record);
+//       // ★ MODIFIED — pass the transaction provider + optional toggle +
+//       // the user-editable custom deduction amount (defaults to net salary,
+//       // but can be partial/full/more — plain ledger arithmetic, no cap).
 //       final txnProvider = context.read<StaffTransactionProvider>();
 //       await provider.saveSalary(
 //         record,
 //         transactionProvider: txnProvider,
 //         recordInLedger: _recordInLedger, // ★ optional toggle se control hota hai
+//         ledgerDeductionAmount: _recordInLedger ? _deductionAmount : null, // ★ NEW
 //       );
 //
 //       if (mounted) {
@@ -687,21 +727,9 @@
 //       _recordInLedger = true; // ★ NEW
 //       _currentLedgerBalance = null; // ★ NEW
 //       _resetDuplicateState();
+//       _resetDeductionAmount(); // ★ NEW
 //     });
 //   }
-//   // void _resetForm() {
-//   //   setState(() {
-//   //     _selectedEmployee = null;
-//   //     _searchCtrl.clear();
-//   //     _fineCtrl.clear();
-//   //     _bonusCtrl.clear();
-//   //     _noteCtrl.clear();
-//   //     _manualLeavesCtrl.text = '0';
-//   //     _calcResult = null;
-//   //     _markTerminated = false; // ★ NEW
-//   //     _resetDuplicateState();
-//   //   });
-//   // }
 //
 //   String get _initials {
 //     final name = _selectedEmployee?.name.trim() ?? '';
@@ -1110,6 +1138,201 @@
 //             ],
 //           ),
 //         ),
+//       ),
+//     );
+//   }
+//
+//   // ★ UPDATED — Ledger balance preview + optional deduction toggle +
+//   // EDITABLE deduction amount field. Shown once an employee is selected.
+//   // Lets the user see how much the employee currently owes (or is owed),
+//   // choose whether generating this salary should record a ledger credit
+//   // entry, and — if so — how much exactly to deduct (defaults to net
+//   // salary, fully editable, no cap: newBalance = currentBalance - amount).
+//   Widget _ledgerDeductionCard() {
+//     if (_selectedEmployee == null) return const SizedBox.shrink();
+//
+//     final netSalary = (_calcResult?['netSalary'] as double?) ?? 0;
+//     final currentBalance = _currentLedgerBalance ?? 0;
+//     final deductionAmount = _deductionAmount;
+//     // Projected balance if this deduction amount is recorded as a credit
+//     final projectedBalance =
+//     _recordInLedger ? (currentBalance - deductionAmount) : currentBalance;
+//
+//     return Container(
+//       padding: const EdgeInsets.all(14),
+//       decoration: BoxDecoration(
+//         color: _kSurface,
+//         borderRadius: BorderRadius.circular(12),
+//         border: Border.all(color: _kBorder),
+//       ),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           // Current balance row
+//           Row(
+//             children: [
+//               const Icon(Icons.account_balance_wallet_outlined,
+//                   size: 16, color: _kPurple),
+//               const SizedBox(width: 8),
+//               const Text('Current Ledger Balance',
+//                   style: TextStyle(
+//                       fontSize: 12.5,
+//                       fontWeight: FontWeight.w700,
+//                       color: _kInk)),
+//               const Spacer(),
+//               if (_loadingLedgerBalance)
+//                 const SizedBox(
+//                   width: 14,
+//                   height: 14,
+//                   child: CircularProgressIndicator(strokeWidth: 2),
+//                 )
+//               else
+//                 Text(
+//                   'Rs ${NumberFormat('#,##0').format(currentBalance.abs())}'
+//                       '${currentBalance == 0 ? '' : (currentBalance > 0 ? ' (owes)' : ' (owed)')}',
+//                   style: TextStyle(
+//                     fontSize: 13,
+//                     fontWeight: FontWeight.w800,
+//                     color: currentBalance > 0
+//                         ? _kRed
+//                         : (currentBalance < 0 ? _kGreen : _kSlate),
+//                   ),
+//                 ),
+//             ],
+//           ),
+//           const SizedBox(height: 10),
+//           Container(height: 1, color: _kBorder),
+//           const SizedBox(height: 10),
+//
+//           // Toggle
+//           Row(
+//             children: [
+//               Expanded(
+//                 child: Column(
+//                   crossAxisAlignment: CrossAxisAlignment.start,
+//                   children: [
+//                     Text(
+//                       'Deduct from Ledger',
+//                       style: TextStyle(
+//                         fontSize: 13,
+//                         fontWeight: FontWeight.w700,
+//                         color: _recordInLedger ? _kPurple : _kInk,
+//                       ),
+//                     ),
+//                     const SizedBox(height: 2),
+//                     Text(
+//                       'Records this salary as a credit entry in the employee ledger, reducing what they owe.',
+//                       style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//               Switch(
+//                 value: _recordInLedger,
+//                 activeColor: _kPurple,
+//                 onChanged: (v) => setState(() => _recordInLedger = v),
+//               ),
+//             ],
+//           ),
+//
+//           // ★ NEW — editable deduction amount, only shown when the toggle is on.
+//           if (_recordInLedger) ...[
+//             const SizedBox(height: 12),
+//             TextFormField(
+//               controller: _deductionAmountCtrl,
+//               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+//               onChanged: (_) => setState(() => _deductionAmountManuallyEdited = true),
+//               decoration: InputDecoration(
+//                 labelText: 'Deduction Amount',
+//                 helperText: netSalary > 0
+//                     ? 'Defaults to net salary (Rs ${NumberFormat('#,##0').format(netSalary)}) — edit to deduct a custom amount'
+//                     : 'Enter the amount to deduct from the ledger',
+//                 helperMaxLines: 2,
+//                 labelStyle: const TextStyle(fontSize: 13),
+//                 helperStyle: TextStyle(fontSize: 10.5, color: Colors.grey.shade500),
+//                 prefixText: 'Rs  ',
+//                 prefixIcon: const Icon(Icons.trending_down_rounded, size: 18, color: _kPurple),
+//                 suffixIcon: _deductionAmountManuallyEdited
+//                     ? IconButton(
+//                   tooltip: 'Reset to net salary',
+//                   icon: const Icon(Icons.refresh_rounded, size: 18, color: _kSlate),
+//                   onPressed: () {
+//                     setState(() {
+//                       _deductionAmountManuallyEdited = false;
+//                       _syncDeductionAmountWithNetSalary();
+//                     });
+//                   },
+//                 )
+//                     : null,
+//                 border: OutlineInputBorder(
+//                   borderRadius: BorderRadius.circular(10),
+//                   borderSide: BorderSide(color: Colors.grey.shade300),
+//                 ),
+//                 enabledBorder: OutlineInputBorder(
+//                   borderRadius: BorderRadius.circular(10),
+//                   borderSide: BorderSide(color: Colors.grey.shade300),
+//                 ),
+//                 focusedBorder: OutlineInputBorder(
+//                   borderRadius: BorderRadius.circular(10),
+//                   borderSide: const BorderSide(color: _kPurple, width: 1.5),
+//                 ),
+//                 contentPadding:
+//                 const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+//               ),
+//             ),
+//           ],
+//
+//           if (_recordInLedger && deductionAmount != 0) ...[
+//             const SizedBox(height: 10),
+//             Container(
+//               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+//               decoration: BoxDecoration(
+//                 color: _kPurpleLight,
+//                 borderRadius: BorderRadius.circular(8),
+//               ),
+//               child: Row(
+//                 children: [
+//                   const Icon(Icons.trending_down_rounded, size: 14, color: _kPurple),
+//                   const SizedBox(width: 6),
+//                   Expanded(
+//                     child: Text(
+//                       'Balance after this deduction: Rs ${NumberFormat('#,##0').format(projectedBalance.abs())}'
+//                           '${projectedBalance == 0 ? '' : (projectedBalance > 0 ? ' (owes)' : ' (owed)')}',
+//                       style: const TextStyle(
+//                           fontSize: 11.5,
+//                           fontWeight: FontWeight.w600,
+//                           color: _kPurpleDark),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//             if (deductionAmount != netSalary && netSalary > 0) ...[
+//               const SizedBox(height: 6),
+//               Container(
+//                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+//                 decoration: BoxDecoration(
+//                   color: _kOrangeBg,
+//                   borderRadius: BorderRadius.circular(8),
+//                 ),
+//                 child: Row(
+//                   children: [
+//                     const Icon(Icons.info_outline_rounded, size: 14, color: _kOrange),
+//                     const SizedBox(width: 6),
+//                     Expanded(
+//                       child: Text(
+//                         deductionAmount < netSalary
+//                             ? 'Deducting less than net salary — the remaining Rs ${NumberFormat('#,##0').format(netSalary - deductionAmount)} stays in the ledger balance (not carried as a separate pending item; it simply reflects in the balance above).'
+//                             : 'Deducting more than net salary — the extra Rs ${NumberFormat('#,##0').format(deductionAmount - netSalary)} will push the balance further (can go negative, meaning the school owes the employee).',
+//                         style: const TextStyle(fontSize: 10.5, color: _kOrange, height: 1.3),
+//                       ),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//             ],
+//           ],
+//         ],
 //       ),
 //     );
 //   }
@@ -1653,7 +1876,6 @@
 //             if (_mode == 'attendance') _attendanceSummary(),
 //           ]),
 //
-//
 //           // Adjustments + preview: shown in edit mode always, and in
 //           // new-record mode only when not already generated.
 //           if (_isEditMode || !_alreadyGenerated) ...[
@@ -1663,7 +1885,7 @@
 //               _noteField(),
 //             ]),
 //
-//             // ★ NEW — Ledger / transaction deduction (optional)
+//             // ★ NEW — Ledger / transaction deduction (optional, editable amount)
 //             if (_selectedEmployee != null)
 //               _sectionCard(
 //                 'Ledger & Transactions',
@@ -1676,18 +1898,6 @@
 //               const SizedBox(height: 20),
 //             ],
 //           ],
-//           // if (_isEditMode || !_alreadyGenerated) ...[
-//           //   _sectionCard('Adjustments', Icons.tune_rounded, [
-//           //     _fineAndBonusFields(),
-//           //     const SizedBox(height: 14),
-//           //     _noteField(),
-//           //   ]),
-//           //
-//           //   if (_calcResult != null) ...[
-//           //     _netSalaryPreview(),
-//           //     const SizedBox(height: 20),
-//           //   ],
-//           // ],
 //
 //           _saveButton(width: double.infinity),
 //           const SizedBox(height: 20),
@@ -2085,9 +2295,16 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   bool _markTerminated = false;
 
   // ★ NEW — ledger/transaction deduction (optional)
-  bool _recordInLedger = true;
+  bool _recordInLedger = false;
   double? _currentLedgerBalance;
   bool _loadingLedgerBalance = false;
+
+  // ★ NEW — user-editable balance deduction amount. Off & 0 by default;
+  // the user turns "Deduct from Balance" on and types any custom amount.
+  // This amount is subtracted live from Net Salary (can push it negative)
+  // and, on save, from the employee's balance — plain arithmetic, no cap:
+  // newBalance = currentBalance - deductionAmount.
+  final _deductionAmountCtrl = TextEditingController();
 
   // ───── Duplicate check state (skipped entirely in edit mode) ─────
   bool _alreadyGenerated = false;
@@ -2132,6 +2349,12 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     _fineCtrl.addListener(_recalculateIfManual);
     _bonusCtrl.addListener(_recalculateIfManual);
     _manualLeavesCtrl.addListener(_recalculateIfManual);
+
+    // ★ NEW — any time the deduction amount changes, live-refresh the
+    // Net Salary preview and the "balance after deduction" preview.
+    _deductionAmountCtrl.addListener(() {
+      setState(() {});
+    });
   }
 
   @override
@@ -2142,6 +2365,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     _manualLeavesCtrl.dispose();
     _searchCtrl.dispose();
     _searchFocus.dispose();
+    _deductionAmountCtrl.dispose(); // ★ NEW
     super.dispose();
   }
 
@@ -2236,6 +2460,21 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   double get _fine => double.tryParse(_fineCtrl.text.trim()) ?? 0;
   double get _bonus => double.tryParse(_bonusCtrl.text.trim()) ?? 0;
 
+  // ★ NEW — the amount that will actually be deducted from the balance.
+  // Defaults to 0 when off/empty — the user must explicitly type an amount.
+  double get _deductionAmount {
+    if (!_recordInLedger) return 0;
+    return double.tryParse(_deductionAmountCtrl.text.trim()) ?? 0;
+  }
+
+  // ★ NEW — Net Salary recalculated live to include the balance deduction,
+  // so the figure the user sees always reflects what's actually payable.
+  // Can go negative if the deduction exceeds the calculated net salary.
+  double get _payableNetSalary {
+    final calculatedNet = (_calcResult?['netSalary'] as double?) ?? 0;
+    return calculatedNet - _deductionAmount;
+  }
+
   void _switchType(String type) {
     if (_isEditMode) return; // locked in edit mode
     setState(() {
@@ -2245,6 +2484,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       _calcResult = null;
       _markTerminated = false; // ★ NEW — reset on employee-type switch
       _resetDuplicateState();
+      _resetDeductionAmount(); // ★ NEW
     });
   }
 
@@ -2256,10 +2496,17 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       _showSuggestions = false;
       _markTerminated = false; // ★ NEW — reset per new selection
       _currentLedgerBalance = null;
+      _resetDeductionAmount(); // ★ NEW
     });
     _searchFocus.unfocus();
     _checkDuplicate(); // checks after employee & month are both set
     _fetchLedgerBalance(); // ★ NEW
+  }
+
+  // ★ NEW — reset the deduction field & toggle back to off/0.
+  void _resetDeductionAmount() {
+    _recordInLedger = false;
+    _deductionAmountCtrl.text = '';
   }
 
   // ★ NEW — fetch current ledger balance for the selected employee
@@ -2371,7 +2618,9 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
         fine: _fine,
         bonus: _bonus,
       );
-      if (mounted) setState(() => _calcResult = result);
+      if (mounted) {
+        setState(() => _calcResult = result);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2558,12 +2807,16 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
         generatedDate: generatedDate, // ★ NEW - set to current date
       );
 
-      // ★ MODIFIED — pass the transaction provider + optional toggle
+      // ★ MODIFIED — pass the transaction provider + optional toggle +
+      // the user-editable custom deduction amount (off & 0 by default;
+      // user must explicitly enable and type an amount — plain ledger
+      // arithmetic, no cap: newBalance = currentBalance - deductionAmount).
       final txnProvider = context.read<StaffTransactionProvider>();
       await provider.saveSalary(
         record,
         transactionProvider: txnProvider,
         recordInLedger: _recordInLedger, // ★ optional toggle se control hota hai
+        ledgerDeductionAmount: _recordInLedger ? _deductionAmount : null, // ★ NEW
       );
 
       if (mounted) {
@@ -2676,9 +2929,9 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       _manualLeavesCtrl.text = '0';
       _calcResult = null;
       _markTerminated = false; // ★ NEW
-      _recordInLedger = true; // ★ NEW
       _currentLedgerBalance = null; // ★ NEW
       _resetDuplicateState();
+      _resetDeductionAmount(); // ★ resets _recordInLedger to false and clears amount
     });
   }
 
@@ -3093,19 +3346,20 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     );
   }
 
-  // ★ NEW — Ledger balance preview + optional deduction toggle card.
-  // Shown once an employee is selected. Lets the user see how much the
-  // employee currently owes (or is owed), and choose whether generating
-  // this salary should also record a credit (deduction) entry in their
-  // transaction ledger.
+  // ★ UPDATED — Balance preview + optional deduction toggle + EDITABLE
+  // deduction amount field. Off & 0 by default. Once turned on, the user
+  // types any custom amount, which is live-subtracted from Net Salary
+  // (shown lower in the breakdown card) and, on save, from the employee's
+  // balance — plain arithmetic, no cap: newBalance = currentBalance - amount,
+  // and Net Salary itself can go negative if the deduction is large enough.
   Widget _ledgerDeductionCard() {
     if (_selectedEmployee == null) return const SizedBox.shrink();
 
-    final netSalary = (_calcResult?['netSalary'] as double?) ?? 0;
     final currentBalance = _currentLedgerBalance ?? 0;
-    // Projected balance if this salary's net amount is recorded as a credit
+    final deductionAmount = _deductionAmount;
+    // Projected balance if this deduction amount is recorded as a credit
     final projectedBalance =
-    _recordInLedger ? (currentBalance - netSalary) : currentBalance;
+    _recordInLedger ? (currentBalance - deductionAmount) : currentBalance;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -3123,7 +3377,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
               const Icon(Icons.account_balance_wallet_outlined,
                   size: 16, color: _kPurple),
               const SizedBox(width: 8),
-              const Text('Current Ledger Balance',
+              const Text('Current Balance',
                   style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
@@ -3153,7 +3407,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
           Container(height: 1, color: _kBorder),
           const SizedBox(height: 10),
 
-          // Toggle
+          // Toggle — OFF by default
           Row(
             children: [
               Expanded(
@@ -3161,7 +3415,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Deduct from Ledger',
+                      'Deduct from Balance',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -3170,7 +3424,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Records this salary as a credit entry in the employee ledger, reducing what they owe.',
+                      'Turn on to deduct an amount from this salary and reduce what the employee owes.',
                       style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                     ),
                   ],
@@ -3179,13 +3433,56 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
               Switch(
                 value: _recordInLedger,
                 activeColor: _kPurple,
-                onChanged: (v) => setState(() => _recordInLedger = v),
+                onChanged: (v) {
+                  setState(() {
+                    _recordInLedger = v;
+                    // Reset amount to 0 whenever toggled, so it never
+                    // silently carries a leftover value from before.
+                    if (!v) _deductionAmountCtrl.text = '';
+                  });
+                },
               ),
             ],
           ),
 
-          if (_recordInLedger && netSalary > 0) ...[
-            const SizedBox(height: 8),
+          // ★ Editable deduction amount, only shown when the toggle is on.
+          // Starts blank (0) — user must type the amount themselves.
+          if (_recordInLedger) ...[
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _deductionAmountCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'Deduction Amount',
+                hintText: '0',
+                helperText: 'This amount is subtracted from Net Salary and from the balance.',
+                helperMaxLines: 2,
+                labelStyle: const TextStyle(fontSize: 13),
+                helperStyle: TextStyle(fontSize: 10.5, color: Colors.grey.shade500),
+                prefixText: 'Rs  ',
+                prefixIcon: const Icon(Icons.trending_down_rounded, size: 18, color: _kPurple),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: _kPurple, width: 1.5),
+                ),
+                contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+            ),
+          ],
+
+          if (_recordInLedger && deductionAmount != 0) ...[
+            const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
@@ -3198,7 +3495,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Balance after this salary: Rs ${NumberFormat('#,##0').format(projectedBalance.abs())}'
+                      'Balance after this deduction: Rs ${NumberFormat('#,##0').format(projectedBalance.abs())}'
                           '${projectedBalance == 0 ? '' : (projectedBalance > 0 ? ' (owes)' : ' (owed)')}',
                       style: const TextStyle(
                           fontSize: 11.5,
@@ -3209,6 +3506,29 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
                 ],
               ),
             ),
+            if (_payableNetSalary < 0) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _kRedBg,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, size: 14, color: _kRed),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'This deduction exceeds the net salary — Net Salary will show as negative '
+                            '(Rs ${NumberFormat('#,##0').format(_payableNetSalary.abs())} owed back), meaning the school owes the employee.',
+                        style: const TextStyle(fontSize: 10.5, color: _kRed, height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ],
       ),
@@ -3502,7 +3822,13 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     final deduction = _calcResult!['absentDeduction'] as double;
     final fine = _calcResult!['fine'] as double;
     final bonus = _calcResult!['bonus'] as double;
-    final net = _calcResult!['netSalary'] as double;
+    // ★ FIXED — the bottom total must be the fully payable amount, i.e.
+    // net salary MINUS the balance deduction. Previously this line still
+    // showed the raw calculated net salary even though a "Balance
+    // Deduction" row was displayed above it, so the two didn't add up.
+    final showBalanceDeduction = _recordInLedger && _selectedEmployee != null;
+    final balanceDeductionAmount = _deductionAmount;
+    final payableNet = _payableNetSalary;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -3519,7 +3845,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
         children: [
           Row(
             children: [
-              Text(_markTerminated ? 'Final Net Salary' : 'Net Salary',
+              Text('Salary Breakdown',
                   style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 12,
@@ -3542,19 +3868,42 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
               ],
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Rs ${NumberFormat('#,##0').format(net)}',
-            style: const TextStyle(
-                color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800),
-          ),
           const SizedBox(height: 12),
-          Container(height: 1, color: Colors.white24),
-          const SizedBox(height: 10),
+          // ★ CHANGED — breakdown lines now come first, and the Net Salary
+          // total is shown as the final summary line at the bottom, same
+          // as a normal receipt/statement (Base → deductions/additions →
+          // Total).
           _breakdownRow('Base Salary', base, positive: true),
           _breakdownRow('Absent Deduction', -deduction),
           if (fine > 0) _breakdownRow('Fine', -fine),
           if (bonus > 0) _breakdownRow('Bonus', bonus, positive: true),
+          // ★ NEW — Balance deduction line, shown whenever the toggle is on,
+          // so the user can see this amount is also being subtracted.
+          if (showBalanceDeduction && balanceDeductionAmount != 0)
+            _breakdownRow('Balance Deduction', -balanceDeductionAmount),
+          const SizedBox(height: 10),
+          Container(height: 1, color: Colors.white24),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(_markTerminated ? 'Final Net Salary' : 'Net Salary',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700)),
+              Text(
+                // ★ FIXED — shows a leading "- " when the payable amount is
+                // negative (deduction exceeded net salary), instead of
+                // silently formatting it as a positive number.
+                '${payableNet < 0 ? '- ' : ''}Rs ${NumberFormat('#,##0').format(payableNet.abs())}',
+                style: TextStyle(
+                    color: payableNet < 0 ? const Color(0xFFFFD1D1) : Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -3763,13 +4112,17 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
               _noteField(),
             ]),
 
-            // ★ NEW — Ledger / transaction deduction (optional)
-            if (_selectedEmployee != null)
+            // ★ CHANGED — Balance & Transactions now comes FIRST, so the
+            // user sets the deduction before seeing the final breakdown
+            // total. Salary Breakdown (with the live-updated Net Salary)
+            // comes AFTER it.
+            if (_selectedEmployee != null) ...[
               _sectionCard(
-                'Ledger & Transactions',
+                'Balance & Transactions',
                 Icons.account_balance_wallet_outlined,
                 [_ledgerDeductionCard()],
               ),
+            ],
 
             if (_calcResult != null) ...[
               _netSalaryPreview(),
