@@ -29,6 +29,12 @@
 //   // 'Pending' | 'Paid' | 'Unpaid'
 //   final String status;
 //
+//   // ★ NEW – true when this salary was generated as (or marked as) the
+//   // employee's termination salary. Used to highlight/badge the record in
+//   // the Salary List, and to know that deleting this record should
+//   // automatically reinstate the employee.
+//   final bool isTerminated;
+//
 //   final DateTime? createdAt;
 //   final DateTime? paidAt;   // timestamp when marked as Paid
 //
@@ -52,6 +58,7 @@
 //     this.note,
 //     required this.netSalary,
 //     this.status = 'Pending',
+//     this.isTerminated = false,   // ★ NEW default: not a termination record
 //     this.createdAt,
 //     this.paidAt,
 //   });
@@ -76,6 +83,7 @@
 //       'note': note,
 //       'netSalary': netSalary,
 //       'status': status,
+//       'isTerminated': isTerminated, // ★ NEW
 //       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
 //     };
 //
@@ -114,6 +122,8 @@
 //       note: map['note'] as String?,
 //       netSalary: (map['netSalary'] ?? 0).toDouble(),
 //       status: map['status'] ?? 'Pending',
+//       // ★ NEW – default false so existing old records stay non-terminated
+//       isTerminated: map['isTerminated'] ?? false,
 //       createdAt: map['createdAt'] != null && map['createdAt'] is Timestamp
 //           ? (map['createdAt'] as Timestamp).toDate()
 //           : null,
@@ -159,6 +169,9 @@ class SalaryRecord {
   // automatically reinstate the employee.
   final bool isTerminated;
 
+  // ★ FIX 1: Add generatedDate - the date when salary was generated
+  final DateTime generatedDate;
+
   final DateTime? createdAt;
   final DateTime? paidAt;   // timestamp when marked as Paid
 
@@ -182,10 +195,11 @@ class SalaryRecord {
     this.note,
     required this.netSalary,
     this.status = 'Pending',
-    this.isTerminated = false,   // ★ NEW default: not a termination record
+    this.isTerminated = false,
+    DateTime? generatedDate,  // ★ NEW
     this.createdAt,
     this.paidAt,
-  });
+  }) : generatedDate = generatedDate ?? DateTime.now();  // Auto-set to now if not provided
 
   Map<String, dynamic> toMap() {
     final map = <String, dynamic>{
@@ -207,7 +221,8 @@ class SalaryRecord {
       'note': note,
       'netSalary': netSalary,
       'status': status,
-      'isTerminated': isTerminated, // ★ NEW
+      'isTerminated': isTerminated,
+      'generatedDate': generatedDate.toIso8601String(), // ★ NEW
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
     };
 
@@ -224,6 +239,18 @@ class SalaryRecord {
       if (map['paidAt'] is Timestamp) {
         paid = (map['paidAt'] as Timestamp).toDate();
       }
+    }
+
+    // ★ NEW: Parse generatedDate
+    DateTime generatedDate = DateTime.now();
+    if (map['generatedDate'] != null) {
+      try {
+        if (map['generatedDate'] is String) {
+          generatedDate = DateTime.parse(map['generatedDate']);
+        } else if (map['generatedDate'] is Timestamp) {
+          generatedDate = (map['generatedDate'] as Timestamp).toDate();
+        }
+      } catch (_) {}
     }
 
     return SalaryRecord(
@@ -246,8 +273,8 @@ class SalaryRecord {
       note: map['note'] as String?,
       netSalary: (map['netSalary'] ?? 0).toDouble(),
       status: map['status'] ?? 'Pending',
-      // ★ NEW – default false so existing old records stay non-terminated
       isTerminated: map['isTerminated'] ?? false,
+      generatedDate: generatedDate, // ★ NEW
       createdAt: map['createdAt'] != null && map['createdAt'] is Timestamp
           ? (map['createdAt'] as Timestamp).toDate()
           : null,

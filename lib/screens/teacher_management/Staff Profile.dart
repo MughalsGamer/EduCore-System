@@ -1,7 +1,9 @@
 //
 // import 'dart:convert';
 // import 'package:flutter/material.dart';
+// import 'package:provider/provider.dart';
 // import '../../models/teacher.dart';
+// import '../../providers/teacher_provider.dart';
 //
 // // ─────────────────────────────────────────────────────────────────────────────
 // // Screen wrapper (mobile navigation)
@@ -18,6 +20,16 @@
 //
 //   @override
 //   Widget build(BuildContext context) {
+//     // FIX: always resolve the FRESHEST copy of this member from the
+//     // provider by id, instead of trusting whatever `staff` instance the
+//     // caller happened to pass in. A stale snapshot (captured before the
+//     // provider's notifyListeners() rebuild) was the reason Termination
+//     // events were missing in Employment History even though they existed
+//     // in Firestore. Watching the provider also keeps the profile live.
+//     final freshStaff = staff.id == null
+//         ? staff
+//         : (context.watch<StaffProvider>().getMemberById(staff.id!) ?? staff);
+//
 //     return Scaffold(
 //       backgroundColor: const Color(0xFFF0EFF8),
 //       appBar: AppBar(
@@ -35,7 +47,7 @@
 //       body: SafeArea(
 //         child: Padding(
 //           padding: const EdgeInsets.all(16),
-//           child: StaffProfileView(staff: staff, classIdToName: classIdToName),
+//           child: StaffProfileView(staff: freshStaff, classIdToName: classIdToName),
 //         ),
 //       ),
 //     );
@@ -285,6 +297,7 @@
 //     if (!hasJoined && staff.joiningDate != null && staff.joiningDate!.isNotEmpty) {
 //       events.add(StatusEvent(type: 'joined', date: staff.joiningDate!));
 //     }
+//
 //
 //     if (!hasTerminated &&
 //         staff.terminationDate != null &&
@@ -636,6 +649,16 @@
 //             const SizedBox(height: 8),
 //             _sidebarRow(Icons.calendar_today_outlined,
 //                 'Joined ${_formatDate(staff.joiningDate)}'),
+//           ],
+//           // ★ NEW – show termination date if terminated
+//           if (staff.isTerminated &&
+//               staff.terminationDate != null &&
+//               staff.terminationDate!.isNotEmpty) ...[
+//             const SizedBox(height: 8),
+//             _sidebarRow(
+//               Icons.calendar_today_outlined,
+//               'Terminated ${_formatDate(staff.terminationDate)}',
+//             ),
 //           ],
 //
 //           // ★ Employment History — fills all remaining empty space below the
@@ -1229,26 +1252,36 @@ class StaffProfileView extends StatelessWidget {
   //   • Terminated                → "Joined" ... "Terminated" (most recent)
   //   • Rejoined after terminate  → "Joined" ... "Terminated" ... "Rejoined"
   //
-  // Fix vs. previous version: earlier this only backfilled from
-  // joiningDate/terminationDate when statusHistory was COMPLETELY empty, so
-  // a record that already had a 'joined' entry (but was missing a
-  // 'terminated' entry, e.g. terminated before this feature existed) would
-  // never show its termination date. Now each event type is backfilled
-  // independently based on what's actually missing from the log.
+  // ★ FIX: Now properly shows termination date from staff.terminationDate
+  // even if the statusHistory doesn't contain it (e.g., for old records).
   List<StatusEvent> _buildHistoryEvents() {
     final events = List<StatusEvent>.from(staff.statusHistory);
 
     final hasJoined = events.any((e) => e.type == 'joined');
     final hasTerminated = events.any((e) => e.type == 'terminated');
 
+    // Backfill joining date if missing
     if (!hasJoined && staff.joiningDate != null && staff.joiningDate!.isNotEmpty) {
       events.add(StatusEvent(type: 'joined', date: staff.joiningDate!));
     }
 
-
-    if (!hasTerminated &&
+    // ★ CRITICAL FIX: Backfill termination date if missing but staff is terminated
+    // This ensures termination date shows even for old records that were
+    // terminated before the statusHistory feature existed.
+    if (!hasTerminated && staff.isTerminated) {
+      // Use terminationDate if available, otherwise use a reasonable fallback
+      String dateToUse = staff.terminationDate ?? DateTime.now().toIso8601String().split('T').first;
+      if (dateToUse.isNotEmpty) {
+        events.add(StatusEvent(
+          type: 'terminated',
+          date: dateToUse,
+          note: staff.terminationNote,
+        ));
+      }
+    } else if (!hasTerminated &&
         staff.terminationDate != null &&
         staff.terminationDate!.isNotEmpty) {
+      // Fallback: if terminationDate exists but wasn't in history
       events.add(StatusEvent(
         type: 'terminated',
         date: staff.terminationDate!,
@@ -1264,6 +1297,12 @@ class StaffProfileView extends StatelessWidget {
 
   // ─────────────────────────── Terminated status banner ────────────────────
   Widget _buildTerminatedBanner() {
+    // ★ FIX: Show termination date prominently
+    String terminationDateStr = '—';
+    if (staff.terminationDate != null && staff.terminationDate!.isNotEmpty) {
+      terminationDateStr = _formatDate(staff.terminationDate);
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -1283,14 +1322,14 @@ class StaffProfileView extends StatelessWidget {
                 const Text('Deactivated / Terminated',
                     style: TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w700, color: _red)),
-                if (staff.terminationDate != null)
-                  Text('Since ${_formatDate(staff.terminationDate)}',
-                      style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700)),
+                if (staff.terminationDate != null && staff.terminationDate!.isNotEmpty)
+                  Text('Terminated on: $terminationDateStr',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                 if (staff.terminationNote != null &&
                     staff.terminationNote!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(staff.terminationNote!,
+                    child: Text('Note: ${staff.terminationNote!}',
                         style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600)),
                   ),
               ],
@@ -1597,7 +1636,7 @@ class StaffProfileView extends StatelessWidget {
             _sidebarRow(Icons.calendar_today_outlined,
                 'Joined ${_formatDate(staff.joiningDate)}'),
           ],
-          // ★ NEW – show termination date if terminated
+          // ★ FIX: Show termination date if terminated - using staff.terminationDate
           if (staff.isTerminated &&
               staff.terminationDate != null &&
               staff.terminationDate!.isNotEmpty) ...[

@@ -44,24 +44,7 @@
     CollectionReference get teachersCollection =>
         _db.collection('schools').doc('school1').collection('teachers');
 
-    // Future<List<Teacher>> getTeachers() async {
-    //   final snapshot = await teachersCollection.get();
-    //   return snapshot.docs
-    //       .map((doc) =>
-    //       Teacher.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-    //       .toList();
-    // }
-    //
-    // Future<void> addTeacher(Teacher teacher) =>
-    //     teachersCollection.add(teacher.toMap());
-    //
-    // Future<void> updateTeacher(String id, Teacher teacher) =>
-    //     teachersCollection.doc(id).update(teacher.toMap());
-    //
-    // Future<void> deleteTeacher(String id) =>
-    //     teachersCollection.doc(id).delete();
 
-    // ---------- Classes (SchoolClass) ----------
     CollectionReference get classesCollection =>
         _db.collection('schools').doc('school1').collection('classes');
 
