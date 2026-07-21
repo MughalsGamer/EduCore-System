@@ -68,6 +68,10 @@ class AdmissionProvider extends ChangeNotifier {
     _listen(); // re‑subscribe to the stream, triggers a fresh fetch + notifyListeners()
   }
 
+  // In admission_provider.dart
+  Future<List<FamilyModel>> fetchAllFamilies() =>
+      _familyService.fetchAllFamilies();
+
   // ── ID Generators ──────────────────────────────
   Future<String> generateAdmissionId(AdmissionType type) =>
       _service.generateAdmissionId(type);

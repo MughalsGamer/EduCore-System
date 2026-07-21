@@ -7,9 +7,18 @@ class FamilyFirestoreService {
 
   CollectionReference get _familiesCol =>
       _db.collection('schools').doc('school1').collection('families');
+  // ✅ Add this line
+  CollectionReference get familiesCollection => _familiesCol;
 
   CollectionReference get _countersCol =>
       _db.collection('schools').doc('school1').collection('counters');
+  // In family_firestore_service.dart
+  Future<List<FamilyModel>> fetchAllFamilies() async {
+    final snapshot = await familiesCollection
+        .orderBy('familyName')
+        .get();
+    return snapshot.docs.map((doc) => FamilyModel.fromFirestore(doc)).toList();
+  }
 
   // ─────────────────────────────────────
   //  Auto-generate Family ID (KHA-0001 style)
