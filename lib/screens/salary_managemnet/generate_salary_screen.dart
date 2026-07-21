@@ -244,72 +244,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
 
     _fetchLedgerBalance();
   }
-  // void _hydrateSelectedEmployeeForEdit() {
-  //   final rec = widget.existingRecord;
-  //   if (rec == null) return;
-  //
-  //   final staffProvider = context.read<StaffProvider>();
-  //   // ★ CHANGED – search allStaff too, since a terminated employee is
-  //   // excluded from the regular teachers/staffOnly getters.
-  //   final list = [
-  //     ...staffProvider.teachers,
-  //     ...staffProvider.staffOnly,
-  //     ...staffProvider.deactivatedMembers,
-  //     ...staffProvider.terminatedMembers,
-  //   ];
-  //
-  //   StaffMember? match;
-  //   for (final e in list) {
-  //     if (e.id == rec.employeeId) {
-  //       match = e;
-  //       break;
-  //     }
-  //   }
-  //
-  //   setState(() {
-  //     _selectedEmployee = match ??
-  //         StaffMember(
-  //           id: rec.employeeId,
-  //           name: rec.employeeName,
-  //           salary: rec.baseSalary,
-  //           designation: rec.designation,
-  //           // All other required fields get dummy/placeholder values
-  //           // because they are never used on this screen.
-  //           address: '',
-  //           cnic: '',
-  //           dob: '2000-01-01',
-  //           emergencyPhone: '',
-  //           employmentType: '',
-  //           fatherOrHusbandName: '',
-  //           gender: '',
-  //           maritalStatus: '',
-  //           nationality: '',
-  //           phone: '',
-  //           religion: '',
-  //           type: _employeeType,
-  //         );
-  //     _searchCtrl.text = _selectedEmployee!.name;
-  //   });
-  //
-  //   // Populate the read-only calc summary from the existing record
-  //   setState(() {
-  //     _calcResult = {
-  //       'baseSalary': rec.baseSalary,
-  //       'workingDays': _kFixedMonthDays,
-  //       'leaves': rec.leaves,
-  //       'perDayRate': rec.baseSalary / _kFixedMonthDays,
-  //       'absentDeduction': (rec.baseSalary / _kFixedMonthDays) * rec.leaves,
-  //       'fine': rec.fine,
-  //       'bonus': rec.bonus,
-  //       'netSalary': rec.netSalary,
-  //     };
-  //   });
-  //   _fetchLedgerBalance(); // ★ NEW
-  // }
 
-  // ───────────────────────────────────────────
-  //  Data helpers
-  // ───────────────────────────────────────────
   List<StaffMember> get _sourceList {
     final staffProvider = context.watch<StaffProvider>();
     return _employeeType == 'teacher'
