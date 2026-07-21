@@ -350,4 +350,172 @@ class AttendanceProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // ─── Bulk attendance state ────────────────────────────────────────
+  List<AttendanceRecord> _bulkRecords = [];
+  bool _bulkLoading = false;
+  String? _bulkError;
+  int _bulkYear = DateTime.now().year;
+  int _bulkMonth = DateTime.now().month;
+  String _bulkFilter = 'all';
+
+  List<AttendanceRecord> get bulkRecords => _bulkRecords;
+  bool get bulkLoading => _bulkLoading;
+  String? get bulkError => _bulkError;
+
+  Future<void> loadBulkAttendance({
+    required int year,
+    required int month,
+    String typeFilter = 'all',
+  }) async {
+    _bulkYear = year;
+    _bulkMonth = month;
+    _bulkFilter = typeFilter;
+    _bulkLoading = true;
+    _bulkError = null;
+    notifyListeners();
+
+    try {
+      // Ensure staff lists are fresh
+      await _staffProvider.fetchTeachers();
+      await _staffProvider.fetchStaffOnly();
+
+      List<StaffMember> activeStaff;
+      if (typeFilter == 'teacher') {
+        activeStaff = _staffProvider.teachers;
+      } else if (typeFilter == 'staff') {
+        activeStaff = _staffProvider.staffOnly;
+      } else {
+        activeStaff = [..._staffProvider.teachers, ..._staffProvider.staffOnly];
+      }
+
+      final monthStart = DateTime(year, month, 1);
+      final monthEnd = DateTime(year, month + 1, 0);
+      final startStr = _fmt(monthStart);
+      final endStr = _fmt(monthEnd);
+
+      // Fetch all existing attendance for these staff in the month
+      final allExisting = <AttendanceRecord>[];
+      for (final staff in activeStaff) {
+        final fetched = await _service.getAttendanceForStaffInRange(
+          staffId: staff.id!,
+          startDate: startStr,
+          endDate: endStr,
+        );
+        allExisting.addAll(fetched);
+      }
+
+      // Map: staffId -> (date -> record)
+      final Map<String, Map<String, AttendanceRecord>> existingMap = {};
+      for (final rec in allExisting) {
+        existingMap.putIfAbsent(rec.staffId, () => {});
+        existingMap[rec.staffId]![rec.date] = rec;
+      }
+
+      final List<AttendanceRecord> result = [];
+      var cursor = monthStart;
+      while (!cursor.isAfter(monthEnd)) {
+        final dateStr = _fmt(cursor);
+        final isSunday = cursor.weekday == DateTime.sunday;
+
+        for (final staff in activeStaff) {
+          // ---- Check joining date ----
+          bool isBeforeJoin = false;
+          if (staff.joiningDate != null && staff.joiningDate!.isNotEmpty) {
+            try {
+              final joinDate = DateTime.parse(staff.joiningDate!);
+              if (joinDate.isAfter(cursor)) {
+                isBeforeJoin = true;
+              }
+            } catch (_) {}
+          }
+
+          // Create a record for this staff/day
+          final existing = existingMap[staff.id]?[dateStr];
+          if (existing != null) {
+            result.add(existing);
+          } else {
+            // Default: holiday on Sunday, otherwise present
+            final defaultStatus = isSunday ? 'holiday' : 'present';
+            result.add(AttendanceRecord(
+              id: '${staff.id}_$dateStr',
+              staffId: staff.id!,
+              staffName: staff.name,
+              photoBase64: staff.imageBase64,
+              type: staff.type,
+              date: dateStr,
+              status: isBeforeJoin ? 'holiday' : defaultStatus,
+              remarks: isBeforeJoin ? 'Before joining' : '',
+              designation: staff.designation,
+              isSaved: isBeforeJoin, // if before join, treat as already saved (read‑only)
+              isSaving: false,
+            ));
+          }
+        }
+        cursor = cursor.add(const Duration(days: 1));
+      }
+
+      // Sort: by staff name, then by date
+      result.sort((a, b) {
+        final nameComp = a.staffName.compareTo(b.staffName);
+        if (nameComp != 0) return nameComp;
+        return a.date.compareTo(b.date);
+      });
+
+      _bulkRecords = result;
+    } catch (e) {
+      _bulkError = 'Failed to load bulk attendance: $e';
+      _bulkRecords = [];
+    } finally {
+      _bulkLoading = false;
+      notifyListeners();
+    }
+  }
+
+// Reload with the same parameters
+  Future<void> reloadBulk() =>
+      loadBulkAttendance(year: _bulkYear, month: _bulkMonth, typeFilter: _bulkFilter);
+
+// Update a single bulk record's status (called from UI)
+  void updateBulkStatus(String staffId, String date, String newStatus) {
+    final index = _bulkRecords.indexWhere(
+          (r) => r.staffId == staffId && r.date == date,
+    );
+    if (index == -1) return;
+    // Only allow changes if the record is not read‑only (holiday before join)
+    if (_bulkRecords[index].isSaved &&
+        _bulkRecords[index].remarks == 'Before joining') {
+      return;
+    }
+    _bulkRecords[index].status = newStatus;
+    // Mark as unsaved so it will be included in save
+    _bulkRecords[index].isSaved = false;
+    notifyListeners();
+  }
+
+// Save all unsaved bulk records (including updates to existing)
+  Future<void> saveBulkAttendance() async {
+    // Collect all records that are not read‑only and have changes
+    final toSave = _bulkRecords.where(
+          (r) => !r.isSaved && r.status != 'holiday',
+    ).toList();
+
+    if (toSave.isEmpty) {
+      // Optionally show a message
+      return;
+    }
+
+    for (final record in toSave) {
+      await _service.saveSingleRecord(record);
+      // Mark as saved in the list
+      final idx = _bulkRecords.indexWhere(
+            (r) => r.staffId == record.staffId && r.date == record.date,
+      );
+      if (idx != -1) {
+        _bulkRecords[idx].isSaved = true;
+      }
+    }
+    notifyListeners();
+  }
+
 }
