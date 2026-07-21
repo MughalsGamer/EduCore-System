@@ -57,6 +57,25 @@ class StaffMember {
   String? terminationNote;
   List<StatusEvent> statusHistory;
 
+
+  // ─── Add this getter here ───
+  String? get effectiveJoiningDate {
+    // Collect all 'joined' or 'rejoined' events from statusHistory
+    final events = statusHistory
+        .where((e) => e.type == 'joined' || e.type == 'rejoined')
+        .toList();
+
+    if (events.isNotEmpty) {
+      // Sort by date descending (most recent first)
+      events.sort((a, b) => b.date.compareTo(a.date));
+      return events.first.date;
+    }
+
+    // Fallback to the original joining date if no history exists
+    return joiningDate;
+  }
+
+
   StaffMember({
     this.id,
     required this.type,
@@ -158,3 +177,4 @@ class StaffMember {
     );
   }
 }
+

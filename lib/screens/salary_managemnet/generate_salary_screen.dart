@@ -100,6 +100,19 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   bool _isCheckingDuplicate = false;
 
   bool get _isEditMode => widget.isEditMode;
+  bool _isMonthValidForEmployee(int year, int month) {
+    if (_selectedEmployee == null) return true;
+    final joinDateStr = _selectedEmployee!.joiningDate;
+    if (joinDateStr == null || joinDateStr.isEmpty) return true;
+    try {
+      final joinDate = DateTime.parse(joinDateStr);
+      if (year < joinDate.year) return false;
+      if (year == joinDate.year && month < joinDate.month) return false;
+      return true;
+    } catch (_) {
+      return true; // If parse fails, allow (should not happen)
+    }
+  }
 
   @override
   void initState() {
@@ -217,15 +230,27 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     setState(() {
       _calcResult = {
         'baseSalary': rec.baseSalary,
-        'workingDays': _kFixedMonthDays,
+        'workingDays': rec.workingDays,       // ★ FIXED — use the actual stored value
         'leaves': rec.leaves,
-        'perDayRate': rec.baseSalary / _kFixedMonthDays,
-        'absentDeduction': (rec.baseSalary / _kFixedMonthDays) * rec.leaves,
+        'perDayRate': rec.perDayRate,         // ★ FIXED — use stored value, not baseSalary/30
+        'absentDeduction': rec.absentDeduction, // ★ FIXED
         'fine': rec.fine,
         'bonus': rec.bonus,
         'netSalary': rec.netSalary,
       };
     });
+    // setState(() {
+    //   _calcResult = {
+    //     'baseSalary': rec.baseSalary,
+    //     'workingDays': _kFixedMonthDays,
+    //     'leaves': rec.leaves,
+    //     'perDayRate': rec.baseSalary / _kFixedMonthDays,
+    //     'absentDeduction': (rec.baseSalary / _kFixedMonthDays) * rec.leaves,
+    //     'fine': rec.fine,
+    //     'bonus': rec.bonus,
+    //     'netSalary': rec.netSalary,
+    //   };
+    // });
 
     // ★ NEW — pre-fill the "Deduct from Balance" toggle + amount from the
     // salary record itself, so editing shows exactly what was set when
@@ -275,6 +300,23 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
   double get _payableNetSalary {
     final calculatedNet = (_calcResult?['netSalary'] as double?) ?? 0;
     return calculatedNet - _deductionAmount;
+  }
+  String? _joiningAdjustedNote() {
+    // final jd = _selectedEmployee?.joiningDate;
+    final jd = _selectedEmployee?.effectiveJoiningDate; // <-- new
+
+    if (jd == null || jd.isEmpty) return null;
+    try {
+      final parsed = DateTime.parse(jd);
+      if (parsed.year == _selectedYear && parsed.month == _selectedMonth) {
+        final monthEnd = DateTime(_selectedYear, _selectedMonth + 1, 0);
+        final days = monthEnd.day - parsed.day + 1;
+        return 'Joined ${DateFormat('d MMM yyyy').format(parsed)} — salary calculated for '
+            '$days day${days == 1 ? '' : 's'} (${parsed.day}–${monthEnd.day} '
+            '${DateFormat('MMM').format(monthEnd)}).';
+      }
+    } catch (_) {}
+    return null;
   }
 
   void _switchType(String type) {
@@ -375,20 +417,60 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     }
   }
 
+  // Future<void> _openMonthYearPicker() async {
+  //   if (_isEditMode) return; // locked in edit mode
+  //   final result = await _showMonthYearPicker(
+  //     context: context,
+  //     initialYear: _selectedYear,
+  //     initialMonth: _selectedMonth,
+  //   );
+  //   if (result == null) return;
+  //   setState(() {
+  //     _selectedYear = result.year;
+  //     _selectedMonth = result.month;
+  //     _calcResult = null;
+  //   });
+  //   _checkDuplicate(); // re-check duplicate after month change
+  // }
   Future<void> _openMonthYearPicker() async {
-    if (_isEditMode) return; // locked in edit mode
+    if (_isEditMode) return;
     final result = await _showMonthYearPicker(
       context: context,
       initialYear: _selectedYear,
       initialMonth: _selectedMonth,
     );
     if (result == null) return;
+
+    // ─── VALIDATE ───
+    if (!_isMonthValidForEmployee(result.year, result.month)) {
+      final joinDateStr = _selectedEmployee!.joiningDate;
+      String? formattedJoin;
+      if (joinDateStr != null && joinDateStr.isNotEmpty) {
+        try {
+          final jd = DateTime.parse(joinDateStr);
+          formattedJoin = DateFormat('MMMM yyyy').format(jd);
+        } catch (_) {}
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Salary cannot be generated for a month prior to the employee\'s joining date. '
+                'Please select a month from ${formattedJoin ?? 'joining month'} onwards.',
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return; // Don't update the state
+    }
+
+    // Valid → update
     setState(() {
       _selectedYear = result.year;
       _selectedMonth = result.month;
       _calcResult = null;
     });
-    _checkDuplicate(); // re-check duplicate after month change
+    _checkDuplicate();
   }
 
   // ───────────────────────────────────────────
@@ -451,6 +533,10 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
         baseSalary: _selectedEmployee!.salary,
         year: _selectedYear,
         month: _selectedMonth,
+        // joiningDate: _selectedEmployee!.joiningDate, // ★ NEW
+        joiningDate: _selectedEmployee!.effectiveJoiningDate, // <-- new
+
+
         fine: _fine,
         bonus: _bonus,
       );
@@ -472,13 +558,30 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
     final leaves = int.tryParse(_manualLeavesCtrl.text.trim()) ?? 0;
     final result = provider.calculateManual(
       baseSalary: _selectedEmployee!.salary,
-      workingDays: _kFixedMonthDays,
+      year: _selectedYear,
+      month: _selectedMonth,
+      // joiningDate: _selectedEmployee!.joiningDate, // ★ NEW
+      joiningDate: _selectedEmployee!.effectiveJoiningDate, // <-- new
+
       leaves: leaves,
       fine: _fine,
       bonus: _bonus,
     );
     setState(() => _calcResult = result);
   }
+  // void _recalculateManual() {
+  //   if (_selectedEmployee == null) return;
+  //   final provider = context.read<SalaryProvider>();
+  //   final leaves = int.tryParse(_manualLeavesCtrl.text.trim()) ?? 0;
+  //   final result = provider.calculateManual(
+  //     baseSalary: _selectedEmployee!.salary,
+  //     workingDays: _kFixedMonthDays,
+  //     leaves: leaves,
+  //     fine: _fine,
+  //     bonus: _bonus,
+  //   );
+  //   setState(() => _calcResult = result);
+  // }
 
   void _recalculateIfManual() {
     if (_alreadyGenerated && !_isEditMode) return;
@@ -1625,16 +1728,32 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
 
   Widget _manualInputs() {
     final disabled = _alreadyGenerated && !_isEditMode;
+    final workingDaysLabel =
+    _calcResult != null ? '${_calcResult!['workingDays']}' : '$_kFixedMonthDays';
     return TextFormField(
       controller: _manualLeavesCtrl,
       keyboardType: TextInputType.number,
       enabled: !disabled,
       decoration: _fieldDeco('Leaves (Absents) *').copyWith(
-        helperText: 'Month is always treated as $_kFixedMonthDays days',
+        helperText: _joiningAdjustedNote() ??
+            'Month is always treated as $workingDaysLabel days',
+        helperMaxLines: 2,
         helperStyle: TextStyle(fontSize: 11, color: Colors.grey.shade500),
       ),
     );
   }
+  // Widget _manualInputs() {
+  //   final disabled = _alreadyGenerated && !_isEditMode;
+  //   return TextFormField(
+  //     controller: _manualLeavesCtrl,
+  //     keyboardType: TextInputType.number,
+  //     enabled: !disabled,
+  //     decoration: _fieldDeco('Leaves (Absents) *').copyWith(
+  //       helperText: 'Month is always treated as $_kFixedMonthDays days',
+  //       helperStyle: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+  //     ),
+  //   );
+  // }
 
   Widget _attendanceSummary() {
     final provider = context.watch<SalaryProvider>();
@@ -1671,6 +1790,9 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       );
     }
 
+    final workingDays = _calcResult!['workingDays'] as int; // ★ dynamic now
+    final joiningNote = _joiningAdjustedNote(); // ★ NEW
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1681,9 +1803,30 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (joiningNote != null) ...[
+            Container(
+              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: _kPurpleLight,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 14, color: _kPurple),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(joiningNote,
+                        style: const TextStyle(
+                            fontSize: 11, color: _kPurpleDark, height: 1.3)),
+                  ),
+                ],
+              ),
+            ),
+          ],
           Row(
             children: [
-              _miniStat('Working Days', '$_kFixedMonthDays', _kPurple),
+              _miniStat('Working Days', '$workingDays', _kPurple),
               _miniStat('Absents', '${_calcResult!['leaves']}', _kRed),
               _miniStat('Present', '${provider.lastPresentDays}', _kGreen),
               _miniStat('Holidays', '${provider.lastHolidaysExcluded}', _kOrange),
@@ -1691,7 +1834,7 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Rule: month treated as $_kFixedMonthDays days · Sundays/holidays excluded · '
+            'Rule: month treated as $workingDays days · Sundays/holidays excluded · '
                 'unmarked or "absent" days deducted at Rs ${NumberFormat('#,##0').format(_calcResult!['perDayRate'])}/day.',
             style: TextStyle(fontSize: 11, color: Colors.grey.shade600, height: 1.4),
           ),
@@ -1699,6 +1842,69 @@ class _GenerateSalaryScreenState extends State<GenerateSalaryScreen> {
       ),
     );
   }
+  // Widget _attendanceSummary() {
+  //   final provider = context.watch<SalaryProvider>();
+  //   if (_alreadyGenerated && !_isEditMode) return const SizedBox.shrink();
+  //
+  //   if (provider.calculating) {
+  //     return Container(
+  //       padding: const EdgeInsets.all(20),
+  //       alignment: Alignment.center,
+  //       child: const CircularProgressIndicator(strokeWidth: 2, color: _kPurple),
+  //     );
+  //   }
+  //
+  //   if (_calcResult == null) {
+  //     return Container(
+  //       padding: const EdgeInsets.all(14),
+  //       decoration: BoxDecoration(
+  //         color: Colors.amber.shade50,
+  //         borderRadius: BorderRadius.circular(8),
+  //         border: Border.all(color: Colors.amber.shade200),
+  //       ),
+  //       child: Row(
+  //         children: [
+  //           Icon(Icons.info_outline, size: 16, color: Colors.amber.shade700),
+  //           const SizedBox(width: 8),
+  //           const Expanded(
+  //             child: Text(
+  //               'Select an employee to auto-calculate attendance-based salary.',
+  //               style: TextStyle(fontSize: 12, color: Colors.amber),
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     );
+  //   }
+  //
+  //   return Container(
+  //     padding: const EdgeInsets.all(14),
+  //     decoration: BoxDecoration(
+  //       color: _kSurface,
+  //       borderRadius: BorderRadius.circular(10),
+  //       border: Border.all(color: _kBorder),
+  //     ),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         Row(
+  //           children: [
+  //             _miniStat('Working Days', '$_kFixedMonthDays', _kPurple),
+  //             _miniStat('Absents', '${_calcResult!['leaves']}', _kRed),
+  //             _miniStat('Present', '${provider.lastPresentDays}', _kGreen),
+  //             _miniStat('Holidays', '${provider.lastHolidaysExcluded}', _kOrange),
+  //           ],
+  //         ),
+  //         const SizedBox(height: 8),
+  //         Text(
+  //           'Rule: month treated as $_kFixedMonthDays days · Sundays/holidays excluded · '
+  //               'unmarked or "absent" days deducted at Rs ${NumberFormat('#,##0').format(_calcResult!['perDayRate'])}/day.',
+  //           style: TextStyle(fontSize: 11, color: Colors.grey.shade600, height: 1.4),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _miniStat(String label, String value, Color color) {
     return Expanded(

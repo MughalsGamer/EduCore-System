@@ -994,11 +994,16 @@ class SalaryProvider extends ChangeNotifier {
   // ────────────────────────────────────────────────────────────
   //  Attendance-based calculation
   // ────────────────────────────────────────────────────────────
+
+  // ────────────────────────────────────────────────────────────
+//  Attendance‑based calculation (FIXED)
+// ────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> calculateAttendanceBased({
     required String employeeId,
     required double baseSalary,
     required int year,
     required int month,
+    String? joiningDate,
     double fine = 0,
     double bonus = 0,
   }) async {
@@ -1008,10 +1013,25 @@ class SalaryProvider extends ChangeNotifier {
     try {
       final monthStart = DateTime(year, month, 1);
       final monthEnd = DateTime(year, month + 1, 0);
+      final daysInMonth = monthEnd.day;
 
-      final startStr = _fmt(monthStart);
+      // ── Determine employment days (calendar days in this month) ──
+      int employmentDays = 30; // default full month
+      DateTime effectiveStart = monthStart;
+
+      if (joiningDate != null && joiningDate.isNotEmpty) {
+        try {
+          final jd = DateTime.parse(joiningDate);
+          if (jd.year == year && jd.month == month) {
+            effectiveStart = DateTime(year, month, jd.day);
+            employmentDays = daysInMonth - jd.day + 1;
+          }
+        } catch (_) {}
+      }
+
+      // ── Fetch attendance for the range ──
+      final startStr = _fmt(effectiveStart);
       final endStr = _fmt(monthEnd);
-
       final fetched = await _attendanceService.getAttendanceForStaffInRange(
         staffId: employeeId,
         startDate: startStr,
@@ -1024,10 +1044,10 @@ class SalaryProvider extends ChangeNotifier {
       }
 
       int absentCount = 0;
-      int presentCount = 0;
       int holidayCount = 0;
+      // presentCount not needed for salary, but we keep it for UI if desired
 
-      var cursor = monthStart;
+      var cursor = effectiveStart;
       while (!cursor.isAfter(monthEnd)) {
         final dateStr = _fmt(cursor);
         final isSunday = cursor.weekday == DateTime.sunday;
@@ -1035,29 +1055,24 @@ class SalaryProvider extends ChangeNotifier {
 
         if (isSunday || status == 'holiday') {
           holidayCount++;
-        } else if (status == null) {
+        } else if (status == null || status == 'absent') {
           absentCount++;
-        } else if (status == 'absent') {
-          absentCount++;
-        } else if (status == 'present') {
-          presentCount++;
-        } else {
-          presentCount++;
         }
-
+        // else present → no deduction
         cursor = cursor.add(const Duration(days: 1));
       }
 
-      _lastPresentDays = presentCount;
       _lastHolidaysExcluded = holidayCount;
+      // We don't store presentCount globally; you can if needed
 
-      final perDayRate = baseSalary / _kFixedMonthDays;
+      final perDayRate = baseSalary / 30; // fixed 30‑day rate
+      final grossSalary = perDayRate * employmentDays;
       final absentDeduction = perDayRate * absentCount;
-      final netSalary = baseSalary - absentDeduction - fine + bonus;
+      final netSalary = grossSalary - absentDeduction - fine + bonus;
 
       final result = <String, dynamic>{
         'baseSalary': baseSalary,
-        'workingDays': _kFixedMonthDays,
+        'workingDays': employmentDays,       // UI shows employment days
         'leaves': absentCount,
         'perDayRate': perDayRate,
         'absentDeduction': absentDeduction,
@@ -1073,24 +1088,38 @@ class SalaryProvider extends ChangeNotifier {
     }
   }
 
-  // ────────────────────────────────────────────────────────────
-  //  Manual calculation
-  // ────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────
+//  Manual calculation (FIXED)
+// ────────────────────────────────────────────────────────────
   Map<String, dynamic> calculateManual({
     required double baseSalary,
-    required int workingDays,
     required int leaves,
+    required int year,
+    required int month,
+    String? joiningDate,
     double fine = 0,
     double bonus = 0,
   }) {
-    const safeWorkingDays = _kFixedMonthDays;
-    final perDayRate = baseSalary / safeWorkingDays;
+    int employmentDays = 30;
+
+    if (joiningDate != null && joiningDate.isNotEmpty) {
+      try {
+        final jd = DateTime.parse(joiningDate);
+        if (jd.year == year && jd.month == month) {
+          final monthEnd = DateTime(year, month + 1, 0);
+          employmentDays = monthEnd.day - jd.day + 1;
+        }
+      } catch (_) {}
+    }
+
+    final perDayRate = baseSalary / 30;
+    final grossSalary = perDayRate * employmentDays;
     final absentDeduction = perDayRate * leaves;
-    final netSalary = baseSalary - absentDeduction - fine + bonus;
+    final netSalary = grossSalary - absentDeduction - fine + bonus;
 
     return {
       'baseSalary': baseSalary,
-      'workingDays': safeWorkingDays,
+      'workingDays': employmentDays,
       'leaves': leaves,
       'perDayRate': perDayRate,
       'absentDeduction': absentDeduction,
@@ -1100,9 +1129,157 @@ class SalaryProvider extends ChangeNotifier {
     };
   }
 
-  // ────────────────────────────────────────────────────────────
-  //  Duplicate check & save
-  // ────────────────────────────────────────────────────────────
+  // Future<Map<String, dynamic>> calculateAttendanceBased({
+  //   required String employeeId,
+  //   required double baseSalary,
+  //   required int year,
+  //   required int month,
+  //   String? joiningDate, // ★ NEW
+  //   double fine = 0,
+  //   double bonus = 0,
+  // }) async
+  // {
+  //   _calculating = true;
+  //   notifyListeners();
+  //
+  //   try {
+  //     var monthStart = DateTime(year, month, 1);
+  //     final monthEnd = DateTime(year, month + 1, 0);
+  //     final daysInMonth = monthEnd.day;
+  //
+  //     int effectiveWorkingDays = _kFixedMonthDays; // default = 30
+  //
+  //
+  //     if (joiningDate != null && joiningDate.isNotEmpty) {
+  //       try {
+  //         final jd = DateTime.parse(joiningDate);
+  //         if (jd.year == year && jd.month == month) {
+  //           monthStart = DateTime(year, month, jd.day);
+  //           effectiveWorkingDays = daysInMonth - jd.day + 1;
+  //         }
+  //       } catch (_) {}
+  //     }
+  //
+  //     // ★ NEW — if the employee joined within this exact salary month/year,
+  //     // start the window from the joining date instead of the 1st, and use
+  //     // the actual remaining days (joiningDay → monthEnd) as the working-days
+  //     // denominator instead of the fixed 30. Any other month is untouched.
+  //     // int effectiveWorkingDays = _kFixedMonthDays;
+  //     if (joiningDate != null && joiningDate.isNotEmpty) {
+  //       try {
+  //         final jd = DateTime.parse(joiningDate);
+  //         if (jd.year == year && jd.month == month) {
+  //           monthStart = DateTime(year, month, jd.day);
+  //           effectiveWorkingDays = daysInMonth - jd.day + 1;
+  //         }
+  //       } catch (_) {}
+  //     }
+  //
+  //     final startStr = _fmt(monthStart);
+  //     final endStr = _fmt(monthEnd);
+  //
+  //     final fetched = await _attendanceService.getAttendanceForStaffInRange(
+  //       staffId: employeeId,
+  //       startDate: startStr,
+  //       endDate: endStr,
+  //     );
+  //
+  //     final byDate = <String, String>{};
+  //     for (final rec in fetched) {
+  //       byDate[rec.date] = rec.status;
+  //     }
+  //
+  //     int absentCount = 0;
+  //     int presentCount = 0;
+  //     int holidayCount = 0;
+  //
+  //     var cursor = monthStart; // ★ now possibly = joining date
+  //     while (!cursor.isAfter(monthEnd)) {
+  //       final dateStr = _fmt(cursor);
+  //       final isSunday = cursor.weekday == DateTime.sunday;
+  //       final status = byDate[dateStr];
+  //
+  //       if (isSunday || status == 'holiday') {
+  //         holidayCount++;
+  //       } else if (status == null) {
+  //         absentCount++;
+  //       } else if (status == 'absent') {
+  //         absentCount++;
+  //       } else if (status == 'present') {
+  //         presentCount++;
+  //       } else {
+  //         presentCount++;
+  //       }
+  //
+  //       cursor = cursor.add(const Duration(days: 1));
+  //     }
+  //
+  //     _lastPresentDays = presentCount;
+  //     _lastHolidaysExcluded = holidayCount;
+  //
+  //     final perDayRate = baseSalary / effectiveWorkingDays;
+  //     final absentDeduction = perDayRate * absentCount;
+  //     final netSalary = baseSalary - absentDeduction - fine + bonus;
+  //
+  //     final result = <String, dynamic>{
+  //       'baseSalary': baseSalary,
+  //       'workingDays': effectiveWorkingDays,
+  //       'leaves': absentCount,
+  //       'perDayRate': perDayRate,
+  //       'absentDeduction': absentDeduction,
+  //       'fine': fine,
+  //       'bonus': bonus,
+  //       'netSalary': netSalary,
+  //     };
+  //
+  //     return result;
+  //   } finally {
+  //     _calculating = false;
+  //     notifyListeners();
+  //   }
+  // }
+
+  // Map<String, dynamic> calculateManual({
+  //   required double baseSalary,
+  //   required int leaves,
+  //   required int year,   // ★ NEW — needed to check joining month
+  //   required int month,  // ★ NEW
+  //   String? joiningDate, // ★ NEW
+  //   double fine = 0,
+  //   double bonus = 0,
+  // })
+  // {
+  //   int workingDays = _kFixedMonthDays;
+  //
+  //   // ★ NEW — same joining-month rule as attendance mode: if the employee
+  //   // joined during this exact salary month, working days = remaining days
+  //   // from joining date to month-end. Otherwise stays fixed at 30.
+  //   if (joiningDate != null && joiningDate.isNotEmpty) {
+  //     try {
+  //       final jd = DateTime.parse(joiningDate);
+  //       if (jd.year == year && jd.month == month) {
+  //         final monthEnd = DateTime(year, month + 1, 0);
+  //         workingDays = monthEnd.day - jd.day + 1;
+  //       }
+  //     } catch (_) {}
+  //   }
+  //
+  //   final perDayRate = baseSalary / workingDays;
+  //   final absentDeduction = perDayRate * leaves;
+  //   final netSalary = baseSalary - absentDeduction - fine + bonus;
+  //
+  //   return {
+  //     'baseSalary': baseSalary,
+  //     'workingDays': workingDays,
+  //     'leaves': leaves,
+  //     'perDayRate': perDayRate,
+  //     'absentDeduction': absentDeduction,
+  //     'fine': fine,
+  //     'bonus': bonus,
+  //     'netSalary': netSalary,
+  //   };
+  // }
+
   Future<SalaryRecord?> checkAlreadyGenerated(
       String employeeId, int year, int month) {
     return _service.checkAlreadyGenerated(employeeId, year, month);
