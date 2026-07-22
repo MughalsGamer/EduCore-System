@@ -1,8 +1,13 @@
 
 import 'dart:convert';
+import 'package:educoresystem/screens/teacher_management/pdf_utils.dart';
+import 'package:educoresystem/screens/teacher_management/staff_pdf_generator.dart';
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import '../../models/teacher.dart';
+import '../../providers/school_setting_prodvider.dart';
 import '../../providers/teacher_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -17,6 +22,24 @@ class StaffProfileScreen extends StatelessWidget {
     required this.staff,
     this.classIdToName = const {},
   });
+
+  Future<void> _savePdf(BuildContext context, StaffMember staff) async {
+    try {
+      final school = context.read<SchoolSettingsProvider>().settings;
+      final pdfBytes = await generateStaffProfilePdf(staff, classIdToName, school: school);
+      final fileName = '${staff.name.replaceAll(' ', '_')}_profile.pdf';
+
+      await PdfUtils.saveAndOpenPdf(pdfBytes, fileName);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('PDF saved & opened successfully!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving PDF: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +57,20 @@ class StaffProfileScreen extends StatelessWidget {
         backgroundColor: const Color(0xFF534AB7),
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
+        actions: [
+          // IconButton(
+          //   icon: const Icon(Icons.print, color: Colors.white),
+          //   tooltip: 'Print PDF',
+          //   onPressed: () => _printPdf(context, freshStaff),
+          // ),
+          IconButton(
+            icon: const Icon(Icons.save_alt, color: Colors.white),
+            tooltip: 'Save PDF & open',
+            onPressed: () => _savePdf(context, freshStaff),
+          ),
+        ],
       ),
+
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),

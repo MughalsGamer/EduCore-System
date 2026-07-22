@@ -25,6 +25,9 @@ dependencies:
   image:
   shared_preferences:
   shimmer:
+  open_file:
+  universal_platform:
+
 
 
 
