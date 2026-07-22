@@ -577,25 +577,30 @@ class _AdmissionCardState extends State<_AdmissionCard> {
 
   // ✅ Convert Confirm with loading state and date picker
   void _confirmConvert(BuildContext context, AdmissionModel a) async {
-    // 1. Pick a registration date
+    // 1. Pick registration date
     final DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.fromSeed(seedColor: _purple),
-          ),
-          child: child!,
-        );
-      },
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: ColorScheme.fromSeed(seedColor: _purple),
+        ),
+        child: child!,
+      ),
     );
-
     if (pickedDate == null || !context.mounted) return;
 
-    // 2. Confirmation dialog
+    // 2. Collect required student details
+    final updatedStudents = await showDialog<List<AdmissionStudent>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _StudentDetailsDialog(students: a.students),
+    );
+    if (updatedStudents == null || !context.mounted) return; // user cancelled
+
+    // 3. Confirm the conversion
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -606,37 +611,463 @@ class _AdmissionCardState extends State<_AdmissionCard> {
               'and delete this Pre-Admission record. Continue?',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Convert', style: TextStyle(color: Colors.orange))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Convert', style: TextStyle(color: Colors.orange)),
+          ),
         ],
       ),
     );
-
     if (confirmed != true || !context.mounted) return;
 
-    // ✅ Start loading
+    // 4. Execute conversion
     setState(() => _converting = true);
-
     try {
-      await context.read<AdmissionProvider>().convertToRegular(a, customDate: pickedDate);
+      await context.read<AdmissionProvider>().convertToRegular(
+        a,
+        customDate: pickedDate,
+        studentsOverride: updatedStudents,
+      );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Converted to Regular Admission successfully'), backgroundColor: Colors.green),
-
+          const SnackBar(
+            content: Text('Converted to Regular Admission successfully'),
+            backgroundColor: Colors.green,
+          ),
         );
         _findListScreenState()?.switchTab(AdmissionType.regular);
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Conversion failed: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Conversion failed: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
-      // ✅ Stop loading
-      if (mounted) {
-        setState(() => _converting = false);
-      }
+      if (mounted) setState(() => _converting = false);
     }
+  }
+  // void _confirmConvert(BuildContext context, AdmissionModel a) async {
+  //   // 1. Pick registration date
+  //   final DateTime? pickedDate = await showDatePicker(
+  //     context: context,
+  //     initialDate: DateTime.now(),
+  //     firstDate: DateTime(2020),
+  //     lastDate: DateTime(2100),
+  //     builder: (context, child) => Theme(
+  //       data: Theme.of(context).copyWith(
+  //         colorScheme: ColorScheme.fromSeed(seedColor: _purple),
+  //       ),
+  //       child: child!,
+  //     ),
+  //   );
+  //   if (pickedDate == null || !context.mounted) return;
+  //
+  //   // 2. Collect required student details
+  //   final updatedStudents = await _showStudentDetailsDialog(a);
+  //   if (updatedStudents == null || !context.mounted) return; // user cancelled
+  //
+  //   // 3. Confirm the conversion
+  //   final confirmed = await showDialog<bool>(
+  //     context: context,
+  //     builder: (ctx) => AlertDialog(
+  //       title: const Text('Convert to Regular Admission'),
+  //       content: Text(
+  //         'This will create a new Regular Admission with date '
+  //             '${pickedDate.day}/${pickedDate.month}/${pickedDate.year} '
+  //             'and delete this Pre-Admission record. Continue?',
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(ctx, false),
+  //           child: const Text('Cancel'),
+  //         ),
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(ctx, true),
+  //           child: const Text('Convert', style: TextStyle(color: Colors.orange)),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  //   if (confirmed != true || !context.mounted) return;
+  //
+  //   // 4. Execute conversion
+  //   setState(() => _converting = true);
+  //   try {
+  //     await context.read<AdmissionProvider>().convertToRegular(
+  //       a,
+  //       customDate: pickedDate,
+  //       studentsOverride: updatedStudents,   // pass the collected students
+  //     );
+  //     if (context.mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(
+  //           content: Text('Converted to Regular Admission successfully'),
+  //           backgroundColor: Colors.green,
+  //         ),
+  //       );
+  //       _findListScreenState()?.switchTab(AdmissionType.regular);
+  //     }
+  //   } catch (e) {
+  //     if (context.mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text('Conversion failed: $e'),
+  //           backgroundColor: Colors.red,
+  //         ),
+  //       );
+  //     }
+  //   } finally {
+  //     if (mounted) setState(() => _converting = false);
+  //   }
+  // }
+
+  Future<List<AdmissionStudent>?> _showStudentDetailsDialog(AdmissionModel a) async {
+    final students = a.students;
+    final formKey = GlobalKey<FormState>();
+
+    // Controllers and initial dates
+    final List<TextEditingController> cnicCtrls =
+    List.generate(students.length, (i) => TextEditingController(text: students[i].bFormCnic ?? ''));
+    final List<DateTime?> dobList = List.generate(students.length, (i) => students[i].dob);
+
+    return showDialog<List<AdmissionStudent>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Student Details Required'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Form(
+                  key: formKey,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: students.length,
+                    itemBuilder: (context, i) {
+                      final s = students[i];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Student ${i + 1}: ${s.name}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                              const SizedBox(height: 12),
+                              // B-Form / CNIC
+                              TextFormField(
+                                controller: cnicCtrls[i],
+                                decoration: const InputDecoration(
+                                  labelText: 'B-Form / CNIC *',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.credit_card_outlined),
+                                ),
+                                keyboardType: TextInputType.number,
+                                validator: (v) =>
+                                (v == null || v.trim().isEmpty) ? 'Required' : null,
+                              ),
+                              const SizedBox(height: 12),
+                              // Date of Birth
+                              InkWell(
+                                onTap: () async {
+                                  final picked = await showDatePicker(
+                                    context: ctx,
+                                    initialDate: dobList[i] ?? DateTime(2015),
+                                    firstDate: DateTime(2000),
+                                    lastDate: DateTime.now(),
+                                  );
+                                  if (picked != null) {
+                                    setDialogState(() => dobList[i] = picked);
+                                  }
+                                },
+                                child: InputDecorator(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Date of Birth *',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.cake_outlined),
+                                  ),
+                                  child: Text(
+                                    dobList[i] != null
+                                        ? '${dobList[i]!.day}/${dobList[i]!.month}/${dobList[i]!.year}'
+                                        : 'Select Date',
+                                    style: TextStyle(
+                                      color: dobList[i] != null ? Colors.black87 : Colors.grey,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Show validation error if both fields are empty after first attempt
+                              // (validated at dialog submit time anyway)
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    // Dispose controllers before popping
+                    for (var c in cnicCtrls) c.dispose();
+                    Navigator.pop(ctx); // cancel -> null
+                  },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (formKey.currentState!.validate()) {
+                      // All B-Forms filled; check DOBs
+                      final bool allDobFilled = dobList.every((d) => d != null);
+                      if (!allDobFilled) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(content: Text('Please select Date of Birth for all students')),
+                        );
+                        return;
+                      }
+
+                      // Build updated student list
+                      final updated = List<AdmissionStudent>.generate(students.length, (i) {
+                        return students[i].copyWith(
+                          bFormCnic: cnicCtrls[i].text.trim(),
+                          dob: dobList[i],
+                        );
+                      });
+
+                      // Dispose controllers before popping
+                      for (var c in cnicCtrls) c.dispose();
+                      Navigator.pop(ctx, updated);
+                    }
+                  },
+                  child: const Text('Next'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+  // void _confirmConvert(BuildContext context, AdmissionModel a) async {
+  //   // 1. Pick a registration date
+  //   final DateTime? pickedDate = await showDatePicker(
+  //     context: context,
+  //     initialDate: DateTime.now(),
+  //     firstDate: DateTime(2020),
+  //     lastDate: DateTime(2100),
+  //     builder: (context, child) {
+  //       return Theme(
+  //         data: Theme.of(context).copyWith(
+  //           colorScheme: ColorScheme.fromSeed(seedColor: _purple),
+  //         ),
+  //         child: child!,
+  //       );
+  //     },
+  //   );
+  //
+  //   if (pickedDate == null || !context.mounted) return;
+  //
+  //   // 2. Confirmation dialog
+  //   final confirmed = await showDialog<bool>(
+  //     context: context,
+  //     builder: (ctx) => AlertDialog(
+  //       title: const Text('Convert to Regular Admission'),
+  //       content: Text(
+  //         'This will create a new Regular Admission with date '
+  //             '${pickedDate.day}/${pickedDate.month}/${pickedDate.year} '
+  //             'and delete this Pre-Admission record. Continue?',
+  //       ),
+  //       actions: [
+  //         TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+  //         TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Convert', style: TextStyle(color: Colors.orange))),
+  //       ],
+  //     ),
+  //   );
+  //
+  //   if (confirmed != true || !context.mounted) return;
+  //
+  //   // ✅ Start loading
+  //   setState(() => _converting = true);
+  //
+  //   try {
+  //     await context.read<AdmissionProvider>().convertToRegular(a, customDate: pickedDate);
+  //     if (context.mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text('Converted to Regular Admission successfully'), backgroundColor: Colors.green),
+  //
+  //       );
+  //       _findListScreenState()?.switchTab(AdmissionType.regular);
+  //     }
+  //   } catch (e) {
+  //     if (context.mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Conversion failed: $e'), backgroundColor: Colors.red),
+  //       );
+  //     }
+  //   } finally {
+  //     // ✅ Stop loading
+  //     if (mounted) {
+  //       setState(() => _converting = false);
+  //     }
+  //   }
+  // }
+
+}
+
+class _StudentDetailsDialog extends StatefulWidget {
+  final List<AdmissionStudent> students;
+  const _StudentDetailsDialog({required this.students, Key? key}) : super(key: key);
+
+  @override
+  State<_StudentDetailsDialog> createState() => _StudentDetailsDialogState();
+}
+
+class _StudentDetailsDialogState extends State<_StudentDetailsDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final List<TextEditingController> _cnicCtrls;
+  late final List<DateTime?> _dobList;
+
+  @override
+  void initState() {
+    super.initState();
+    _cnicCtrls = List.generate(
+      widget.students.length,
+          (i) => TextEditingController(text: widget.students[i].bFormCnic ?? ''),
+    );
+    _dobList = List.generate(
+      widget.students.length,
+          (i) => widget.students[i].dob,
+    );
+  }
+
+  @override
+  void dispose() {
+    for (final c in _cnicCtrls) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+
+    final allDobFilled = _dobList.every((d) => d != null);
+    if (!allDobFilled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select Date of Birth for all students')),
+      );
+      return;
+    }
+
+    final updated = List<AdmissionStudent>.generate(widget.students.length, (i) {
+      return widget.students[i].copyWith(
+        bFormCnic: _cnicCtrls[i].text.trim(),
+        dob: _dobList[i],
+      );
+    });
+
+    Navigator.pop(context, updated);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Student Details Required'),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: MediaQuery.of(context).size.height * 0.6,
+        child: Form(
+          key: _formKey,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: widget.students.length,
+            itemBuilder: (context, i) {
+              final s = widget.students[i];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Student ${i + 1}: ${s.name}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      const SizedBox(height: 12),
+                      // B-Form / CNIC
+                      TextFormField(
+                        controller: _cnicCtrls[i],
+                        decoration: const InputDecoration(
+                          labelText: 'B-Form / CNIC *',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.credit_card_outlined),
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      // Date of Birth
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _dobList[i] ?? DateTime(2015),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime.now(),
+                          );
+                          if (picked != null) {
+                            setState(() => _dobList[i] = picked);
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Date of Birth *',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.cake_outlined),
+                          ),
+                          child: Text(
+                            _dobList[i] != null
+                                ? '${_dobList[i]!.day}/${_dobList[i]!.month}/${_dobList[i]!.year}'
+                                : 'Select Date',
+                            style: TextStyle(
+                              color: _dobList[i] != null ? Colors.black87 : Colors.grey,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context), // cancel – returns null
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _submit,
+          child: const Text('Next'),
+        ),
+      ],
+    );
   }
 }

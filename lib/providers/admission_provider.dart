@@ -177,23 +177,25 @@ class AdmissionProvider extends ChangeNotifier {
   }
 
   // ── Convert to Regular (Fixed) ──────────────────
-  Future<void> convertToRegular(AdmissionModel preAdmission, {DateTime? customDate}) async {
-    // Guard: agar already loading ho ya ID na ho to ignore
+  // In AdmissionProvider, inside convertToRegular method signature:
+  Future<void> convertToRegular(
+      AdmissionModel preAdmission, {
+        DateTime? customDate,
+        List<AdmissionStudent>? studentsOverride,
+      }) async {
     if (_isLoading || preAdmission.id == null) return;
 
     try {
       _isLoading = true;
       notifyListeners();
 
-      // 1. Generate new Registration ID
       final newRegId = await generateAdmissionId(AdmissionType.regular);
-
-      // 2. Admission date
       final regDate = customDate ?? DateTime.now();
 
-      // 3. Create a copy with required changes
+      final sourceStudents = studentsOverride ?? preAdmission.students;
+
       final converted = AdmissionModel(
-        id: null, // will be set after Firestore add
+        id: null,
         type: AdmissionType.regular,
         inquiryOrRegId: newRegId,
         admissionDate: regDate,
@@ -213,7 +215,7 @@ class AdmissionProvider extends ChangeNotifier {
         previousClassName: preAdmission.previousClassName,
         previousClassMarks: preAdmission.previousClassMarks,
         students: List<AdmissionStudent>.from(
-          preAdmission.students.map((s) => AdmissionStudent(
+          sourceStudents.map((s) => AdmissionStudent(
             name: s.name,
             className: s.className,
             sectionName: s.sectionName,
@@ -231,15 +233,14 @@ class AdmissionProvider extends ChangeNotifier {
         ),
       );
 
-      // 4. Add new regular admission and get the real Firestore ID
+      // 1. Add new regular admission
       final newDocId = await _service.addAdmission(converted);
-      converted.id = newDocId; // Real ID set kar do
+      converted.id = newDocId;
 
-      // 5. Delete old pre-admission
+      // 2. Delete old pre-admission
       await _service.deleteAdmission(preAdmission.id!);
 
-      // 6. Update family's student refs: move each student from
-      //    pre-admission -> regular (same studentId, new admissionId/type).
+      // 3. Update family student refs
       if (preAdmission.familyDocId.isNotEmpty) {
         for (final s in converted.students) {
           if (s.studentId.isEmpty) continue;
@@ -253,10 +254,10 @@ class AdmissionProvider extends ChangeNotifier {
         }
       }
 
-      // 7. Immediate local update (ab ID valid hai, duplicate nahi hoga)
-      _admissions.removeWhere((a) => a.id == preAdmission.id);
-      _admissions.insert(0, converted);
-      _admissions.sort((a, b) => b.admissionDate.compareTo(a.admissionDate));
+      // ❌ یہ تین لائنیں ڈیلیٹ کر دی گئی ہیں (local list manipulation)
+      // _admissions.removeWhere((a) => a.id == preAdmission.id);
+      // _admissions.insert(0, converted);
+      // _admissions.sort((a, b) => b.admissionDate.compareTo(a.admissionDate));
 
       _isLoading = false;
       notifyListeners();
@@ -267,6 +268,96 @@ class AdmissionProvider extends ChangeNotifier {
       rethrow;
     }
   }
+  // Future<void> convertToRegular(
+  //     AdmissionModel preAdmission, {
+  //       DateTime? customDate,
+  //       List<AdmissionStudent>? studentsOverride,  // 1. یہ نیا پیرامیٹر شامل کریں
+  //     }) async
+  // {
+  //   if (_isLoading || preAdmission.id == null) return;
+  //
+  //   try {
+  //     _isLoading = true;
+  //     notifyListeners();
+  //
+  //     final newRegId = await generateAdmissionId(AdmissionType.regular);
+  //     final regDate = customDate ?? DateTime.now();
+  //
+  //     // 2. یہ لائن بدلیں: sourceStudents کو studentsOverride سے لیا جائے
+  //     final sourceStudents = studentsOverride ?? preAdmission.students;
+  //
+  //     final converted = AdmissionModel(
+  //       id: null,
+  //       type: AdmissionType.regular,
+  //       inquiryOrRegId: newRegId,
+  //       admissionDate: regDate,
+  //       fatherName: preAdmission.fatherName,
+  //       fatherPhone: preAdmission.fatherPhone,
+  //       fatherCnic: preAdmission.fatherCnic,
+  //       fatherOccupation: preAdmission.fatherOccupation,
+  //       motherName: preAdmission.motherName,
+  //       motherPhone: preAdmission.motherPhone,
+  //       motherCnic: preAdmission.motherCnic,
+  //       caste: preAdmission.caste,
+  //       address: preAdmission.address,
+  //       familyDocId: preAdmission.familyDocId,
+  //       familyId: preAdmission.familyId,
+  //       familyName: preAdmission.familyName,
+  //       previousSchoolName: preAdmission.previousSchoolName,
+  //       previousClassName: preAdmission.previousClassName,
+  //       previousClassMarks: preAdmission.previousClassMarks,
+  //       // 3. students کی جگہ یہ پورا بلاک رکھیں
+  //       students: List<AdmissionStudent>.from(
+  //         sourceStudents.map((s) => AdmissionStudent(
+  //           name: s.name,
+  //           className: s.className,
+  //           sectionName: s.sectionName,
+  //           classRollNo: s.classRollNo,
+  //           bFormCnic: s.bFormCnic,
+  //           dob: s.dob,
+  //           monthlyFee: s.monthlyFee,
+  //           annualFee: s.annualFee,
+  //           registrationFee: s.registrationFee,
+  //           picBase64: s.picBase64,
+  //           studentId: s.studentId,
+  //           sectionId: s.sectionId,
+  //           classId: s.classId,
+  //         )),
+  //       ),
+  //     );
+  //
+  //     // باقی کوڈ (add, delete, update family refs) وہی رہے گا
+  //     final newDocId = await _service.addAdmission(converted);
+  //     converted.id = newDocId;
+  //     await _service.deleteAdmission(preAdmission.id!);
+  //
+  //     if (preAdmission.familyDocId.isNotEmpty) {
+  //       for (final s in converted.students) {
+  //         if (s.studentId.isEmpty) continue;
+  //         await _familyService.updateStudentRefType(
+  //           familyDocId: preAdmission.familyDocId,
+  //           studentId: s.studentId,
+  //           newAdmissionId: newDocId,
+  //           newInquiryOrRegId: newRegId,
+  //           newType: AdmissionType.regular,
+  //         );
+  //       }
+  //     }
+  //
+  //     _admissions.removeWhere((a) => a.id == preAdmission.id);
+  //     _admissions.insert(0, converted);
+  //     _admissions.sort((a, b) => b.admissionDate.compareTo(a.admissionDate));
+  //
+  //     _isLoading = false;
+  //     notifyListeners();
+  //   } catch (e) {
+  //     _error = e.toString();
+  //     _isLoading = false;
+  //     notifyListeners();
+  //     rethrow;
+  //   }
+  // }
+  //
 
   void clearError() {
     _error = null;
