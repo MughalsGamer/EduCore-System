@@ -1,4 +1,6 @@
 //
+//
+// //2nd code
 // import 'dart:convert';
 // import 'dart:typed_data';
 //
@@ -6,18 +8,19 @@
 // import 'package:flutter/material.dart';
 // import 'package:intl/intl.dart';
 // import 'package:provider/provider.dart';
+// import 'package:shimmer/shimmer.dart';
 //
 // import '../../models/attendance_model.dart';
 // import '../../providers/attendance_provider.dart';
 //
-// // ─── Design tokens ───────────────────────────────────────────────
+// // ─── Design tokens (Material 3 inspired) ──────────────────────
 // const _kInk = Color(0xFF1F2937);
 // const _kSlate = Color(0xFF64748B);
 // const _kBorder = Color(0xFFE2E8F0);
-// const _kSurface = Color(0xFFF1F5F9);
+// const _kSurface = Color(0xFFF8FAFC);
 // const _kCard = Colors.white;
-// const _kPrimary = Color(0xFF1D4ED8);
-// const _kPrimaryDark = Color(0xFF0F1E3D);
+// const _kPrimary = Color(0xFF2563EB);
+// const _kPrimaryDark = Color(0xFF1E40AF);
 //
 // const _kGreen = Color(0xFF16A34A);
 // const _kGreenBg = Color(0xFFDCFCE7);
@@ -68,29 +71,38 @@
 //   State<BulkAttendanceScreen> createState() => _BulkAttendanceScreenState();
 // }
 //
-// class _BulkAttendanceScreenState extends State<BulkAttendanceScreen> {
+// class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
+//     with TickerProviderStateMixin {
 //   int _year = DateTime.now().year;
 //   int _month = DateTime.now().month;
 //   String? _selectedStaffId;
 //   String _search = '';
 //   bool _saving = false;
 //
-//   // True only for the very first load (no data on screen yet), so we can
-//   // show the big centered spinner exactly once. Every subsequent
-//   // month/year/staff change uses `_calendarLoading` instead, which only
-//   // affects the calendar card — nothing else on screen moves or resets.
 //   bool _initialLoading = true;
 //   bool _calendarLoading = false;
 //
-//   // Tracks which (staffId_date) cells the user has NOT touched yet, so
-//   // they render as blank ("—") instead of provider's default 'present'.
-//   // Sundays are excluded from this set (they show as holiday always).
 //   final Set<String> _untouched = {};
+//
+//   late AnimationController _fadeController;
+//   late Animation<double> _fadeAnimation;
 //
 //   @override
 //   void initState() {
 //     super.initState();
+//     _fadeController = AnimationController(
+//       vsync: this,
+//       duration: const Duration(milliseconds: 300),
+//     );
+//     _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
+//     _fadeController.forward();
 //     WidgetsBinding.instance.addPostFrameCallback((_) => _loadData(initial: true));
+//   }
+//
+//   @override
+//   void dispose() {
+//     _fadeController.dispose();
+//     super.dispose();
 //   }
 //
 //   Future<void> _loadData({bool initial = false}) async {
@@ -106,9 +118,6 @@
 //
 //     await provider.loadBulkAttendance(year: _year, month: _month, typeFilter: 'all');
 //
-//     // Mark every non-Sunday, not-already-saved-in-Firestore day as
-//     // "untouched" so the UI shows it blank instead of provider's
-//     // default 'present' status, until the user explicitly taps it.
 //     _untouched.clear();
 //     for (final r in provider.bulkRecords) {
 //       final dt = DateTime.parse(r.date);
@@ -128,6 +137,9 @@
 //       _initialLoading = false;
 //       _calendarLoading = false;
 //     });
+//
+//     _fadeController.reset();
+//     _fadeController.forward();
 //   }
 //
 //   String _key(String staffId, String date) => '${staffId}_$date';
@@ -161,7 +173,7 @@
 //       for (final r in records) {
 //         final dt = DateTime.parse(r.date);
 //         final isReadOnly = r.remarks == 'Before joining' || dt.weekday == DateTime.sunday;
-//         if (isReadOnly) continue; // skip holidays
+//         if (isReadOnly) continue;
 //         provider.updateBulkStatus(r.staffId, r.date, status);
 //         _untouched.remove(_key(r.staffId, r.date));
 //       }
@@ -204,9 +216,6 @@
 //     }
 //   }
 //
-//   // NEW: quick month-jump popup, mirrors the year picker's compact feel.
-//   // Lets Ali jump straight to any month within the currently picked year,
-//   // with < > arrows to flip years without closing the popup.
 //   Future<void> _pickMonth() async {
 //     final result = await showDialog<_MonthYearPick>(
 //       context: context,
@@ -260,14 +269,52 @@
 //       backgroundColor: _kSurface,
 //       body: SafeArea(
 //         child: _initialLoading
-//             ? const Center(child: CircularProgressIndicator())
+//             ? _buildInitialShimmer()
 //             : provider.bulkError != null
 //             ? Center(child: Text('Error: ${provider.bulkError}'))
 //             : provider.bulkRecords.isEmpty
 //             ? const Center(child: Text('No staff found.'))
-//             : isDesktop
-//             ? _buildDesktop(provider)
-//             : _buildMobile(provider),
+//             : FadeTransition(
+//           opacity: _fadeAnimation,
+//           child: isDesktop ? _buildDesktop(provider) : _buildMobile(provider),
+//         ),
+//       ),
+//     );
+//   }
+//
+//   Widget _buildInitialShimmer() {
+//     return Shimmer.fromColors(
+//       baseColor: _kBorder,
+//       highlightColor: Colors.grey[100]!,
+//       child: Padding(
+//         padding: const EdgeInsets.all(16),
+//         child: Column(
+//           children: [
+//             const SizedBox(height: 20),
+//             _shimmerBox(height: 40, width: double.infinity),
+//             const SizedBox(height: 16),
+//             Expanded(
+//               child: Row(
+//                 children: [
+//                   Expanded(child: _shimmerBox(height: double.infinity)),
+//                   const SizedBox(width: 16),
+//                   Expanded(child: _shimmerBox(height: double.infinity)),
+//                 ],
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+//
+//   Widget _shimmerBox({required double height, double? width}) {
+//     return Container(
+//       height: height,
+//       width: width,
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.circular(12),
 //       ),
 //     );
 //   }
@@ -308,10 +355,7 @@
 //   }
 //
 //   // ═══════════════════════════════════════════════════════════════
-//   // DESKTOP LAYOUT — mirrors the reference image exactly
-//   //   Row proportions tuned to match the screenshot: calendar is the
-//   //   widest card, overview is narrower (not a big dominant chart),
-//   //   employee panel stays a fixed compact width on the right.
+//   // DESKTOP LAYOUT
 //   // ═══════════════════════════════════════════════════════════════
 //   Widget _buildDesktop(AttendanceProvider provider) {
 //     final staffList = _uniqueStaff(provider.bulkRecords);
@@ -327,7 +371,7 @@
 //             child: Row(
 //               crossAxisAlignment: CrossAxisAlignment.start,
 //               children: [
-//                 Expanded(flex: 5, child: _buildCalendarCard(selected)),
+//                 Expanded(flex: 4, child: _buildCalendarCard(selected)),
 //                 const SizedBox(width: 16),
 //                 Expanded(flex: 4, child: _buildOverviewCard(counts, selected.length)),
 //                 const SizedBox(width: 16),
@@ -347,27 +391,7 @@
 //       color: _kSurface,
 //       child: Row(
 //         children: [
-//           Container(
-//             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-//             decoration: BoxDecoration(
-//               color: _kCard,
-//               borderRadius: BorderRadius.circular(8),
-//               border: Border.all(color: _kBorder),
-//             ),
-//             child: InkWell(
-//               onTap: _pickMonth,
-//               child: Row(
-//                 children: [
-//                   const Icon(Icons.calendar_today, size: 14, color: _kInk),
-//                   const SizedBox(width: 8),
-//                   Text(DateFormat('MMMM yyyy').format(DateTime(_year, _month)),
-//                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-//                   const SizedBox(width: 4),
-//                   const Icon(Icons.keyboard_arrow_down, size: 16, color: _kSlate),
-//                 ],
-//               ),
-//             ),
-//           ),
+//           _monthYearSelector(),
 //           const SizedBox(width: 10),
 //           _pillButton(label: 'All Present', icon: Icons.check_circle_outline, color: _kGreen, bg: _kGreenBg, onTap: () => _markAllForSelected('present')),
 //           const SizedBox(width: 8),
@@ -375,6 +399,36 @@
 //           const Spacer(),
 //           ..._legendChips(),
 //         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _monthYearSelector() {
+//     return Container(
+//       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+//       decoration: BoxDecoration(
+//         color: _kCard,
+//         borderRadius: BorderRadius.circular(10),
+//         border: Border.all(color: _kBorder),
+//         boxShadow: [
+//           BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 4, offset: const Offset(0, 2)),
+//         ],
+//       ),
+//       child: InkWell(
+//         onTap: _pickMonth,
+//         borderRadius: BorderRadius.circular(8),
+//         child: Row(
+//           children: [
+//             const Icon(Icons.calendar_today, size: 14, color: _kInk),
+//             const SizedBox(width: 8),
+//             Text(
+//               DateFormat('MMMM yyyy').format(DateTime(_year, _month)),
+//               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+//             ),
+//             const SizedBox(width: 4),
+//             const Icon(Icons.keyboard_arrow_down, size: 16, color: _kSlate),
+//           ],
+//         ),
 //       ),
 //     );
 //   }
@@ -388,12 +442,12 @@
 //   }) {
 //     return InkWell(
 //       onTap: onTap,
-//       borderRadius: BorderRadius.circular(8),
+//       borderRadius: BorderRadius.circular(10),
 //       child: Container(
 //         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
 //         decoration: BoxDecoration(
 //           color: bg,
-//           borderRadius: BorderRadius.circular(8),
+//           borderRadius: BorderRadius.circular(10),
 //           border: Border.all(color: color.withOpacity(0.3)),
 //         ),
 //         child: Row(
@@ -422,7 +476,10 @@
 //         padding: const EdgeInsets.only(left: 6),
 //         child: Container(
 //           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-//           decoration: BoxDecoration(color: item.$4, borderRadius: BorderRadius.circular(8)),
+//           decoration: BoxDecoration(
+//             color: item.$4,
+//             borderRadius: BorderRadius.circular(10),
+//           ),
 //           child: Column(
 //             mainAxisSize: MainAxisSize.min,
 //             children: [
@@ -440,60 +497,89 @@
 //       padding: const EdgeInsets.all(14),
 //       decoration: BoxDecoration(
 //         color: _kCard,
-//         borderRadius: BorderRadius.circular(12),
+//         borderRadius: BorderRadius.circular(16),
 //         border: Border.all(color: _kBorder),
+//         boxShadow: [
+//           BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+//         ],
 //       ),
 //       child: Column(
 //         crossAxisAlignment: CrossAxisAlignment.start,
 //         children: [
-//           Container(
-//             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-//             decoration: BoxDecoration(color: _kPrimaryDark, borderRadius: BorderRadius.circular(8)),
-//             child: Row(
-//               children: [
-//                 InkWell(onTap: _prevMonth, child: const Icon(Icons.chevron_left, color: Colors.white, size: 18)),
-//                 Expanded(
-//                   child: InkWell(
-//                     onTap: _pickMonth,
-//                     child: Center(
-//                       child: Text(
-//                         DateFormat('MMMM yyyy').format(DateTime(_year, _month)),
-//                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
-//                       ),
-//                     ),
-//                   ),
-//                 ),
-//                 InkWell(onTap: _nextMonth, child: const Icon(Icons.chevron_right, color: Colors.white, size: 18)),
-//               ],
+//           _calendarHeader(),
+//           const SizedBox(height: 10),
+//           _weekDayRow(),
+//           const SizedBox(height: 6),
+//           Expanded(
+//             child: AnimatedSwitcher(
+//               duration: const Duration(milliseconds: 200),
+//               child: _calendarLoading
+//                   ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+//                   : _buildCalendarGrid(records),
 //             ),
 //           ),
-//           const SizedBox(height: 10),
-//           Row(
-//             children: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-//                 .map((d) => Expanded(
-//               child: Center(
-//                 child: Text(d, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _kSlate)),
-//               ),
-//             ))
-//                 .toList(),
-//           ),
-//           const SizedBox(height: 6),
-//           // Only this inner region swaps to a spinner while a new
-//           // month/year loads — header, weekday row, legend, and the
-//           // rest of the screen never move.
-//           Expanded(
-//             child: _calendarLoading
-//                 ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-//                 : _buildCalendarGrid(records),
-//           ),
 //           const SizedBox(height: 8),
-//           Wrap(
-//             spacing: 10,
-//             runSpacing: 4,
-//             children: _kStatuses.map((s) => _dotLegend(s.label, s.color)).toList()..add(_dotLegend('Holiday', _kGray)),
+//           _statusLegendRow(),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _calendarHeader() {
+//     return Container(
+//       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+//       decoration: BoxDecoration(
+//         color: _kPrimaryDark,
+//         borderRadius: BorderRadius.circular(10),
+//       ),
+//       child: Row(
+//         children: [
+//           IconButton(
+//             onPressed: _prevMonth,
+//             icon: const Icon(Icons.chevron_left, color: Colors.white, size: 18),
+//             splashRadius: 16,
+//             padding: EdgeInsets.zero,
+//           ),
+//           Expanded(
+//             child: InkWell(
+//               onTap: _pickMonth,
+//               child: Center(
+//                 child: Text(
+//                   DateFormat('MMMM yyyy').format(DateTime(_year, _month)),
+//                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+//                 ),
+//               ),
+//             ),
+//           ),
+//           IconButton(
+//             onPressed: _nextMonth,
+//             icon: const Icon(Icons.chevron_right, color: Colors.white, size: 18),
+//             splashRadius: 16,
+//             padding: EdgeInsets.zero,
 //           ),
 //         ],
 //       ),
+//     );
+//   }
+//
+//   Widget _weekDayRow() {
+//     return Row(
+//       children: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+//           .map((d) => Expanded(
+//         child: Center(
+//           child: Text(d, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _kSlate)),
+//         ),
+//       ))
+//           .toList(),
+//     );
+//   }
+//
+//   Widget _statusLegendRow() {
+//     return Wrap(
+//       spacing: 10,
+//       runSpacing: 4,
+//       children: _kStatuses.map((s) => _dotLegend(s.label, s.color)).toList()
+//         ..add(_dotLegend('Holiday', _kGray)),
 //     );
 //   }
 //
@@ -525,11 +611,13 @@
 //       cells.add(_buildDayCell(dt, rec));
 //     }
 //
-//     return GridView.count(
-//       crossAxisCount: 7,
-//       mainAxisSpacing: 6,
-//       crossAxisSpacing: 6,
-//       children: cells,
+//     return RepaintBoundary(
+//       child: GridView.count(
+//         crossAxisCount: 7,
+//         mainAxisSpacing: 6,
+//         crossAxisSpacing: 6,
+//         children: cells,
+//       ),
 //     );
 //   }
 //
@@ -539,30 +627,34 @@
 //     final status = isReadOnly ? 'holiday' : _effectiveStatus(rec);
 //     final info = _statusInfo(status);
 //
-//     return InkWell(
-//       onTap: isReadOnly ? null : () => _openStatusPicker(rec),
-//       borderRadius: BorderRadius.circular(8),
-//       child: Container(
-//         decoration: BoxDecoration(
-//           color: info.bg,
-//           borderRadius: BorderRadius.circular(8),
-//           border: Border.all(color: status == 'unset' ? _kBorder : info.color.withOpacity(0.35)),
-//         ),
-//         alignment: Alignment.center,
-//         child: Text(
-//           '${dt.day}',
-//           style: TextStyle(
-//             fontSize: 13,
-//             fontWeight: FontWeight.w700,
-//             color: isReadOnly ? _kSlate : (status == 'unset' ? _kInk : info.color),
+//     return Material(
+//       color: Colors.transparent,
+//       child: InkWell(
+//         onTap: isReadOnly ? null : () => _openStatusPicker(rec),
+//         borderRadius: BorderRadius.circular(8),
+//         child: AnimatedContainer(
+//           duration: const Duration(milliseconds: 200),
+//           decoration: BoxDecoration(
+//             color: info.bg,
+//             borderRadius: BorderRadius.circular(8),
+//             border: Border.all(
+//               color: status == 'unset' ? _kBorder : info.color.withOpacity(0.35),
+//             ),
+//           ),
+//           alignment: Alignment.center,
+//           child: Text(
+//             '${dt.day}',
+//             style: TextStyle(
+//               fontSize: 13,
+//               fontWeight: FontWeight.w700,
+//               color: isReadOnly ? _kSlate : (status == 'unset' ? _kInk : info.color),
+//             ),
 //           ),
 //         ),
 //       ),
 //     );
 //   }
 //
-//   // Overview card: fixed, modest chart size (radius-capped) so it never
-//   // grows to dominate the row the way a naive Expanded PieChart would.
 //   Widget _buildOverviewCard(Map<String, int> counts, int totalDays) {
 //     final segments = [
 //       ('present', 'Present', _kGreen),
@@ -579,21 +671,23 @@
 //       padding: const EdgeInsets.all(14),
 //       decoration: BoxDecoration(
 //         color: _kCard,
-//         borderRadius: BorderRadius.circular(12),
+//         borderRadius: BorderRadius.circular(16),
 //         border: Border.all(color: _kBorder),
+//         boxShadow: [
+//           BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+//         ],
 //       ),
 //       child: Column(
 //         crossAxisAlignment: CrossAxisAlignment.start,
 //         children: [
 //           const Text('Attendance Overview', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
 //           const SizedBox(height: 12),
-//           // Fixed-height chart zone instead of Expanded — keeps the
-//           // donut visually proportionate to the calendar/employee cards
-//           // regardless of available vertical space.
 //           SizedBox(
 //             height: 220,
 //             child: sumForChart == 0
-//                 ? const Center(child: Text('No attendance marked yet', style: TextStyle(color: _kSlate, fontSize: 12)))
+//                 ? const Center(
+//                 child: Text('No attendance marked yet',
+//                     style: TextStyle(color: _kSlate, fontSize: 12)))
 //                 : Stack(
 //               alignment: Alignment.center,
 //               children: [
@@ -609,7 +703,10 @@
 //                         color: s.$3,
 //                         radius: 48,
 //                         title: '${pct.toStringAsFixed(1)}%',
-//                         titleStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+//                         titleStyle: const TextStyle(
+//                             fontSize: 11,
+//                             fontWeight: FontWeight.w700,
+//                             color: Colors.white),
 //                       );
 //                     }).toList(),
 //                   ),
@@ -617,8 +714,11 @@
 //                 Column(
 //                   mainAxisSize: MainAxisSize.min,
 //                   children: [
-//                     Text('$totalDays', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: _kInk)),
-//                     const Text('Days', style: TextStyle(fontSize: 11, color: _kSlate)),
+//                     Text('$totalDays',
+//                         style: const TextStyle(
+//                             fontSize: 24, fontWeight: FontWeight.w800, color: _kInk)),
+//                     const Text('Days',
+//                         style: TextStyle(fontSize: 11, color: _kSlate)),
 //                   ],
 //                 ),
 //               ],
@@ -635,17 +735,19 @@
 //     );
 //   }
 //
-//   // Employee panel: fixed overall height via IntrinsicHeight-free approach —
-//   // wrapped so the inner ListView always has bounded height and scrolls
-//   // internally, no matter how many staff members exist.
 //   Widget _buildEmployeePanel(List<AttendanceRecord> staffList) {
-//     final filtered = staffList.where((s) => s.staffName.toLowerCase().contains(_search.toLowerCase())).toList();
+//     final filtered = staffList
+//         .where((s) => s.staffName.toLowerCase().contains(_search.toLowerCase()))
+//         .toList();
 //
 //     return Container(
 //       decoration: BoxDecoration(
 //         color: _kCard,
-//         borderRadius: BorderRadius.circular(12),
+//         borderRadius: BorderRadius.circular(16),
 //         border: Border.all(color: _kBorder),
+//         boxShadow: [
+//           BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+//         ],
 //       ),
 //       child: Column(
 //         crossAxisAlignment: CrossAxisAlignment.start,
@@ -655,17 +757,24 @@
 //             child: Column(
 //               crossAxisAlignment: CrossAxisAlignment.start,
 //               children: [
-//                 const Text('Select Employee', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+//                 const Text('Select Employee',
+//                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
 //                 const SizedBox(height: 8),
 //                 TextField(
 //                   decoration: InputDecoration(
 //                     hintText: 'Search employee...',
 //                     prefixIcon: const Icon(Icons.search, size: 18),
 //                     isDense: true,
+//                     filled: true,
+//                     fillColor: _kSurface,
 //                     contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
 //                     border: OutlineInputBorder(
-//                       borderRadius: BorderRadius.circular(8),
+//                       borderRadius: BorderRadius.circular(10),
 //                       borderSide: const BorderSide(color: _kBorder),
+//                     ),
+//                     focusedBorder: OutlineInputBorder(
+//                       borderRadius: BorderRadius.circular(10),
+//                       borderSide: const BorderSide(color: _kPrimary, width: 1.5),
 //                     ),
 //                   ),
 //                   onChanged: (v) => setState(() => _search = v),
@@ -674,17 +783,13 @@
 //             ),
 //           ),
 //           const Divider(height: 1, color: _kBorder),
-//           // Explicit Expanded here is what makes this list scroll
-//           // internally when staff count grows — the outer Row already
-//           // gives this whole panel a bounded height via the calendar
-//           // card's Expanded sibling, so ListView.builder scrolls instead
-//           // of pushing the page taller.
 //           Expanded(
 //             child: filtered.isEmpty
 //                 ? const Center(
 //               child: Padding(
 //                 padding: EdgeInsets.all(16),
-//                 child: Text('No employees found', style: TextStyle(fontSize: 12, color: _kSlate)),
+//                 child: Text('No employees found',
+//                     style: TextStyle(fontSize: 12, color: _kSlate)),
 //               ),
 //             )
 //                 : Scrollbar(
@@ -695,26 +800,7 @@
 //                 itemBuilder: (ctx, i) {
 //                   final s = filtered[i];
 //                   final isSelected = s.staffId == _selectedStaffId;
-//                   return Container(
-//                     margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-//                     decoration: BoxDecoration(
-//                       color: isSelected ? _kPrimary.withOpacity(0.07) : Colors.transparent,
-//                       borderRadius: BorderRadius.circular(8),
-//                       border: isSelected ? Border.all(color: _kPrimary.withOpacity(0.4)) : null,
-//                     ),
-//                     child: ListTile(
-//                       dense: true,
-//                       onTap: () => setState(() => _selectedStaffId = s.staffId),
-//                       leading: _employeeAvatar(s),
-//                       title: Text(s.staffName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-//                       subtitle: Text(s.designation ?? s.type, style: const TextStyle(fontSize: 11, color: _kSlate)),
-//                       trailing: Checkbox(
-//                         value: isSelected,
-//                         activeColor: _kPrimary,
-//                         onChanged: (_) => setState(() => _selectedStaffId = s.staffId),
-//                       ),
-//                     ),
-//                   );
+//                   return _employeeTile(s, isSelected);
 //                 },
 //               ),
 //             ),
@@ -724,18 +810,65 @@
 //     );
 //   }
 //
+//   Widget _employeeTile(AttendanceRecord s, bool isSelected) {
+//     return Padding(
+//       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+//       child: Material(
+//         color: Colors.transparent,
+//         child: InkWell(
+//           onTap: () => setState(() => _selectedStaffId = s.staffId),
+//           borderRadius: BorderRadius.circular(10),
+//           child: AnimatedContainer(
+//             duration: const Duration(milliseconds: 200),
+//             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+//             decoration: BoxDecoration(
+//               color: isSelected ? _kPrimary.withOpacity(0.07) : Colors.transparent,
+//               borderRadius: BorderRadius.circular(10),
+//               border: isSelected ? Border.all(color: _kPrimary.withOpacity(0.4)) : null,
+//             ),
+//             child: Row(
+//               children: [
+//                 _employeeAvatar(s),
+//                 const SizedBox(width: 10),
+//                 Expanded(
+//                   child: Column(
+//                     crossAxisAlignment: CrossAxisAlignment.start,
+//                     mainAxisSize: MainAxisSize.min,
+//                     children: [
+//                       Text(s.staffName,
+//                           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+//                       const SizedBox(height: 2),
+//                       Text(s.designation ?? s.type,
+//                           style: const TextStyle(fontSize: 11, color: _kSlate)),
+//                     ],
+//                   ),
+//                 ),
+//                 Checkbox(
+//                   value: isSelected,
+//                   activeColor: _kPrimary,
+//                   onChanged: (_) => setState(() => _selectedStaffId = s.staffId),
+//                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+//                 ),
+//               ],
+//             ),
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+//
 //   Widget _employeeAvatar(AttendanceRecord s) {
 //     final hasPhoto = s.photoBase64 != null && s.photoBase64!.isNotEmpty;
 //     if (hasPhoto) {
 //       final bytes = _decodeBase64(s.photoBase64!);
 //       if (bytes != null) {
-//         return CircleAvatar(radius: 18, backgroundImage: MemoryImage(bytes));
+//         return CircleAvatar(radius: 16, backgroundImage: MemoryImage(bytes));
 //       }
 //     }
 //     return CircleAvatar(
-//       radius: 18,
+//       radius: 16,
 //       backgroundColor: _kBorder,
-//       child: Icon(Icons.person, size: 18, color: _kSlate),
+//       child: Icon(Icons.person, size: 16, color: _kSlate),
 //     );
 //   }
 //
@@ -749,7 +882,8 @@
 //       child: Column(
 //         crossAxisAlignment: CrossAxisAlignment.start,
 //         children: [
-//           const Text('Attendance Summary', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+//           const Text('Attendance Summary',
+//               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
 //           const SizedBox(height: 8),
 //           Row(children: [Expanded(child: _summaryChipRow(counts))]),
 //           const SizedBox(height: 10),
@@ -759,24 +893,31 @@
 //                 children: [
 //                   const Icon(Icons.calendar_today, size: 14, color: _kSlate),
 //                   const SizedBox(width: 6),
-//                   Text('Total Days: ${records.length}', style: const TextStyle(fontSize: 12, color: _kSlate, fontWeight: FontWeight.w600)),
+//                   Text('Total Days: ${records.length}',
+//                       style: const TextStyle(
+//                           fontSize: 12, color: _kSlate, fontWeight: FontWeight.w600)),
 //                 ],
 //               ),
 //               const SizedBox(width: 16),
-//               const Text('Click on date to view or mark attendance', style: TextStyle(fontSize: 11, color: _kSlate, fontStyle: FontStyle.italic)),
+//               const Text('Click on date to view or mark attendance',
+//                   style: TextStyle(fontSize: 11, color: _kSlate, fontStyle: FontStyle.italic)),
 //               const Spacer(),
 //               ElevatedButton.icon(
 //                 onPressed: (_saving || _selectedStaffId == null) ? null : _saveAttendance,
 //                 icon: _saving
-//                     ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+//                     ? const SizedBox(
+//                     width: 14,
+//                     height: 14,
+//                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
 //                     : const Icon(Icons.save, size: 16),
-//                 label: const Text('Save Attendance', style: TextStyle(fontWeight: FontWeight.w700)),
+//                 label: const Text('Save Attendance',
+//                     style: TextStyle(fontWeight: FontWeight.w700)),
 //                 style: ElevatedButton.styleFrom(
 //                   backgroundColor: _kPrimary,
 //                   foregroundColor: Colors.white,
 //                   elevation: 0,
 //                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-//                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+//                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
 //                 ),
 //               ),
 //             ],
@@ -803,17 +944,27 @@
 //             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
 //             decoration: BoxDecoration(
 //               color: _kCard,
-//               borderRadius: BorderRadius.circular(10),
+//               borderRadius: BorderRadius.circular(12),
 //               border: Border.all(color: _kBorder),
+//               boxShadow: [
+//                 BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+//               ],
 //             ),
 //             child: Column(
 //               crossAxisAlignment: CrossAxisAlignment.start,
 //               children: [
-//                 Text('${item.$2}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: item.$3)),
+//                 Text('${item.$2}',
+//                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: item.$3)),
 //                 const SizedBox(height: 2),
 //                 Text(item.$1, style: const TextStyle(fontSize: 11, color: _kSlate)),
 //                 const SizedBox(height: 4),
-//                 Container(height: 3, decoration: BoxDecoration(color: item.$3, borderRadius: BorderRadius.circular(2))),
+//                 Container(
+//                   height: 3,
+//                   decoration: BoxDecoration(
+//                     color: item.$3,
+//                     borderRadius: BorderRadius.circular(2),
+//                   ),
+//                 ),
 //               ],
 //             ),
 //           ),
@@ -823,199 +974,45 @@
 //   }
 //
 //   // ═══════════════════════════════════════════════════════════════
-//   // MOBILE LAYOUT
+//   // MOBILE LAYOUT (same improvements)
 //   // ═══════════════════════════════════════════════════════════════
 //   Widget _buildMobile(AttendanceProvider provider) {
 //     final staffList = _uniqueStaff(provider.bulkRecords);
 //     final selected = _selectedRecords(provider);
 //     final counts = _counts(selected);
-//     final filteredStaff = staffList.where((s) => s.staffName.toLowerCase().contains(_search.toLowerCase())).toList();
+//     final filteredStaff =
+//     staffList.where((s) => s.staffName.toLowerCase().contains(_search.toLowerCase())).toList();
 //
 //     return SingleChildScrollView(
 //       padding: const EdgeInsets.all(12),
 //       child: Column(
 //         crossAxisAlignment: CrossAxisAlignment.start,
 //         children: [
-//           ElevatedButton.icon(
-//             onPressed: (_saving || _selectedStaffId == null) ? null : _saveAttendance,
-//             icon: _saving
-//                 ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-//                 : const Icon(Icons.save, size: 16),
-//             label: const Text('Save Attendance'),
-//             style: ElevatedButton.styleFrom(
-//               backgroundColor: _kPrimary,
-//               foregroundColor: Colors.white,
-//               elevation: 0,
-//               minimumSize: const Size(double.infinity, 44),
-//               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-//             ),
-//           ),
+//           _mobileSaveButton(),
 //           const SizedBox(height: 12),
-//           const Text('Attendance Calendar', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _kInk)),
+//           const Text('Attendance Calendar',
+//               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _kInk)),
 //           const SizedBox(height: 12),
-//           TextField(
-//             decoration: InputDecoration(
-//               hintText: 'Search employee...',
-//               prefixIcon: const Icon(Icons.search, size: 18),
-//               isDense: true,
-//               filled: true,
-//               fillColor: _kCard,
-//               contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-//               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorder)),
-//             ),
-//             onChanged: (v) => setState(() => _search = v),
-//           ),
+//           _mobileSearchBar(),
 //           const SizedBox(height: 10),
-//           // Horizontal chip strip already scrolls on its own axis, so
-//           // any number of employees is fine here without extra work.
-//           SizedBox(
-//             height: 42,
-//             child: ListView.builder(
-//               scrollDirection: Axis.horizontal,
-//               itemCount: filteredStaff.length,
-//               itemBuilder: (ctx, i) {
-//                 final s = filteredStaff[i];
-//                 final isSelected = s.staffId == _selectedStaffId;
-//                 return Padding(
-//                   padding: const EdgeInsets.only(right: 8),
-//                   child: ChoiceChip(
-//                     avatar: _employeeAvatar(s),
-//                     label: Text(s.staffName, style: const TextStyle(fontSize: 12)),
-//                     selected: isSelected,
-//                     selectedColor: _kPrimary.withOpacity(0.15),
-//                     labelStyle: TextStyle(color: isSelected ? _kPrimary : _kInk, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500),
-//                     onSelected: (_) => setState(() => _selectedStaffId = s.staffId),
-//                   ),
-//                 );
-//               },
-//             ),
-//           ),
+//           _mobileStaffChips(filteredStaff),
 //           const SizedBox(height: 12),
-//           Row(
-//             children: [
-//               Container(
-//                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-//                 decoration: BoxDecoration(color: _kCard, borderRadius: BorderRadius.circular(8), border: Border.all(color: _kBorder)),
-//                 child: InkWell(
-//                   onTap: _pickMonth,
-//                   child: Row(
-//                     mainAxisSize: MainAxisSize.min,
-//                     children: [
-//                       const Icon(Icons.calendar_today, size: 14),
-//                       const SizedBox(width: 8),
-//                       Text(DateFormat('MMMM').format(DateTime(_year, _month)), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-//                       const Icon(Icons.keyboard_arrow_down, size: 16),
-//                     ],
-//                   ),
-//                 ),
-//               ),
-//               const SizedBox(width: 8),
-//               Expanded(
-//                 child: Container(
-//                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-//                   decoration: BoxDecoration(color: _kCard, borderRadius: BorderRadius.circular(8), border: Border.all(color: _kBorder)),
-//                   child: InkWell(
-//                     onTap: _pickYear,
-//                     child: Row(
-//                       children: [
-//                         Text('$_year', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-//                         const Spacer(),
-//                         const Icon(Icons.keyboard_arrow_down, size: 16),
-//                       ],
-//                     ),
-//                   ),
-//                 ),
-//               ),
-//             ],
-//           ),
+//           _mobileMonthYearRow(),
 //           const SizedBox(height: 12),
 //           if (_selectedStaffId != null) ...[
-//             Container(
-//               padding: const EdgeInsets.all(12),
-//               decoration: BoxDecoration(color: _kCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: _kBorder)),
-//               child: Column(
-//                 children: [
-//                   Container(
-//                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-//                     decoration: BoxDecoration(color: _kPrimaryDark, borderRadius: BorderRadius.circular(8)),
-//                     child: Row(
-//                       children: [
-//                         InkWell(onTap: _prevMonth, child: const Icon(Icons.chevron_left, color: Colors.white)),
-//                         Expanded(
-//                           child: InkWell(
-//                             onTap: _pickMonth,
-//                             child: Center(
-//                               child: Text(DateFormat('MMMM yyyy').format(DateTime(_year, _month)),
-//                                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-//                             ),
-//                           ),
-//                         ),
-//                         InkWell(onTap: _nextMonth, child: const Icon(Icons.chevron_right, color: Colors.white)),
-//                       ],
-//                     ),
-//                   ),
-//                   const SizedBox(height: 8),
-//                   Row(
-//                     children: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-//                         .map((d) => Expanded(child: Center(child: Text(d, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _kSlate)))))
-//                         .toList(),
-//                   ),
-//                   const SizedBox(height: 6),
-//                   SizedBox(
-//                     height: 260,
-//                     child: _calendarLoading
-//                         ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-//                         : _buildCalendarGrid(selected),
-//                   ),
-//                   const SizedBox(height: 8),
-//                   Wrap(
-//                     spacing: 8,
-//                     runSpacing: 4,
-//                     children: _kStatuses.map((s) => _dotLegend(s.label, s.color)).toList()..add(_dotLegend('Holiday', _kGray)),
-//                   ),
-//                 ],
-//               ),
-//             ),
+//             _mobileCalendarCard(selected),
 //             const SizedBox(height: 12),
-//             Row(
-//               children: [
-//                 Expanded(child: _pillButton(label: 'All Present', icon: Icons.check_circle_outline, color: _kGreen, bg: _kGreenBg, onTap: () => _markAllForSelected('present'))),
-//                 const SizedBox(width: 8),
-//                 Expanded(child: _pillButton(label: 'All Absent', icon: Icons.cancel_outlined, color: _kRed, bg: _kRedBg, onTap: () => _markAllForSelected('absent'))),
-//               ],
-//             ),
+//             _mobileBulkActionsRow(),
 //             const SizedBox(height: 12),
-//             Container(
-//               padding: const EdgeInsets.all(14),
-//               decoration: BoxDecoration(color: _kCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: _kBorder)),
-//               child: Column(
-//                 crossAxisAlignment: CrossAxisAlignment.start,
-//                 children: [
-//                   const Text('Attendance Overview', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-//                   const SizedBox(height: 12),
-//                   SizedBox(height: 200, child: _buildOverviewChartOnly(counts, selected.length)),
-//                   const SizedBox(height: 10),
-//                   Wrap(
-//                     spacing: 12,
-//                     runSpacing: 6,
-//                     children: [
-//                       _dotLegend('Present', _kGreen),
-//                       _dotLegend('Late', _kOrange),
-//                       _dotLegend('Leave', _kBlue),
-//                       _dotLegend('Half Day', _kPurple),
-//                       _dotLegend('Absent', _kRed),
-//                       _dotLegend('Holiday', _kGray),
-//                     ],
-//                   ),
-//                 ],
-//               ),
-//             ),
+//             _mobileOverviewCard(counts, selected.length),
 //             const SizedBox(height: 12),
-//             const Text('Attendance Summary', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+//             const Text('Attendance Summary',
+//                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
 //             const SizedBox(height: 8),
 //             _buildSummaryGrid(counts),
 //             const SizedBox(height: 8),
-//             Text('Total Days: ${selected.length}', style: const TextStyle(fontSize: 12, color: _kSlate, fontWeight: FontWeight.w600)),
+//             Text('Total Days: ${selected.length}',
+//                 style: const TextStyle(fontSize: 12, color: _kSlate, fontWeight: FontWeight.w600)),
 //           ] else
 //             const Padding(
 //               padding: EdgeInsets.symmetric(vertical: 40),
@@ -1026,15 +1023,229 @@
 //     );
 //   }
 //
+//   Widget _mobileSaveButton() {
+//     return ElevatedButton.icon(
+//       onPressed: (_saving || _selectedStaffId == null) ? null : _saveAttendance,
+//       icon: _saving
+//           ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+//           : const Icon(Icons.save, size: 16),
+//       label: const Text('Save Attendance'),
+//       style: ElevatedButton.styleFrom(
+//         backgroundColor: _kPrimary,
+//         foregroundColor: Colors.white,
+//         elevation: 0,
+//         minimumSize: const Size(double.infinity, 44),
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+//       ),
+//     );
+//   }
+//
+//   Widget _mobileSearchBar() {
+//     return TextField(
+//       decoration: InputDecoration(
+//         hintText: 'Search employee...',
+//         prefixIcon: const Icon(Icons.search, size: 18),
+//         isDense: true,
+//         filled: true,
+//         fillColor: _kCard,
+//         contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+//         border: OutlineInputBorder(
+//             borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kBorder)),
+//         focusedBorder: OutlineInputBorder(
+//             borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kPrimary)),
+//       ),
+//       onChanged: (v) => setState(() => _search = v),
+//     );
+//   }
+//
+//   Widget _mobileStaffChips(List<AttendanceRecord> filteredStaff) {
+//     return SizedBox(
+//       height: 42,
+//       child: ListView.builder(
+//         scrollDirection: Axis.horizontal,
+//         itemCount: filteredStaff.length,
+//         itemBuilder: (ctx, i) {
+//           final s = filteredStaff[i];
+//           final isSelected = s.staffId == _selectedStaffId;
+//           return Padding(
+//             padding: const EdgeInsets.only(right: 8),
+//             child: ChoiceChip(
+//               avatar: _employeeAvatar(s),
+//               label: Text(s.staffName, style: const TextStyle(fontSize: 12)),
+//               selected: isSelected,
+//               selectedColor: _kPrimary.withOpacity(0.15),
+//               labelStyle: TextStyle(
+//                   color: isSelected ? _kPrimary : _kInk,
+//                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500),
+//               onSelected: (_) => setState(() => _selectedStaffId = s.staffId),
+//               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+//             ),
+//           );
+//         },
+//       ),
+//     );
+//   }
+//
+//   Widget _mobileMonthYearRow() {
+//     return Row(
+//       children: [
+//         Expanded(
+//           child: Container(
+//             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+//             decoration: BoxDecoration(
+//                 color: _kCard,
+//                 borderRadius: BorderRadius.circular(10),
+//                 border: Border.all(color: _kBorder)),
+//             child: InkWell(
+//               onTap: _pickMonth,
+//               child: Row(
+//                 mainAxisSize: MainAxisSize.min,
+//                 children: [
+//                   const Icon(Icons.calendar_today, size: 14),
+//                   const SizedBox(width: 8),
+//                   Text(DateFormat('MMMM').format(DateTime(_year, _month)),
+//                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+//                   const Spacer(),
+//                   const Icon(Icons.keyboard_arrow_down, size: 16),
+//                 ],
+//               ),
+//             ),
+//           ),
+//         ),
+//         const SizedBox(width: 8),
+//         Expanded(
+//           child: Container(
+//             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+//             decoration: BoxDecoration(
+//                 color: _kCard,
+//                 borderRadius: BorderRadius.circular(10),
+//                 border: Border.all(color: _kBorder)),
+//             child: InkWell(
+//               onTap: _pickYear,
+//               child: Row(
+//                 children: [
+//                   Text('$_year', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+//                   const Spacer(),
+//                   const Icon(Icons.keyboard_arrow_down, size: 16),
+//                 ],
+//               ),
+//             ),
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+//
+//   Widget _mobileCalendarCard(List<AttendanceRecord> selected) {
+//     return Container(
+//       padding: const EdgeInsets.all(12),
+//       decoration: BoxDecoration(
+//         color: _kCard,
+//         borderRadius: BorderRadius.circular(16),
+//         border: Border.all(color: _kBorder),
+//         boxShadow: [
+//           BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+//         ],
+//       ),
+//       child: Column(
+//         children: [
+//           _calendarHeader(),
+//           const SizedBox(height: 8),
+//           _weekDayRow(),
+//           const SizedBox(height: 6),
+//           SizedBox(
+//             height: 260,
+//             child: AnimatedSwitcher(
+//               duration: const Duration(milliseconds: 200),
+//               child: _calendarLoading
+//                   ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+//                   : _buildCalendarGrid(selected),
+//             ),
+//           ),
+//           const SizedBox(height: 8),
+//           _statusLegendRow(),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _mobileBulkActionsRow() {
+//     return Row(
+//       children: [
+//         Expanded(
+//           child: _pillButton(
+//               label: 'All Present',
+//               icon: Icons.check_circle_outline,
+//               color: _kGreen,
+//               bg: _kGreenBg,
+//               onTap: () => _markAllForSelected('present')),
+//         ),
+//         const SizedBox(width: 8),
+//         Expanded(
+//           child: _pillButton(
+//               label: 'All Absent',
+//               icon: Icons.cancel_outlined,
+//               color: _kRed,
+//               bg: _kRedBg,
+//               onTap: () => _markAllForSelected('absent')),
+//         ),
+//       ],
+//     );
+//   }
+//
+//   Widget _mobileOverviewCard(Map<String, int> counts, int totalDays) {
+//     return Container(
+//       padding: const EdgeInsets.all(14),
+//       decoration: BoxDecoration(
+//         color: _kCard,
+//         borderRadius: BorderRadius.circular(16),
+//         border: Border.all(color: _kBorder),
+//         boxShadow: [
+//           BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+//         ],
+//       ),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           const Text('Attendance Overview',
+//               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+//           const SizedBox(height: 12),
+//           SizedBox(
+//               height: 200,
+//               child: _buildOverviewChartOnly(counts, totalDays)),
+//           const SizedBox(height: 10),
+//           Wrap(
+//             spacing: 12,
+//             runSpacing: 6,
+//             children: [
+//               _dotLegend('Present', _kGreen),
+//               _dotLegend('Late', _kOrange),
+//               _dotLegend('Leave', _kBlue),
+//               _dotLegend('Half Day', _kPurple),
+//               _dotLegend('Absent', _kRed),
+//               _dotLegend('Holiday', _kGray),
+//             ],
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
 //   Widget _buildOverviewChartOnly(Map<String, int> counts, int totalDays) {
 //     final segments = [
-//       ('present', _kGreen), ('late', _kOrange), ('leave', _kBlue),
-//       ('half_day', _kPurple), ('absent', _kRed), ('holiday', _kGray),
+//       ('present', _kGreen),
+//       ('late', _kOrange),
+//       ('leave', _kBlue),
+//       ('half_day', _kPurple),
+//       ('absent', _kRed),
+//       ('holiday', _kGray),
 //     ];
 //     final nonZero = segments.where((s) => (counts[s.$1] ?? 0) > 0).toList();
 //     final sumForChart = nonZero.fold<int>(0, (a, s) => a + (counts[s.$1] ?? 0));
 //     if (sumForChart == 0) {
-//       return const Center(child: Text('No attendance marked yet', style: TextStyle(color: _kSlate, fontSize: 12)));
+//       return const Center(
+//           child: Text('No attendance marked yet',
+//               style: TextStyle(color: _kSlate, fontSize: 12)));
 //     }
 //     return Stack(
 //       alignment: Alignment.center,
@@ -1051,7 +1262,10 @@
 //                 color: s.$2,
 //                 radius: 45,
 //                 title: '${pct.toStringAsFixed(1)}%',
-//                 titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+//                 titleStyle: const TextStyle(
+//                     fontSize: 10,
+//                     fontWeight: FontWeight.w700,
+//                     color: Colors.white),
 //               );
 //             }).toList(),
 //           ),
@@ -1059,7 +1273,9 @@
 //         Column(
 //           mainAxisSize: MainAxisSize.min,
 //           children: [
-//             Text('$totalDays', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _kInk)),
+//             Text('$totalDays',
+//                 style: const TextStyle(
+//                     fontSize: 22, fontWeight: FontWeight.w800, color: _kInk)),
 //             const Text('Days', style: TextStyle(fontSize: 10, color: _kSlate)),
 //           ],
 //         ),
@@ -1086,12 +1302,20 @@
 //       children: items.map((item) {
 //         return Container(
 //           padding: const EdgeInsets.all(10),
-//           decoration: BoxDecoration(color: _kCard, borderRadius: BorderRadius.circular(10), border: Border.all(color: _kBorder)),
+//           decoration: BoxDecoration(
+//             color: _kCard,
+//             borderRadius: BorderRadius.circular(12),
+//             border: Border.all(color: _kBorder),
+//             boxShadow: [
+//               BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+//             ],
+//           ),
 //           child: Column(
 //             crossAxisAlignment: CrossAxisAlignment.start,
 //             mainAxisAlignment: MainAxisAlignment.center,
 //             children: [
-//               Text('${item.$2}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: item.$3)),
+//               Text('${item.$2}',
+//                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: item.$3)),
 //               Text(item.$1, style: const TextStyle(fontSize: 11, color: _kSlate)),
 //             ],
 //           ),
@@ -1114,7 +1338,7 @@
 // // ═══════════════════════════════════════════════════════════════
 // class _StatusPickerSheet extends StatelessWidget {
 //   final DateTime date;
-//   final String currentStatus; // '' means unset
+//   final String currentStatus;
 //
 //   const _StatusPickerSheet({required this.date, required this.currentStatus});
 //
@@ -1142,11 +1366,13 @@
 //             children: [
 //               const Icon(Icons.calendar_today, size: 16, color: _kPrimary),
 //               const SizedBox(width: 8),
-//               Text(DateFormat('EEEE, d MMMM yyyy').format(date), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+//               Text(DateFormat('EEEE, d MMMM yyyy').format(date),
+//                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
 //             ],
 //           ),
 //           const SizedBox(height: 4),
-//           const Text('Select attendance status', style: TextStyle(fontSize: 12, color: _kSlate)),
+//           const Text('Select attendance status',
+//               style: TextStyle(fontSize: 12, color: _kSlate)),
 //           const SizedBox(height: 16),
 //           GridView.count(
 //             crossAxisCount: 3,
@@ -1164,14 +1390,20 @@
 //                   decoration: BoxDecoration(
 //                     color: s.bg,
 //                     borderRadius: BorderRadius.circular(12),
-//                     border: Border.all(color: isSelected ? s.color : s.color.withOpacity(0.25), width: isSelected ? 2 : 1),
+//                     border: Border.all(
+//                         color: isSelected ? s.color : s.color.withOpacity(0.25),
+//                         width: isSelected ? 2 : 1),
 //                   ),
 //                   child: Column(
 //                     mainAxisAlignment: MainAxisAlignment.center,
 //                     children: [
 //                       Icon(s.icon, color: s.color, size: 22),
 //                       const SizedBox(height: 6),
-//                       Text(s.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: s.color)),
+//                       Text(s.label,
+//                           style: TextStyle(
+//                               fontSize: 12,
+//                               fontWeight: FontWeight.w700,
+//                               color: s.color)),
 //                     ],
 //                   ),
 //                 ),
@@ -1185,7 +1417,7 @@
 // }
 //
 // // ═══════════════════════════════════════════════════════════════
-// // Compact year picker popup (small, opens when clicking year)
+// // Compact year picker popup
 // // ═══════════════════════════════════════════════════════════════
 // class _CompactYearPicker extends StatelessWidget {
 //   final int currentYear;
@@ -1211,7 +1443,8 @@
 //             children: [
 //               const Padding(
 //                 padding: EdgeInsets.symmetric(vertical: 6),
-//                 child: Text('Select Year', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+//                 child: Text('Select Year',
+//                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
 //               ),
 //               Flexible(
 //                 child: GridView.builder(
@@ -1258,10 +1491,7 @@
 // }
 //
 // // ═══════════════════════════════════════════════════════════════
-// // NEW: Compact month picker popup — same tight dialog UX as the year
-// // picker. Shows a 3x4 grid of month abbreviations for the currently
-// // selected year, with < > arrows above to flip years in place without
-// // closing the popup (so jumping e.g. "Nov 2023" takes 2 taps total).
+// // Compact month picker popup
 // // ═══════════════════════════════════════════════════════════════
 // class _MonthYearPick {
 //   final int year;
@@ -1329,16 +1559,21 @@
 //                     borderRadius: BorderRadius.circular(6),
 //                     child: Padding(
 //                       padding: const EdgeInsets.all(4),
-//                       child: Icon(Icons.chevron_left, size: 20, color: _canGoPrevYear ? _kInk : _kBorder),
+//                       child: Icon(Icons.chevron_left,
+//                           size: 20,
+//                           color: _canGoPrevYear ? _kInk : _kBorder),
 //                     ),
 //                   ),
-//                   Text('$_year', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+//                   Text('$_year',
+//                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
 //                   InkWell(
 //                     onTap: _canGoNextYear ? () => setState(() => _year += 1) : null,
 //                     borderRadius: BorderRadius.circular(6),
 //                     child: Padding(
 //                       padding: const EdgeInsets.all(4),
-//                       child: Icon(Icons.chevron_right, size: 20, color: _canGoNextYear ? _kInk : _kBorder),
+//                       child: Icon(Icons.chevron_right,
+//                           size: 20,
+//                           color: _canGoNextYear ? _kInk : _kBorder),
 //                     ),
 //                   ),
 //                 ],
@@ -1355,10 +1590,13 @@
 //                   ),
 //                   itemCount: 12,
 //                   itemBuilder: (ctx, i) {
-//                     final isSelected = (i + 1) == widget.currentMonth && _year == widget.currentYear;
+//                     final isSelected =
+//                         (i + 1) == widget.currentMonth && _year == widget.currentYear;
 //                     final isDisabled = _isMonthDisabled(i);
 //                     return InkWell(
-//                       onTap: isDisabled ? null : () => Navigator.pop(context, _MonthYearPick(_year, i + 1)),
+//                       onTap: isDisabled
+//                           ? null
+//                           : () => Navigator.pop(context, _MonthYearPick(_year, i + 1)),
 //                       borderRadius: BorderRadius.circular(6),
 //                       child: Container(
 //                         alignment: Alignment.center,
@@ -1372,7 +1610,9 @@
 //                           style: TextStyle(
 //                             fontSize: 12,
 //                             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-//                             color: isDisabled ? _kBorder : (isSelected ? _kPrimary : _kInk),
+//                             color: isDisabled
+//                                 ? _kBorder
+//                                 : (isSelected ? _kPrimary : _kInk),
 //                           ),
 //                         ),
 //                       ),
@@ -1390,7 +1630,8 @@
 //
 //
 
-//2nd code
+
+
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -1403,14 +1644,14 @@ import 'package:shimmer/shimmer.dart';
 import '../../models/attendance_model.dart';
 import '../../providers/attendance_provider.dart';
 
-// ─── Design tokens (Material 3 inspired) ──────────────────────
+// ─── Design tokens (Matched to Image) ──────────────────────────
 const _kInk = Color(0xFF1F2937);
 const _kSlate = Color(0xFF64748B);
 const _kBorder = Color(0xFFE2E8F0);
 const _kSurface = Color(0xFFF8FAFC);
 const _kCard = Colors.white;
 const _kPrimary = Color(0xFF2563EB);
-const _kPrimaryDark = Color(0xFF1E40AF);
+const _kPrimaryDark = Color(0xFF1E3A5F); // Dark Navy from image header
 
 const _kGreen = Color(0xFF16A34A);
 const _kGreenBg = Color(0xFFDCFCE7);
@@ -1422,10 +1663,8 @@ const _kBlue = Color(0xFF2563EB);
 const _kBlueBg = Color(0xFFDBEAFE);
 const _kPurple = Color(0xFF9333EA);
 const _kPurpleBg = Color(0xFFF3E8FF);
-const _kGray = Color(0xFF6B7280);
-const _kGrayBg = Color(0xFFE5E7EB);
-const _kBlank = Color(0xFF94A3B8);
-const _kBlankBg = Color(0xFFF8FAFC);
+const _kGray = Color(0xFF9CA3AF);
+const _kGrayBg = Color(0xFFF3F4F6);
 
 class _StatusInfo {
   final String key;
@@ -1446,7 +1685,7 @@ const _kStatuses = <_StatusInfo>[
 
 _StatusInfo _statusInfo(String key) {
   if (key.isEmpty || key == 'unset') {
-    return const _StatusInfo('unset', '—', _kBlank, _kBlankBg, Icons.circle_outlined);
+    return const _StatusInfo('unset', '—', _kGray, _kGrayBg, Icons.circle_outlined);
   }
   return _kStatuses.firstWhere(
         (s) => s.key == key,
@@ -1657,6 +1896,22 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
 
     return Scaffold(
       backgroundColor: _kSurface,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        // Leading Back Button (Arrow)
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: _kInk),
+          onPressed: () {
+            // Ye wapas pichli screen par le jayega
+            Navigator.pop(context);
+          },
+        ),
+        // Title ko hata diya taake Design disturb na ho, sirf arrow rahega
+        title: null,
+        // Transparent AppBar ke neeche content ko smooth dikhane ke liye
+      ),
+
       body: SafeArea(
         child: _initialLoading
             ? _buildInitialShimmer()
@@ -1745,44 +2000,48 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // DESKTOP LAYOUT
+  // DESKTOP LAYOUT (Perfectly matched to Image)
   // ═══════════════════════════════════════════════════════════════
   Widget _buildDesktop(AttendanceProvider provider) {
     final staffList = _uniqueStaff(provider.bulkRecords);
     final selected = _selectedRecords(provider);
     final counts = _counts(selected);
 
-    return Column(
-      children: [
-        _buildTopBar(),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+    return Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Column(
+        children: [
+          _buildTopBar(provider),
+          const SizedBox(height: 12),
+          Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(flex: 4, child: _buildCalendarCard(selected)),
+                // Calendar Card (Left) - Adjust flex to match image
+                Expanded(flex: 30, child: _buildCalendarCard(selected)),
                 const SizedBox(width: 16),
-                Expanded(flex: 4, child: _buildOverviewCard(counts, selected.length)),
+                // Bar Chart Card (Middle) - Adjust flex to match image
+                Expanded(flex: 16, child: _buildOverviewCard(counts, selected.length)),
                 const SizedBox(width: 16),
-                SizedBox(width: 260, child: _buildEmployeePanel(staffList)),
+                // Employee List (Right)
+                Expanded(flex: 15, child: _buildEmployeePanel(staffList)),
               ],
             ),
           ),
-        ),
-        _buildBottomBar(selected, counts),
-      ],
+          _buildBottomBar(selected, counts),
+        ],
+      ),
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(AttendanceProvider provider) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: _kSurface,
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+      child:
+      Row(
         children: [
           _monthYearSelector(),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           _pillButton(label: 'All Present', icon: Icons.check_circle_outline, color: _kGreen, bg: _kGreenBg, onTap: () => _markAllForSelected('present')),
           const SizedBox(width: 8),
           _pillButton(label: 'All Absent', icon: Icons.cancel_outlined, color: _kRed, bg: _kRedBg, onTap: () => _markAllForSelected('absent')),
@@ -1795,28 +2054,25 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
 
   Widget _monthYearSelector() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: _kCard,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: _kBorder),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 4, offset: const Offset(0, 2)),
-        ],
       ),
       child: InkWell(
         onTap: _pickMonth,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         child: Row(
           children: [
-            const Icon(Icons.calendar_today, size: 14, color: _kInk),
+            const Icon(Icons.calendar_today_outlined, size: 16, color: _kInk),
             const SizedBox(width: 8),
             Text(
               DateFormat('MMMM yyyy').format(DateTime(_year, _month)),
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: _kInk),
             ),
             const SizedBox(width: 4),
-            const Icon(Icons.keyboard_arrow_down, size: 16, color: _kSlate),
+            const Icon(Icons.keyboard_arrow_down, size: 18, color: _kSlate),
           ],
         ),
       ),
@@ -1832,20 +2088,20 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withOpacity(0.2)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 15, color: color),
+            Icon(icon, size: 16, color: color),
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+            Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
           ],
         ),
       ),
@@ -1865,16 +2121,21 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
       return Padding(
         padding: const EdgeInsets.only(left: 6),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           decoration: BoxDecoration(
-            color: item.$4,
-            borderRadius: BorderRadius.circular(10),
+            color: _kCard,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: _kBorder),
           ),
-          child: Column(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(item.$1, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: item.$3)),
-              Text(item.$2, style: TextStyle(fontSize: 9, color: item.$3)),
+              Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(color: item.$4, borderRadius: BorderRadius.circular(4)),
+                  child: Text(item.$1, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: item.$3))),
+              const SizedBox(width: 4),
+              Text(item.$2, style: const TextStyle(fontSize: 10, color: _kSlate)),
             ],
           ),
         ),
@@ -1887,10 +2148,10 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _kCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _kBorder),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(
@@ -1917,16 +2178,16 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
 
   Widget _calendarHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: _kPrimaryDark,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
           IconButton(
             onPressed: _prevMonth,
-            icon: const Icon(Icons.chevron_left, color: Colors.white, size: 18),
+            icon: const Icon(Icons.chevron_left, color: Colors.white, size: 20),
             splashRadius: 16,
             padding: EdgeInsets.zero,
           ),
@@ -1936,14 +2197,14 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
               child: Center(
                 child: Text(
                   DateFormat('MMMM yyyy').format(DateTime(_year, _month)),
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
                 ),
               ),
             ),
           ),
           IconButton(
             onPressed: _nextMonth,
-            icon: const Icon(Icons.chevron_right, color: Colors.white, size: 18),
+            icon: const Icon(Icons.chevron_right, color: Colors.white, size: 20),
             splashRadius: 16,
             padding: EdgeInsets.zero,
           ),
@@ -1957,7 +2218,7 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
       children: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
           .map((d) => Expanded(
         child: Center(
-          child: Text(d, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _kSlate)),
+          child: Text(d, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _kSlate)),
         ),
       ))
           .toList(),
@@ -1966,7 +2227,7 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
 
   Widget _statusLegendRow() {
     return Wrap(
-      spacing: 10,
+      spacing: 8,
       runSpacing: 4,
       children: _kStatuses.map((s) => _dotLegend(s.label, s.color)).toList()
         ..add(_dotLegend('Holiday', _kGray)),
@@ -2004,8 +2265,9 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
     return RepaintBoundary(
       child: GridView.count(
         crossAxisCount: 7,
-        mainAxisSpacing: 6,
+        mainAxisSpacing: 6, // Reduced spacing for compactness
         crossAxisSpacing: 6,
+        childAspectRatio: 1.1, // Keep cells square-like but compact
         children: cells,
       ),
     );
@@ -2021,21 +2283,22 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
       color: Colors.transparent,
       child: InkWell(
         onTap: isReadOnly ? null : () => _openStatusPicker(rec),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 150),
           decoration: BoxDecoration(
             color: info.bg,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: status == 'unset' ? _kBorder : info.color.withOpacity(0.35),
+              color: status == 'unset' ? _kBorder : info.color.withOpacity(0.3),
+              width: 1,
             ),
           ),
           alignment: Alignment.center,
           child: Text(
             '${dt.day}',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
               color: isReadOnly ? _kSlate : (status == 'unset' ? _kInk : info.color),
             ),
@@ -2045,80 +2308,79 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
     );
   }
 
+  // ─── BAR CHART IMPLEMENTATION (Matches the 2nd uploaded image) ───
   Widget _buildOverviewCard(Map<String, int> counts, int totalDays) {
-    final segments = [
-      ('present', 'Present', _kGreen),
-      ('late', 'Late', _kOrange),
-      ('leave', 'Leave', _kBlue),
-      ('half_day', 'Half Day', _kPurple),
-      ('absent', 'Absent', _kRed),
-      ('holiday', 'Holiday', _kGray),
+    // Define the exact order and colors from the 2nd image
+    final data = [
+      {'key': 'present', 'label': 'Present', 'color': _kGreen},
+      {'key': 'absent', 'label': 'Absent', 'color': _kRed},
+      {'key': 'late', 'label': 'Late', 'color': _kOrange},
+      {'key': 'leave', 'label': 'Leave', 'color': _kBlue},
+      {'key': 'half_day', 'label': 'Half Day', 'color': _kPurple},
+      {'key': 'holiday', 'label': 'Holiday', 'color': _kGray},
     ];
-    final nonZero = segments.where((s) => (counts[s.$1] ?? 0) > 0).toList();
-    final sumForChart = nonZero.fold<int>(0, (a, s) => a + (counts[s.$1] ?? 0));
+
+    final totalDaysInMonth = _selectedRecords(context.read<AttendanceProvider>()).length;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _kCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _kBorder),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Attendance Overview', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 220,
-            child: sumForChart == 0
-                ? const Center(
-                child: Text('No attendance marked yet',
-                    style: TextStyle(color: _kSlate, fontSize: 12)))
-                : Stack(
-              alignment: Alignment.center,
-              children: [
-                PieChart(
-                  PieChartData(
-                    sectionsSpace: 2,
-                    centerSpaceRadius: 48,
-                    sections: nonZero.map((s) {
-                      final value = (counts[s.$1] ?? 0).toDouble();
-                      final pct = sumForChart > 0 ? (value / sumForChart * 100) : 0.0;
-                      return PieChartSectionData(
-                        value: value,
-                        color: s.$3,
-                        radius: 48,
-                        title: '${pct.toStringAsFixed(1)}%',
-                        titleStyle: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white),
-                      );
-                    }).toList(),
-                  ),
+          const Text('Attendance Overview', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: _kInk)),
+          const SizedBox(height: 16),
+          Expanded(
+            child: totalDaysInMonth == 0
+                ? const Center(child: Text('No days in this month', style: TextStyle(color: _kSlate, fontSize: 12)))
+                : BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: 5, // Based on image, max is 1.0, but we adjust dynamically or fixed. Let's use 1.0
+                barTouchData: BarTouchData(enabled: false),
+                titlesData: FlTitlesData(
+                  show: false,
                 ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('$totalDays',
-                        style: const TextStyle(
-                            fontSize: 24, fontWeight: FontWeight.w800, color: _kInk)),
-                    const Text('Days',
-                        style: TextStyle(fontSize: 11, color: _kSlate)),
-                  ],
-                ),
-              ],
+                borderData: FlBorderData(show: false),
+                gridData: FlGridData(show: false),
+                barGroups: data.asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final item = entry.value;
+                  final count = counts[item['key']] ?? 0;
+                  final double percentage = totalDaysInMonth == 0 ? 0 : count / totalDaysInMonth;
+
+                  return BarChartGroupData(
+                    x: idx,
+                    barRods: [
+                      BarChartRodData(
+                        toY: percentage > 0 ? percentage + 0.05 : 0, // slight offset for 0 value appearance
+                        color: item['color'] as Color,
+                        width: 24,
+                        borderRadius: BorderRadius.circular(4),
+                        backDrawRodData: BackgroundBarChartRodData(
+                          show: false,
+                        ),
+                      ),
+                    ],
+                    showingTooltipIndicators: [],
+                  );
+                }).toList(),
+              ),
             ),
           ),
           const SizedBox(height: 12),
+          // Legend below the chart
           Wrap(
             spacing: 12,
             runSpacing: 6,
-            children: segments.map((s) => _dotLegend(s.$2, s.$3)).toList(),
+            children: data.map((s) => _dotLegend(s['label'] as String, s['color'] as Color)).toList(),
           ),
         ],
       ),
@@ -2133,10 +2395,10 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
     return Container(
       decoration: BoxDecoration(
         color: _kCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _kBorder),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(
@@ -2147,23 +2409,22 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Select Employee',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                const SizedBox(height: 8),
+                const Text('Select Employee', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                const SizedBox(height: 10),
                 TextField(
                   decoration: InputDecoration(
                     hintText: 'Search employee...',
-                    prefixIcon: const Icon(Icons.search, size: 18),
+                    prefixIcon: const Icon(Icons.search, size: 18, color: _kSlate),
                     isDense: true,
                     filled: true,
                     fillColor: _kSurface,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                       borderSide: const BorderSide(color: _kBorder),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                       borderSide: const BorderSide(color: _kPrimary, width: 1.5),
                     ),
                   ),
@@ -2178,8 +2439,7 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
                 ? const Center(
               child: Padding(
                 padding: EdgeInsets.all(16),
-                child: Text('No employees found',
-                    style: TextStyle(fontSize: 12, color: _kSlate)),
+                child: Text('No employees found', style: TextStyle(fontSize: 12, color: _kSlate)),
               ),
             )
                 : Scrollbar(
@@ -2207,37 +2467,45 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
         color: Colors.transparent,
         child: InkWell(
           onTap: () => setState(() => _selectedStaffId = s.staffId),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: isSelected ? _kPrimary.withOpacity(0.07) : Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
-              border: isSelected ? Border.all(color: _kPrimary.withOpacity(0.4)) : null,
+              color: isSelected ? _kPrimary.withOpacity(0.05) : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: isSelected ? Border.all(color: _kPrimary.withOpacity(0.3), width: 1) : null,
             ),
             child: Row(
               children: [
                 _employeeAvatar(s),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(s.staffName,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      Text(s.staffName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: _kInk)),
                       const SizedBox(height: 2),
-                      Text(s.designation ?? s.type,
-                          style: const TextStyle(fontSize: 11, color: _kSlate)),
+                      Text(s.designation ?? s.type, style: const TextStyle(fontSize: 11, color: _kSlate)),
                     ],
                   ),
                 ),
-                Checkbox(
-                  value: isSelected,
-                  activeColor: _kPrimary,
-                  onChanged: (_) => setState(() => _selectedStaffId = s.staffId),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                // Custom circular Checkbox like the image
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isSelected ? _kPrimary : Colors.transparent,
+                    border: Border.all(
+                      color: isSelected ? _kPrimary : _kSlate.withOpacity(0.4),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: isSelected
+                      ? const Icon(Icons.check, size: 14, color: Colors.white)
+                      : null,
                 ),
               ],
             ),
@@ -2252,62 +2520,106 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
     if (hasPhoto) {
       final bytes = _decodeBase64(s.photoBase64!);
       if (bytes != null) {
-        return CircleAvatar(radius: 16, backgroundImage: MemoryImage(bytes));
+        return CircleAvatar(radius: 18, backgroundImage: MemoryImage(bytes));
       }
     }
     return CircleAvatar(
-      radius: 16,
-      backgroundColor: _kBorder,
-      child: Icon(Icons.person, size: 16, color: _kSlate),
+      radius: 18,
+      backgroundColor: _kGrayBg,
+      child: Icon(Icons.person, size: 18, color: _kSlate),
     );
   }
 
   Widget _buildBottomBar(List<AttendanceRecord> records, Map<String, int> counts) {
+    final items = [
+      ('Present', counts['present']!, _kGreen, _kGreenBg),
+      ('Absent', counts['absent']!, _kRed, _kRedBg),
+      ('Late', counts['late']!, _kOrange, _kOrangeBg),
+      ('Leave', counts['leave']!, _kBlue, _kBlueBg),
+      ('Half Day', counts['half_day']!, _kPurple, _kPurpleBg),
+      ('Holidays', counts['holiday']!, _kGray, _kGrayBg),
+    ];
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(
-        color: _kSurface,
-        border: Border(top: BorderSide(color: _kBorder)),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Attendance Summary',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-          const SizedBox(height: 8),
-          Row(children: [Expanded(child: _summaryChipRow(counts))]),
+          const Text('Attendance Summary', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _kInk)),
           const SizedBox(height: 10),
+          Row(
+            children: items.map((item) {
+              return Expanded(
+                child: Container(
+                  margin: const EdgeInsets.only(right: 8, bottom: 0),
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                  decoration: BoxDecoration(
+                    color: item.$4,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: item.$3.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('${item.$2}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: item.$3)),
+                          Icon(Icons.person_outline, size: 14, color: item.$3.withOpacity(0.5)),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(item.$1, style: TextStyle(fontSize: 10, color: item.$3.withOpacity(0.8))),
+                      const SizedBox(height: 4),
+                      Container(
+                        height: 3,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: item.$3.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            width: 30, // fixed width bar like image
+                            height: 3,
+                            decoration: BoxDecoration(
+                              color: item.$3,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Row(
                 children: [
-                  const Icon(Icons.calendar_today, size: 14, color: _kSlate),
+                  const Icon(Icons.calendar_today_outlined, size: 16, color: _kSlate),
                   const SizedBox(width: 6),
                   Text('Total Days: ${records.length}',
-                      style: const TextStyle(
-                          fontSize: 12, color: _kSlate, fontWeight: FontWeight.w600)),
+                      style: const TextStyle(fontSize: 13, color: _kSlate, fontWeight: FontWeight.w600)),
                 ],
               ),
-              const SizedBox(width: 16),
-              const Text('Click on date to view or mark attendance',
-                  style: TextStyle(fontSize: 11, color: _kSlate, fontStyle: FontStyle.italic)),
               const Spacer(),
               ElevatedButton.icon(
                 onPressed: (_saving || _selectedStaffId == null) ? null : _saveAttendance,
                 icon: _saving
-                    ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.save, size: 16),
-                label: const Text('Save Attendance',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
+                label: const Text('Save Attendance', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _kPrimary,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
             ],
@@ -2317,54 +2629,8 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
     );
   }
 
-  Widget _summaryChipRow(Map<String, int> counts) {
-    final items = [
-      ('Present', counts['present']!, _kGreen),
-      ('Absent', counts['absent']!, _kRed),
-      ('Late', counts['late']!, _kOrange),
-      ('Leave', counts['leave']!, _kBlue),
-      ('Half Day', counts['half_day']!, _kPurple),
-      ('Holidays', counts['holiday']!, _kGray),
-    ];
-    return Row(
-      children: items.map((item) {
-        return Expanded(
-          child: Container(
-            margin: const EdgeInsets.only(right: 8),
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-            decoration: BoxDecoration(
-              color: _kCard,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _kBorder),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('${item.$2}',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: item.$3)),
-                const SizedBox(height: 2),
-                Text(item.$1, style: const TextStyle(fontSize: 11, color: _kSlate)),
-                const SizedBox(height: 4),
-                Container(
-                  height: 3,
-                  decoration: BoxDecoration(
-                    color: item.$3,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
   // ═══════════════════════════════════════════════════════════════
-  // MOBILE LAYOUT (same improvements)
+  // MOBILE LAYOUT (Adjusted for smaller screens)
   // ═══════════════════════════════════════════════════════════════
   Widget _buildMobile(AttendanceProvider provider) {
     final staffList = _uniqueStaff(provider.bulkRecords);
@@ -2425,7 +2691,7 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
         foregroundColor: Colors.white,
         elevation: 0,
         minimumSize: const Size(double.infinity, 44),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -2440,9 +2706,9 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
         fillColor: _kCard,
         contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kBorder)),
+            borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _kBorder)),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kPrimary)),
+            borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _kPrimary)),
       ),
       onChanged: (v) => setState(() => _search = v),
     );
@@ -2484,7 +2750,7 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
                 color: _kCard,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: _kBorder)),
             child: InkWell(
               onTap: _pickMonth,
@@ -2508,7 +2774,7 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
                 color: _kCard,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: _kBorder)),
             child: InkWell(
               onTap: _pickYear,
@@ -2531,10 +2797,10 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: _kCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _kBorder),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(
@@ -2544,7 +2810,7 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
           _weekDayRow(),
           const SizedBox(height: 6),
           SizedBox(
-            height: 260,
+            height: 310,
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
               child: _calendarLoading
@@ -2588,88 +2854,20 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _kCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _kBorder),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Attendance Overview',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+          const Text('Attendance Overview', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
           const SizedBox(height: 12),
-          SizedBox(
-              height: 200,
-              child: _buildOverviewChartOnly(counts, totalDays)),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 12,
-            runSpacing: 6,
-            children: [
-              _dotLegend('Present', _kGreen),
-              _dotLegend('Late', _kOrange),
-              _dotLegend('Leave', _kBlue),
-              _dotLegend('Half Day', _kPurple),
-              _dotLegend('Absent', _kRed),
-              _dotLegend('Holiday', _kGray),
-            ],
-          ),
+          SizedBox(height: 180, child: _buildOverviewCard(counts, totalDays)),
         ],
       ),
-    );
-  }
-
-  Widget _buildOverviewChartOnly(Map<String, int> counts, int totalDays) {
-    final segments = [
-      ('present', _kGreen),
-      ('late', _kOrange),
-      ('leave', _kBlue),
-      ('half_day', _kPurple),
-      ('absent', _kRed),
-      ('holiday', _kGray),
-    ];
-    final nonZero = segments.where((s) => (counts[s.$1] ?? 0) > 0).toList();
-    final sumForChart = nonZero.fold<int>(0, (a, s) => a + (counts[s.$1] ?? 0));
-    if (sumForChart == 0) {
-      return const Center(
-          child: Text('No attendance marked yet',
-              style: TextStyle(color: _kSlate, fontSize: 12)));
-    }
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        PieChart(
-          PieChartData(
-            sectionsSpace: 2,
-            centerSpaceRadius: 45,
-            sections: nonZero.map((s) {
-              final value = (counts[s.$1] ?? 0).toDouble();
-              final pct = sumForChart > 0 ? (value / sumForChart * 100) : 0.0;
-              return PieChartSectionData(
-                value: value,
-                color: s.$2,
-                radius: 45,
-                title: '${pct.toStringAsFixed(1)}%',
-                titleStyle: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white),
-              );
-            }).toList(),
-          ),
-        ),
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('$totalDays',
-                style: const TextStyle(
-                    fontSize: 22, fontWeight: FontWeight.w800, color: _kInk)),
-            const Text('Days', style: TextStyle(fontSize: 10, color: _kSlate)),
-          ],
-        ),
-      ],
     );
   }
 
@@ -2694,7 +2892,7 @@ class _BulkAttendanceScreenState extends State<BulkAttendanceScreen>
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: _kCard,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(color: _kBorder),
             boxShadow: [
               BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
@@ -2761,8 +2959,7 @@ class _StatusPickerSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          const Text('Select attendance status',
-              style: TextStyle(fontSize: 12, color: _kSlate)),
+          const Text('Select attendance status', style: TextStyle(fontSize: 12, color: _kSlate)),
           const SizedBox(height: 16),
           GridView.count(
             crossAxisCount: 3,
@@ -2833,8 +3030,7 @@ class _CompactYearPicker extends StatelessWidget {
             children: [
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 6),
-                child: Text('Select Year',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                child: Text('Select Year', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
               ),
               Flexible(
                 child: GridView.builder(
@@ -2954,8 +3150,7 @@ class _CompactMonthPickerState extends State<_CompactMonthPicker> {
                           color: _canGoPrevYear ? _kInk : _kBorder),
                     ),
                   ),
-                  Text('$_year',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  Text('$_year', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                   InkWell(
                     onTap: _canGoNextYear ? () => setState(() => _year += 1) : null,
                     borderRadius: BorderRadius.circular(6),
@@ -3017,5 +3212,3 @@ class _CompactMonthPickerState extends State<_CompactMonthPicker> {
     );
   }
 }
-
-
