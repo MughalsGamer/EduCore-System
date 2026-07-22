@@ -126,29 +126,90 @@ class AdmissionProvider extends ChangeNotifier {
         await _service.updateAdmission(admission);
       }
 
+      debugPrint('Admission saved with ID: $admissionDocId');
+
       // 3. Sync every student in this admission into the family's
       //    students[] array (add new / refresh existing by studentId).
       for (final s in admission.students) {
         if (s.studentId.isEmpty) continue;
-        await _familyService.upsertStudentRef(
-          familyDocId: familyDocId,
-          ref: FamilyStudentRef(
-            studentId: s.studentId,
-            name: s.name,
-            admissionId: admissionDocId,
-            inquiryOrRegId: admission.inquiryOrRegId,
-            type: admission.type,
-          ),
-        );
+        try {
+          await _familyService.upsertStudentRef(
+            familyDocId: familyDocId,
+            ref: FamilyStudentRef(
+              studentId: s.studentId,
+              name: s.name,
+              admissionId: admissionDocId,
+              inquiryOrRegId: admission.inquiryOrRegId,
+              type: admission.type,
+            ),
+          );
+        } catch (e) {
+          // Silent error na ho, console mein dikhao
+          debugPrint('Error upserting student ref ${s.studentId}: $e');
+        }
       }
+
+      debugPrint('All student refs upserted successfully');
     } catch (e) {
       _error = e.toString();
+      debugPrint('saveAdmission main error: $e');
       rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
+  // Future<void> saveAdmission(
+  //     AdmissionModel admission, FamilyModel family) async
+  // {
+  //   try {
+  //     _isLoading = true;
+  //     notifyListeners();
+  //
+  //     // 1. Ensure the family document exists — create if new.
+  //     String familyDocId = family.docId ?? '';
+  //     if (familyDocId.isEmpty) {
+  //       familyDocId = await _familyService.createFamily(family);
+  //       family.docId = familyDocId;
+  //     }
+  //
+  //     admission.familyDocId = familyDocId;
+  //     admission.familyId = family.familyId;
+  //     admission.familyName = family.familyName;
+  //
+  //     // 2. Save the admission itself (add or update).
+  //     String admissionDocId;
+  //     if (admission.id == null) {
+  //       admissionDocId = await _service.addAdmission(admission);
+  //       admission.id = admissionDocId;
+  //     } else {
+  //       admissionDocId = admission.id!;
+  //       await _service.updateAdmission(admission);
+  //     }
+  //
+  //     // 3. Sync every student in this admission into the family's
+  //     //    students[] array (add new / refresh existing by studentId).
+  //     for (final s in admission.students) {
+  //       if (s.studentId.isEmpty) continue;
+  //       await _familyService.upsertStudentRef(
+  //         familyDocId: familyDocId,
+  //         ref: FamilyStudentRef(
+  //           studentId: s.studentId,
+  //           name: s.name,
+  //           admissionId: admissionDocId,
+  //           inquiryOrRegId: admission.inquiryOrRegId,
+  //           type: admission.type,
+  //         ),
+  //       );
+  //     }
+  //   } catch (e) {
+  //     _error = e.toString();
+  //     rethrow;
+  //   } finally {
+  //     _isLoading = false;
+  //     notifyListeners();
+  //   }
+  // }
 
   Future<void> deleteAdmission(String id) async {
     try {

@@ -441,7 +441,6 @@ class _AdmissionFormScreenState extends State<AdmissionFormScreen> {
   Future<void> _save() async {
     setState(() => _familyValidationTriggered = true);
 
-    // Point 2 (validated): family select/create karna lazmi hai.
     if (_isFamilyMissing) {
       _snack(_isExistingFamily
           ? 'Existing family select karein ya "Nai Family" choose karein'
@@ -456,13 +455,19 @@ class _AdmissionFormScreenState extends State<AdmissionFormScreen> {
       return;
     }
 
-    // Every student must have an auto-generated ID before saving.
     for (final f in _studentForms) {
       if (f.nameCtrl.text.trim().isEmpty) continue;
       if (f.data.studentId.isEmpty) {
         _snack('Student ID generate hone ka intezar karein');
         return;
       }
+    }
+
+    // Cancel any running debounce timers to avoid setState after dispose
+    _familyIdDebounce?.cancel();
+    _familySearchDebounce?.cancel();
+    for (final f in _studentForms) {
+      f._debounce?.cancel();
     }
 
     setState(() => _isSaving = true);
@@ -536,20 +541,141 @@ class _AdmissionFormScreenState extends State<AdmissionFormScreen> {
 
     try {
       await context.read<AdmissionProvider>().saveAdmission(admission, family);
-      if (mounted) {
-        _snack('Admission saved successfully!');
-        widget.onSaved?.call();
-        Navigator.pop(context, _type);
-      }
+      debugPrint('Save completed successfully');
+
+      if (!mounted) return;
+      _snack('Admission saved successfully!');
+      widget.onSaved?.call();
+
+      // Small delay to allow snackbar and state to settle before popping
+      await Future.delayed(const Duration(milliseconds: 150));
+
+      if (!mounted) return;
+      Navigator.pop(context, _type);
     } catch (e) {
+      debugPrint('Error during save: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Error: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
+
+  // Future<void> _save() async {
+  //   setState(() => _familyValidationTriggered = true);
+  //
+  //   // Point 2 (validated): family select/create karna lazmi hai.
+  //   if (_isFamilyMissing) {
+  //     _snack(_isExistingFamily
+  //         ? 'Existing family select karein ya "Nai Family" choose karein'
+  //         : 'Family Name likhain, Family ID auto-generate ho jayegi');
+  //     return;
+  //   }
+  //
+  //   if (!_formKey.currentState!.validate()) return;
+  //
+  //   if (_admissionId.isEmpty) {
+  //     _snack('Please wait for ID generation');
+  //     return;
+  //   }
+  //
+  //   // Every student must have an auto-generated ID before saving.
+  //   for (final f in _studentForms) {
+  //     if (f.nameCtrl.text.trim().isEmpty) continue;
+  //     if (f.data.studentId.isEmpty) {
+  //       _snack('Student ID generate hone ka intezar karein');
+  //       return;
+  //     }
+  //   }
+  //
+  //   setState(() => _isSaving = true);
+  //
+  //   for (final f in _studentForms) {
+  //     f.data.name = f.nameCtrl.text.trim();
+  //     f.syncFees();
+  //   }
+  //
+  //   final family = FamilyModel(
+  //     docId: _selectedFamily?.docId,
+  //     familyId: _familyId,
+  //     familyName: _familyNameCtrl.text.trim(),
+  //     fatherName: _fatherNameCtrl.text.trim(),
+  //     fatherOccupation: _fatherOccCtrl.text.trim().isEmpty
+  //         ? null
+  //         : _fatherOccCtrl.text.trim(),
+  //     fatherCnic: _fatherCnicCtrl.text.trim().isEmpty
+  //         ? null
+  //         : _fatherCnicCtrl.text.trim(),
+  //     fatherPhone: _fatherPhoneCtrl.text.trim(),
+  //     motherName: _motherNameCtrl.text.trim(),
+  //     motherCnic: _motherCnicCtrl.text.trim().isEmpty
+  //         ? null
+  //         : _motherCnicCtrl.text.trim(),
+  //     motherPhone: _motherPhoneCtrl.text.trim().isEmpty
+  //         ? null
+  //         : _motherPhoneCtrl.text.trim(),
+  //     caste: _casteCtrl.text.trim().isEmpty ? null : _casteCtrl.text.trim(),
+  //     address:
+  //     _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
+  //   );
+  //
+  //   final admission = AdmissionModel(
+  //     id: widget.existing?.id,
+  //     type: _type,
+  //     inquiryOrRegId: _admissionId,
+  //     admissionDate: _admissionDate,
+  //     previousSchoolName: _prevSchoolCtrl.text.trim().isEmpty
+  //         ? null
+  //         : _prevSchoolCtrl.text.trim(),
+  //     previousClassName: _prevClassCtrl.text.trim().isEmpty
+  //         ? null
+  //         : _prevClassCtrl.text.trim(),
+  //     previousClassMarks: _prevMarksCtrl.text.trim().isEmpty
+  //         ? null
+  //         : _prevMarksCtrl.text.trim(),
+  //     familyDocId: _selectedFamily?.docId ?? '',
+  //     familyId: _familyId,
+  //     familyName: _familyNameCtrl.text.trim(),
+  //     fatherName: _fatherNameCtrl.text.trim(),
+  //     fatherOccupation: _fatherOccCtrl.text.trim().isEmpty
+  //         ? null
+  //         : _fatherOccCtrl.text.trim(),
+  //     fatherCnic: _fatherCnicCtrl.text.trim().isEmpty
+  //         ? null
+  //         : _fatherCnicCtrl.text.trim(),
+  //     fatherPhone: _fatherPhoneCtrl.text.trim(),
+  //     motherName: _motherNameCtrl.text.trim(),
+  //     motherCnic: _motherCnicCtrl.text.trim().isEmpty
+  //         ? null
+  //         : _motherCnicCtrl.text.trim(),
+  //     motherPhone: _motherPhoneCtrl.text.trim().isEmpty
+  //         ? null
+  //         : _motherPhoneCtrl.text.trim(),
+  //     caste: _casteCtrl.text.trim().isEmpty ? null : _casteCtrl.text.trim(),
+  //     address:
+  //     _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
+  //     students: _studentForms.map((f) => f.data).toList(),
+  //   );
+  //
+  //   try {
+  //     await context.read<AdmissionProvider>().saveAdmission(admission, family);
+  //     if (mounted) {
+  //       _snack('Admission saved successfully!');
+  //       widget.onSaved?.call();
+  //       Navigator.pop(context, _type);
+  //     }
+  //   } catch (e) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+  //           content: Text('Error: $e'), backgroundColor: Colors.red));
+  //     }
+  //   } finally {
+  //     if (mounted) setState(() => _isSaving = false);
+  //   }
+  // }
 
   // ────────────────────────────────────────────
   //  BUILD
