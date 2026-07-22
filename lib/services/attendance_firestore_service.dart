@@ -19,33 +19,28 @@ class AttendanceFirestoreService {
     }).toList();
   }
 
-  // Fetch all attendance records for one staff/teacher within a
-  // given month. `startDate`/`endDate` are 'yyyy-MM-dd' strings
-  // (inclusive), used with a simple string range query since `date` is
-  // stored as a sortable 'yyyy-MM-dd' string.
-  //
-  // ★ FIX (root cause of the infinite "By Person" spinner):
-  // This query combines an equality filter (staffId) with a range
-  // filter (date >= / date <=) on TWO different fields. Firestore
-  // requires a composite index for that combination — without it the
-  // query throws `failed-precondition` the very first time it runs.
-  // The old code had no try/catch anywhere in the call chain, so the
-  // exception was silently swallowed by the Future and
-  // `_historyLoading = false` never ran → spinner span forever.
-  //
-  // Fixes applied here:
-  //   1. try/catch so a failure is never silent again.
-  //   2. `.orderBy` removed from the query itself (we already sort
-  //      client-side below) to avoid requiring an even bigger composite
-  //      index — matches the pattern already used elsewhere in this
-  //      codebase (admissions module) to dodge composite-index errors.
-  //   3. On error, rethrow a clear message so the provider can surface
-  //      it instead of hanging.
-  //
-  // NOTE: You still need ONE composite index for staffId + date range.
-  // On first run, check your debug console — Firestore prints a direct
-  // link to auto-create it. Or create manually in Firebase Console:
-  // Collection: attendance | Fields: staffId (Asc), date (Asc)
+// In AttendanceFirestoreService.dart
+  Future<void> saveAttendanceBatch(List<AttendanceRecord> records) async {
+    if (records.isEmpty) return;
+
+    // Same chunking logic as saveAttendance (max 450 per batch)
+    const chunkSize = 450;
+    for (var i = 0; i < records.length; i += chunkSize) {
+      final chunk = records.sublist(
+        i,
+        (i + chunkSize > records.length) ? records.length : i + chunkSize,
+      );
+      final batch = _firestore.batch();
+      for (final record in chunk) {
+        final docRef = _firestore.collection('attendance').doc(record.id);
+        final data = record.toMap();
+        data['timestamp'] = FieldValue.serverTimestamp(); // ✅ add timestamp
+        batch.set(docRef, data, SetOptions(merge: true)); // ✅ merge to preserve existing fields
+      }
+      await batch.commit();
+    }
+  }
+
   Future<List<AttendanceRecord>> getAttendanceForStaffInRange({
     required String staffId,
     required String startDate,

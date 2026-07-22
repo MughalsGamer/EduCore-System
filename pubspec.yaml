@@ -24,6 +24,8 @@ dependencies:
   image_picker_web:
   image:
   shared_preferences:
+  shimmer:
+
 
 
 dev_dependencies:
