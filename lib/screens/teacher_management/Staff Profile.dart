@@ -25,8 +25,12 @@ class StaffProfileScreen extends StatelessWidget {
 
   Future<void> _savePdf(BuildContext context, StaffMember staff) async {
     try {
-      final school = context.read<SchoolSettingsProvider>().settings;
-      final pdfBytes = await generateStaffProfilePdf(staff, classIdToName, school: school);
+      // Remove the school provider retrieval
+      // final school = context.read<SchoolSettingsProvider>().settings;
+
+      // Remove the 'school:' named parameter
+      final pdfBytes = await generateStaffProfilePdf(staff, classIdToName);
+
       final fileName = '${staff.name.replaceAll(' ', '_')}_profile.pdf';
 
       await PdfUtils.saveAndOpenPdf(pdfBytes, fileName);
@@ -40,7 +44,6 @@ class StaffProfileScreen extends StatelessWidget {
       );
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final freshStaff = staff.id == null
