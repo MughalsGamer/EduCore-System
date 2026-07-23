@@ -1,4 +1,4 @@
-//2nd code
+//
 // import 'dart:convert';
 // import 'dart:typed_data';
 // import 'package:pdf/pdf.dart';
@@ -6,6 +6,7 @@
 // import 'package:printing/printing.dart' as pw_fonts;
 //
 // import '../../models/teacher.dart';
+// import '../../models/employee_trasaction_model.dart';   // ← new import for transactions
 //
 // // ─────────────────────────────────────────────────────────────────────────
 // // Color palette (unchanged)
@@ -24,6 +25,25 @@
 // const _grey100 = PdfColor.fromInt(0xFFF5F5FA);
 // const _white = PdfColors.white;
 //
+// // Category colours & icons
+// const _kCategoryIcons = <String, int>{
+//   'Advance': 0xe3a3,           // payments_outlined
+//   'Loan': 0xe3a0,              // account_balance_outlined
+//   'Expense': 0xe8b6,           // receipt_long_outlined
+//   'Fine': 0xe8e6,              // gavel_outlined
+//   'Reimbursement': 0xe95c,     // assignment_return_outlined
+//   'Others': 0xe5d4,            // more_horiz_rounded
+// };
+//
+// const _kCategoryColors = <String, PdfColor>{
+//   'Advance': PdfColor.fromInt(0xFF185FA5),
+//   'Loan': PdfColor.fromInt(0xFF854F0B),
+//   'Expense': PdfColor.fromInt(0xFF993C1D),
+//   'Fine': PdfColor.fromInt(0xFF993556),
+//   'Reimbursement': PdfColor.fromInt(0xFF0F6E56),
+//   'Others': PdfColor.fromInt(0xFF5F5E5A),
+// };
+//
 // String _fmtDate(String? iso) {
 //   if (iso == null || iso.isEmpty) return '--';
 //   try {
@@ -34,13 +54,6 @@
 //   } catch (_) {
 //     return iso;
 //   }
-// }
-//
-// String _todayStr() {
-//   final d = DateTime.now();
-//   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-//     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-//   return '${d.day} ${months[d.month - 1]} ${d.year}';
 // }
 //
 // String _initials(String name) {
@@ -66,6 +79,12 @@
 //     }
 //   }
 //   return buffer.toString().split('').reversed.join();
+// }
+//
+// String _formatTransactionDate(DateTime date) {
+//   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+//     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+//   return '${date.day} ${months[date.month - 1]} ${date.year}';
 // }
 //
 // List<StatusEvent> _buildHistoryEvents(StaffMember staff) {
@@ -96,9 +115,6 @@
 //   return events;
 // }
 //
-// // ════════════════════════════════════════════════════
-// // ★ CACHE Font (unchanged)
-// // ════════════════════════════════════════════════════
 // class _FontCache {
 //   static pw.Font? _iconFont;
 //   static Future<pw.Font> get iconFont async {
@@ -108,20 +124,22 @@
 //   }
 // }
 //
+// // ─────────────────────────────────────────────────────────────────────────
+// // ★ UPDATED: now accepts optional transactions list
+// // ─────────────────────────────────────────────────────────────────────────
 // Future<Uint8List> generateStaffProfilePdf(
 //     StaffMember staff,
-//     Map<String, String> classIdToName,
-//     ) async {
+//     Map<String, String> classIdToName, {
+//       List<StaffTransaction>? transactions,   // ← new parameter
+//     }) async
+// {
 //   final pdf = pw.Document();
 //   final historyEvents = _buildHistoryEvents(staff);
 //   final isTeacher = staff.type == 'teacher';
 //
-//   // Default text fonts
 //   final regularFont = pw.Font.helvetica();
 //   final boldFont = pw.Font.helveticaBold();
 //   final decorativeFont = pw.Font.timesBold();
-//
-//   // Icon font (cached)
 //   final iconFont = await _FontCache.iconFont;
 //
 //   pdf.addPage(
@@ -132,9 +150,9 @@
 //         return pw.Row(
 //           crossAxisAlignment: pw.CrossAxisAlignment.stretch,
 //           children: [
-//             // ── Sidebar (narrower to save space) ────────────────────────
+//             // ── Sidebar ────────────────────────────────────────────────
 //             pw.Container(
-//               width: 155,   // reduced from 170
+//               width: 155,
 //               padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 20),
 //               decoration: const pw.BoxDecoration(color: _navy),
 //               child: pw.Column(
@@ -166,7 +184,7 @@
 //                   ),
 //                   pw.SizedBox(height: 10),
 //
-//                   // ── Name (replaces "STAFF MEMBER") ──
+//                   // Name
 //                   pw.Text(
 //                     staff.name,
 //                     textAlign: pw.TextAlign.center,
@@ -179,7 +197,6 @@
 //                     ),
 //                   ),
 //
-//                   // ── Designation (if provided) ──
 //                   if (staff.designation != null && staff.designation!.trim().isNotEmpty)
 //                     pw.Padding(
 //                       padding: const pw.EdgeInsets.only(top: 4),
@@ -214,16 +231,12 @@
 //                   pw.Divider(color: PdfColors.blueGrey700, thickness: 0.7),
 //                   pw.SizedBox(height: 10),
 //
-//                   // Sidebar info blocks (CNIC & Joining)
+//                   // ── Sidebar: CNIC only (Registered removed) ──
 //                   _sidebarInfoBlock(const pw.IconData(0xe853), 'CNIC', staff.cnic,
-//                       iconFont: iconFont, regularFont: regularFont, boldFont: boldFont),
-//                   pw.SizedBox(height: 8),
-//                   _sidebarInfoBlock(const pw.IconData(0xe935), 'Registered',
-//                       'Joined ${_fmtDate(staff.joiningDate)}',
 //                       iconFont: iconFont, regularFont: regularFont, boldFont: boldFont),
 //                   pw.SizedBox(height: 14),
 //
-//                   // Employment history box
+//                   // ── Employment history ──
 //                   pw.Container(
 //                     width: double.infinity,
 //                     padding: const pw.EdgeInsets.all(8),
@@ -236,8 +249,7 @@
 //                       crossAxisAlignment: pw.CrossAxisAlignment.start,
 //                       children: [
 //                         pw.Text('EMPLOYMENT HISTORY',
-//                             style: pw.TextStyle(
-//                                 fontSize: 8, font: boldFont,
+//                             style: pw.TextStyle(fontSize: 8, font: boldFont,
 //                                 color: PdfColors.grey400, letterSpacing: 0.4)),
 //                         pw.SizedBox(height: 6),
 //                         ...historyEvents.asMap().entries.map((entry) {
@@ -251,18 +263,28 @@
 //                       ],
 //                     ),
 //                   ),
+//                   pw.SizedBox(height: 12),
+//
+//                   // ── NEW: Transaction History (if available) ──
+//                   if (transactions != null && transactions.isNotEmpty)
+//                     _transactionHistoryBlock(
+//                       transactions: transactions,
+//                       iconFont: iconFont,
+//                       boldFont: boldFont,
+//                       regularFont: regularFont,
+//                     ),
 //                 ],
 //               ),
 //             ),
 //
-//             // ── Main content (reduced padding) ─────────────────────────
+//             // ── Main content ─────────────────────────────────────────
 //             pw.Expanded(
 //               child: pw.Padding(
 //                 padding: const pw.EdgeInsets.fromLTRB(18, 20, 18, 20),
 //                 child: pw.Column(
 //                   crossAxisAlignment: pw.CrossAxisAlignment.start,
 //                   children: [
-//                     // Header (smaller)
+//                     // Header
 //                     pw.Row(
 //                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
 //                       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -281,7 +303,6 @@
 //                     ),
 //                     pw.SizedBox(height: 4),
 //
-//                     // Termination banner (if applicable)
 //                     if (staff.isTerminated) ...[
 //                       _terminatedBanner(staff, font: regularFont, boldFont: boldFont),
 //                       pw.SizedBox(height: 4),
@@ -295,7 +316,6 @@
 //                       font: regularFont, boldFont: boldFont,
 //                       rows: [
 //                         _row('Father / Husband', staff.fatherOrHusbandName),
-//                         // CNIC removed (already in sidebar)
 //                         _row('Date of Birth', _fmtDate(staff.dob)),
 //                         _row('Gender', staff.gender),
 //                         _row('Marital Status', staff.maritalStatus),
@@ -306,7 +326,6 @@
 //                     ),
 //                     pw.SizedBox(height: 4),
 //
-//                     // Contact Information
 //                     _sectionCard(
 //                       icon: const pw.IconData(0xe0b0), iconFont: iconFont,
 //                       iconColor: _blue, iconBg: _blueLight,
@@ -320,7 +339,6 @@
 //                     ),
 //                     pw.SizedBox(height: 4),
 //
-//                     // Job Details
 //                     _sectionCard(
 //                       icon: const pw.IconData(0xe8f9), iconFont: iconFont,
 //                       iconColor: _blue, iconBg: _blueLight,
@@ -335,7 +353,6 @@
 //                       ],
 //                     ),
 //
-//                     // Subjects (only if assigned)
 //                     if (staff.subjects.isNotEmpty) ...[
 //                       pw.SizedBox(height: 4),
 //                       _chipCard(
@@ -351,7 +368,6 @@
 //                       ),
 //                     ],
 //
-//                     // Assigned Classes (only if assigned)
 //                     if (staff.assignedClasses.isNotEmpty) ...[
 //                       pw.SizedBox(height: 4),
 //                       _chipCard(
@@ -367,16 +383,14 @@
 //                       ),
 //                     ],
 //
-//                     // Notes (only if provided)
 //                     if (staff.note != null && staff.note!.isNotEmpty) ...[
 //                       pw.SizedBox(height: 4),
 //                       _noteCard(staff.note!, font: regularFont, boldFont: boldFont),
 //                     ],
 //
-//                     // Flexible spacer pushes footer to the bottom
 //                     pw.Spacer(),
 //
-//                     // ── Centred footer ──
+//                     // Centred footer
 //                     pw.Center(
 //                       child: pw.Text(
 //                         'Developed by Ali Haider | 0300-7465064',
@@ -402,9 +416,119 @@
 // }
 //
 // // ─────────────────────────────────────────────────────────────────────────
-// // Helper widgets (adjusted for compactness)
+// // NEW: Transaction history block in sidebar
 // // ─────────────────────────────────────────────────────────────────────────
+// pw.Widget _transactionHistoryBlock({
+//   required List<StaffTransaction> transactions,
+//   required pw.Font iconFont,
+//   required pw.Font boldFont,
+//   required pw.Font regularFont,
+// })
+// {
+//   // Sort by date descending (most recent first)
+//   final sorted = List<StaffTransaction>.from(transactions)
+//     ..sort((a, b) => b.date.compareTo(a.date));
+//   // Limit to last 10 to avoid overflow
+//   final display = sorted.take(10).toList();
 //
+//   return pw.Container(
+//     width: double.infinity,
+//     padding: const pw.EdgeInsets.all(8),
+//     decoration: pw.BoxDecoration(
+//       color: _navyDark,
+//       borderRadius: pw.BorderRadius.circular(8),
+//       border: pw.Border.all(color: PdfColors.blueGrey700, width: 0.6),
+//     ),
+//     child: pw.Column(
+//       crossAxisAlignment: pw.CrossAxisAlignment.start,
+//       children: [
+//         pw.Text('TRANSACTION HISTORY',
+//             style: pw.TextStyle(fontSize: 8, font: boldFont,
+//                 color: PdfColors.grey400, letterSpacing: 0.4)),
+//         pw.SizedBox(height: 6),
+//         ...display.map((txn) => _transactionTile(txn, iconFont: iconFont, regularFont: regularFont, boldFont: boldFont)),
+//       ],
+//     ),
+//   );
+// }
+//
+// pw.Widget _transactionTile(
+//     StaffTransaction txn, {
+//       required pw.Font iconFont,
+//       required pw.Font regularFont,
+//       required pw.Font boldFont,
+//     })
+// {
+//   final catIconCode = _kCategoryIcons[txn.category] ?? 0xe5d4; // more_horiz as fallback
+//   final catColor = _kCategoryColors[txn.category] ?? PdfColors.grey400;
+//   final dateStr = _formatTransactionDate(txn.date);
+//   final amountStr = 'Rs ${_formatMoney(txn.amount)}';
+//
+//   return pw.Padding(
+//     padding: const pw.EdgeInsets.only(bottom: 6),
+//     child: pw.Row(
+//       crossAxisAlignment: pw.CrossAxisAlignment.start,
+//       children: [
+//         // Left icon column
+//         pw.Column(
+//           children: [
+//             pw.Container(
+//               width: 14, height: 14,
+//               decoration: pw.BoxDecoration(
+//                 color: catColor.withAlpha(80),
+//                 shape: pw.BoxShape.circle,
+//               ),
+//               child: pw.Center(
+//                 child: pw.Icon(
+//                   pw.IconData(catIconCode),
+//                   font: iconFont,
+//                   size: 8,
+//                   color: catColor,
+//                 ),
+//               ),
+//             ),
+//             // Small line separator between items (not between last)
+//             if (false) pw.Container(width: 1, height: 10, color: PdfColors.grey500), // not needed with padding separation
+//           ],
+//         ),
+//         pw.SizedBox(width: 6),
+//         pw.Expanded(
+//           child: pw.Column(
+//             crossAxisAlignment: pw.CrossAxisAlignment.start,
+//             children: [
+//               pw.Row(
+//                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+//                 children: [
+//                   pw.Expanded(
+//                     child: pw.Text(
+//                       txn.displayCategory,
+//                       style: pw.TextStyle(fontSize: 8, font: boldFont, color: _white),
+//                       maxLines: 1,
+//                       overflow: pw.TextOverflow.clip,   // ← FIXED
+//                     ),
+//                   ),
+//                   pw.Text(
+//                     amountStr,
+//                     style: pw.TextStyle(fontSize: 8, font: boldFont, color: _white),
+//                   ),
+//                 ],
+//               ),
+//               pw.SizedBox(height: 2),
+//               pw.Text(
+//                 dateStr,
+//                 style: pw.TextStyle(fontSize: 7, font: regularFont, color: PdfColors.grey500),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ],
+//     ),
+//   );
+// }
+//
+// // ─────────────────────────────────────────────────────────────────────────
+// // Existing helpers (unchanged except minor adjustments)
+// // ─────────────────────────────────────────────────────────────────────────
 // pw.Widget _pill({required String text, required PdfColor bg, required PdfColor fg, required pw.Font font}) {
 //   return pw.Container(
 //     padding: const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -496,7 +620,6 @@
 //   );
 // }
 //
-// // Simple key‑value row for section cards
 // class _KV { final String label; final String value; final bool highlight; _KV(this.label, this.value, {this.highlight = false}); }
 // _KV _row(String label, String value, {bool highlight = false}) => _KV(label, value, highlight: highlight);
 //
@@ -640,6 +763,8 @@
 //     ),
 //   );
 // }
+//
+//
 
 
 import 'dart:convert';
@@ -649,10 +774,10 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart' as pw_fonts;
 
 import '../../models/teacher.dart';
-import '../../models/employee_trasaction_model.dart';   // ← new import for transactions
+import '../../models/salary_adjustment_history.dart'; // SalaryHistory model
 
 // ─────────────────────────────────────────────────────────────────────────
-// Color palette (unchanged)
+// Color palette
 // ─────────────────────────────────────────────────────────────────────────
 const _navy = PdfColor.fromInt(0xFF0F1E3D);
 const _navyDark = PdfColor.fromInt(0xFF0A1530);
@@ -667,25 +792,6 @@ const _grey500 = PdfColor.fromInt(0xFF888899);
 const _grey200 = PdfColor.fromInt(0xFFEEEEF5);
 const _grey100 = PdfColor.fromInt(0xFFF5F5FA);
 const _white = PdfColors.white;
-
-// Category colours & icons
-const _kCategoryIcons = <String, int>{
-  'Advance': 0xe3a3,           // payments_outlined
-  'Loan': 0xe3a0,              // account_balance_outlined
-  'Expense': 0xe8b6,           // receipt_long_outlined
-  'Fine': 0xe8e6,              // gavel_outlined
-  'Reimbursement': 0xe95c,     // assignment_return_outlined
-  'Others': 0xe5d4,            // more_horiz_rounded
-};
-
-const _kCategoryColors = <String, PdfColor>{
-  'Advance': PdfColor.fromInt(0xFF185FA5),
-  'Loan': PdfColor.fromInt(0xFF854F0B),
-  'Expense': PdfColor.fromInt(0xFF993C1D),
-  'Fine': PdfColor.fromInt(0xFF993556),
-  'Reimbursement': PdfColor.fromInt(0xFF0F6E56),
-  'Others': PdfColor.fromInt(0xFF5F5E5A),
-};
 
 String _fmtDate(String? iso) {
   if (iso == null || iso.isEmpty) return '--';
@@ -722,12 +828,6 @@ String _formatMoney(num value) {
     }
   }
   return buffer.toString().split('').reversed.join();
-}
-
-String _formatTransactionDate(DateTime date) {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return '${date.day} ${months[date.month - 1]} ${date.year}';
 }
 
 List<StatusEvent> _buildHistoryEvents(StaffMember staff) {
@@ -768,12 +868,12 @@ class _FontCache {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// ★ UPDATED: now accepts optional transactions list
+// Main PDF generation – now accepts salary adjustments
 // ─────────────────────────────────────────────────────────────────────────
 Future<Uint8List> generateStaffProfilePdf(
     StaffMember staff,
     Map<String, String> classIdToName, {
-      List<StaffTransaction>? transactions,   // ← new parameter
+      List<SalaryHistory>? salaryHistory,   // ★ changed parameter
     }) async {
   final pdf = pw.Document();
   final historyEvents = _buildHistoryEvents(staff);
@@ -873,12 +973,12 @@ Future<Uint8List> generateStaffProfilePdf(
                   pw.Divider(color: PdfColors.blueGrey700, thickness: 0.7),
                   pw.SizedBox(height: 10),
 
-                  // ── Sidebar: CNIC only (Registered removed) ──
+                  // CNIC only
                   _sidebarInfoBlock(const pw.IconData(0xe853), 'CNIC', staff.cnic,
                       iconFont: iconFont, regularFont: regularFont, boldFont: boldFont),
                   pw.SizedBox(height: 14),
 
-                  // ── Employment history ──
+                  // Employment history
                   pw.Container(
                     width: double.infinity,
                     padding: const pw.EdgeInsets.all(8),
@@ -907,10 +1007,10 @@ Future<Uint8List> generateStaffProfilePdf(
                   ),
                   pw.SizedBox(height: 12),
 
-                  // ── NEW: Transaction History (if available) ──
-                  if (transactions != null && transactions.isNotEmpty)
-                    _transactionHistoryBlock(
-                      transactions: transactions,
+                  // ★ SALARY ADJUSTMENT (if available)
+                  if (salaryHistory != null && salaryHistory.isNotEmpty)
+                    _salaryAdjustmentBlock(
+                      salaryHistory: salaryHistory,
                       iconFont: iconFont,
                       boldFont: boldFont,
                       regularFont: regularFont,
@@ -950,7 +1050,7 @@ Future<Uint8List> generateStaffProfilePdf(
                       pw.SizedBox(height: 4),
                     ],
 
-                    // Personal Information (without CNIC)
+                    // Personal Information
                     _sectionCard(
                       icon: const pw.IconData(0xe853), iconFont: iconFont,
                       iconColor: _blue, iconBg: _blueLight,
@@ -1058,19 +1158,18 @@ Future<Uint8List> generateStaffProfilePdf(
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// NEW: Transaction history block in sidebar
+// SALARY ADJUSTMENT block (Employment-History style timeline)
 // ─────────────────────────────────────────────────────────────────────────
-pw.Widget _transactionHistoryBlock({
-  required List<StaffTransaction> transactions,
+pw.Widget _salaryAdjustmentBlock({
+  required List<SalaryHistory> salaryHistory,
   required pw.Font iconFont,
   required pw.Font boldFont,
   required pw.Font regularFont,
 }) {
-  // Sort by date descending (most recent first)
-  final sorted = List<StaffTransaction>.from(transactions)
+  // sort by date descending
+  final sorted = List<SalaryHistory>.from(salaryHistory)
     ..sort((a, b) => b.date.compareTo(a.date));
-  // Limit to last 10 to avoid overflow
-  final display = sorted.take(10).toList();
+  final display = sorted.take(10).toList(); // limit to 10
 
   return pw.Container(
     width: double.infinity,
@@ -1083,54 +1182,46 @@ pw.Widget _transactionHistoryBlock({
     child: pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text('TRANSACTION HISTORY',
+        pw.Text('SALARY ADJUSTMENT',
             style: pw.TextStyle(fontSize: 8, font: boldFont,
                 color: PdfColors.grey400, letterSpacing: 0.4)),
         pw.SizedBox(height: 6),
-        ...display.map((txn) => _transactionTile(txn, iconFont: iconFont, regularFont: regularFont, boldFont: boldFont)),
+        ...display.asMap().entries.map((entry) {
+          return _salaryTile(
+            entry.value,
+            entry.key == display.length - 1,
+            boldFont: boldFont,
+            regularFont: regularFont,
+          );
+        }),
       ],
     ),
   );
 }
 
-pw.Widget _transactionTile(
-    StaffTransaction txn, {
-      required pw.Font iconFont,
-      required pw.Font regularFont,
+pw.Widget _salaryTile(
+    SalaryHistory h,
+    bool isLast, {
       required pw.Font boldFont,
+      required pw.Font regularFont,
     }) {
-  final catIconCode = _kCategoryIcons[txn.category] ?? 0xe5d4; // more_horiz as fallback
-  final catColor = _kCategoryColors[txn.category] ?? PdfColors.grey400;
-  final dateStr = _formatTransactionDate(txn.date);
-  final amountStr = 'Rs ${_formatMoney(txn.amount)}';
+  final isIncrement = h.isIncrement;
+  final color = isIncrement ? _green : _red;
+  final label = isIncrement ? 'Increment' : 'Decrement';
+  final sign = isIncrement ? '+' : '-';
+  final amountStr = '$sign Rs ${_formatMoney(h.amount)}';
 
   return pw.Padding(
     padding: const pw.EdgeInsets.only(bottom: 6),
     child: pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        // Left icon column
-        pw.Column(
-          children: [
-            pw.Container(
-              width: 14, height: 14,
-              decoration: pw.BoxDecoration(
-                color: catColor.withAlpha(80),
-                shape: pw.BoxShape.circle,
-              ),
-              child: pw.Center(
-                child: pw.Icon(
-                  pw.IconData(catIconCode),
-                  font: iconFont,
-                  size: 8,
-                  color: catColor,
-                ),
-              ),
-            ),
-            // Small line separator between items (not between last)
-            if (false) pw.Container(width: 1, height: 10, color: PdfColors.grey500), // not needed with padding separation
-          ],
-        ),
+        pw.Column(children: [
+          pw.Container(
+              width: 6, height: 6,
+              decoration: pw.BoxDecoration(color: color, shape: pw.BoxShape.circle)),
+          if (!isLast) pw.Container(width: 1, height: 18, color: PdfColors.grey500),
+        ]),
         pw.SizedBox(width: 6),
         pw.Expanded(
           child: pw.Column(
@@ -1139,25 +1230,14 @@ pw.Widget _transactionTile(
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Expanded(
-                    child: pw.Text(
-                      txn.displayCategory,
-                      style: pw.TextStyle(fontSize: 8, font: boldFont, color: _white),
-                      maxLines: 1,
-                      overflow: pw.TextOverflow.clip,   // ← FIXED
-                    ),
-                  ),
-                  pw.Text(
-                    amountStr,
-                    style: pw.TextStyle(fontSize: 8, font: boldFont, color: _white),
-                  ),
+                  pw.Text(label,
+                      style: pw.TextStyle(fontSize: 8, font: boldFont, color: _white)),
+                  pw.Text(amountStr,
+                      style: pw.TextStyle(fontSize: 8, font: boldFont, color: color)),
                 ],
               ),
-              pw.SizedBox(height: 2),
-              pw.Text(
-                dateStr,
-                style: pw.TextStyle(fontSize: 7, font: regularFont, color: PdfColors.grey500),
-              ),
+              pw.Text(_fmtDate(h.date),
+                  style: pw.TextStyle(fontSize: 7, font: regularFont, color: PdfColors.grey500)),
             ],
           ),
         ),
@@ -1167,7 +1247,7 @@ pw.Widget _transactionTile(
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Existing helpers (unchanged except minor adjustments)
+// Helpers (unchanged)
 // ─────────────────────────────────────────────────────────────────────────
 pw.Widget _pill({required String text, required PdfColor bg, required PdfColor fg, required pw.Font font}) {
   return pw.Container(
