@@ -2,7 +2,6 @@
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart' as html;
-import 'package:educoresystem/screens/teacher_management/pdf_files/staff_ledger_pdf_generator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -13,6 +12,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/employee_trasaction_model.dart';
 import '../../models/teacher.dart';
+import '../../pdf_files/staff_ledger_pdf_generator.dart';
 import '../../providers/employee_transaction_provider.dart';
 import '../../providers/teacher_provider.dart';
 import 'add_employee_transaction.dart';

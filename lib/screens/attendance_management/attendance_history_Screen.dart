@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
 import '../../models/teacher.dart';
+import '../../pdf_files/attendance_pdf_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/teacher_provider.dart';
 import '../../providers/attendance_provider.dart';
@@ -70,6 +71,7 @@ class AttendanceHistoryScreen extends StatefulWidget {
 class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+
 
 
 
@@ -1341,6 +1343,8 @@ class _ByPersonTabState extends State<_ByPersonTab> {
   int _selectedYear = DateTime.now().year;
   int _selectedMonth = DateTime.now().month;
   String _search = '';
+  bool _isExporting = false;   // ★ NEW
+
 
   @override
   void initState() {
@@ -1363,6 +1367,8 @@ class _ByPersonTabState extends State<_ByPersonTab> {
     );
   }
 
+
+
   Future<void> _openMonthYearPicker() async {
     final result = await _showMonthYearPicker(
       context: context,
@@ -1377,12 +1383,17 @@ class _ByPersonTabState extends State<_ByPersonTab> {
     _load();
   }
 
-  void _handleExportPdf() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('PDF export is coming soon.'),
-        backgroundColor: _kPrimary,
-      ),
+  Future<void> _handleExportPdf() async {
+    final staff = _selectedStaff;
+    if (staff == null) return;
+
+    final provider = context.read<AttendanceProvider>();
+    await generateAndOpenAttendancePdf(
+      staff: staff,
+      records: provider.historyRecords,
+      summary: provider.monthSummary,
+      year: _selectedYear,
+      month: _selectedMonth,
     );
   }
 
@@ -1648,11 +1659,35 @@ class _ByPersonTabState extends State<_ByPersonTab> {
       ),
     );
 
-    final exportButton = ElevatedButton.icon(
-      onPressed: _handleExportPdf,
-      icon: const Icon(Icons.file_download_outlined, size: 16),
-      label: const Text('Export PDF',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+    final exportButton =
+    // in _buildFilterRow, replace the export button with:
+    ElevatedButton.icon(
+      onPressed: _isExporting
+          ? null
+          : () async {
+        setState(() => _isExporting = true);
+        try {
+          await _handleExportPdf();
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Export failed: $e')),
+            );
+          }
+        } finally {
+          if (mounted) setState(() => _isExporting = false);
+        }
+      },
+      icon: _isExporting
+          ? const SizedBox(
+        width: 16, height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+      )
+          : const Icon(Icons.file_download_outlined, size: 16),
+      label: Text(
+        _isExporting ? 'Exporting…' : 'Export PDF',
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      ),
       style: ElevatedButton.styleFrom(
         backgroundColor: _kPrimary,
         foregroundColor: Colors.white,

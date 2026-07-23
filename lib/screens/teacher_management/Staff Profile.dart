@@ -1003,18 +1003,18 @@
 
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:educoresystem/screens/teacher_management/pdf_files/pdf_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
+import 'package:provider/provider.dart';
 import 'dart:html' as html; // صرف ویب کے لیے
 
-import 'package:educoresystem/screens/teacher_management/pdf_files/staff_pdf_generator.dart';
-import 'package:provider/provider.dart';
 
 import '../../models/teacher.dart';
+import '../../pdf_files/pdf_utils.dart';
+import '../../pdf_files/staff_pdf_generator.dart';
 import '../../providers/teacher_provider.dart';
 import '../../providers/salary_adjustment_history_provider.dart'; // ★ ADDED
 
