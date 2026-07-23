@@ -1,6 +1,14 @@
 
+import 'dart:io';
+
+import 'package:cloud_firestore/cloud_firestore.dart' as html;
+import 'package:educoresystem/screens/teacher_management/pdf_files/staff_ledger_pdf_generator.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/employee_trasaction_model.dart';
@@ -216,6 +224,55 @@ class _EmployeeLedgerScreenState extends State<EmployeeLedgerScreen> {
     if (picked != null) setState(() => _dateTo = picked);
   }
 
+
+
+  Future<void> _exportPdf() async {
+    if (_selectedEmployee == null || _transactions.isEmpty) return;
+
+    try {
+      final pdfData = await generateEmployeeLedgerPdf(
+        employee: _selectedEmployee!,
+        transactions: _transactions,
+        balance: _balance,
+      );
+
+      final fileName = '${_selectedEmployee!.name}_ledger.pdf';
+
+      if (kIsWeb) {
+        // Download + Open in browser
+        await Printing.layoutPdf(
+          onLayout: (_) async => pdfData,
+          name: fileName,
+        );
+      } else {
+        final dir = await getApplicationDocumentsDirectory();
+
+        final file = File('${dir.path}/$fileName');
+        await file.writeAsBytes(pdfData);
+
+        // Auto Open
+        await OpenFile.open(file.path);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('PDF saved:\n${file.path}'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _clearFilters() {
     setState(() {
       _dateFrom = null;
@@ -344,7 +401,7 @@ class _EmployeeLedgerScreenState extends State<EmployeeLedgerScreen> {
           ),
           const SizedBox(width: 10),
           OutlinedButton.icon(
-            onPressed: _transactions.isEmpty ? null : () {},
+            onPressed: _transactions.isEmpty ? null : _exportPdf,
             icon: const Icon(Icons.ios_share_rounded, size: 16),
             label: const Text('Export'),
             style: OutlinedButton.styleFrom(

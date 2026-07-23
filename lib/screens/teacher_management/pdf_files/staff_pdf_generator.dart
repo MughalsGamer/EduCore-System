@@ -773,8 +773,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart' as pw_fonts;
 
-import '../../models/teacher.dart';
-import '../../models/salary_adjustment_history.dart'; // SalaryHistory model
+import '../../../models/teacher.dart';
+import '../../../models/salary_adjustment_history.dart'; // SalaryHistory model
 
 // ─────────────────────────────────────────────────────────────────────────
 // Color palette
