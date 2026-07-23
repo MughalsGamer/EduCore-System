@@ -1,4 +1,4 @@
-//
+//2nd code
 // import 'dart:convert';
 // import 'dart:typed_data';
 // import 'package:pdf/pdf.dart';
@@ -8,7 +8,7 @@
 // import '../../models/teacher.dart';
 //
 // // ─────────────────────────────────────────────────────────────────────────
-// // Color palette
+// // Color palette (unchanged)
 // // ─────────────────────────────────────────────────────────────────────────
 // const _navy = PdfColor.fromInt(0xFF0F1E3D);
 // const _navyDark = PdfColor.fromInt(0xFF0A1530);
@@ -28,7 +28,8 @@
 //   if (iso == null || iso.isEmpty) return '--';
 //   try {
 //     final d = DateTime.parse(iso);
-//     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+//     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+//       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 //     return '${d.day} ${months[d.month - 1]} ${d.year}';
 //   } catch (_) {
 //     return iso;
@@ -37,7 +38,8 @@
 //
 // String _todayStr() {
 //   final d = DateTime.now();
-//   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+//   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+//     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 //   return '${d.day} ${months[d.month - 1]} ${d.year}';
 // }
 //
@@ -72,7 +74,6 @@
 //   if (!hasJoined && staff.joiningDate != null && staff.joiningDate!.isNotEmpty) {
 //     events.add(StatusEvent(type: 'joined', date: staff.joiningDate!));
 //   }
-//   // ... (rest of history logic remains exactly the same)
 //   if (staff.terminationDate != null && staff.terminationDate!.isNotEmpty) {
 //     final hasTerminatedEvent = events.any((e) => e.type == 'terminated' && e.date == staff.terminationDate);
 //     if (!hasTerminatedEvent && staff.isTerminated) {
@@ -96,7 +97,7 @@
 // }
 //
 // // ════════════════════════════════════════════════════
-// // ★ CACHE Font: Download ONLY ONCE, then use instantly
+// // ★ CACHE Font (unchanged)
 // // ════════════════════════════════════════════════════
 // class _FontCache {
 //   static pw.Font? _iconFont;
@@ -115,12 +116,12 @@
 //   final historyEvents = _buildHistoryEvents(staff);
 //   final isTeacher = staff.type == 'teacher';
 //
-//   // Default text fonts (Fast & Offline)
+//   // Default text fonts
 //   final regularFont = pw.Font.helvetica();
 //   final boldFont = pw.Font.helveticaBold();
 //   final decorativeFont = pw.Font.timesBold();
 //
-//   // ★ Icon font (Downloaded once, cached forever)
+//   // Icon font (cached)
 //   final iconFont = await _FontCache.iconFont;
 //
 //   pdf.addPage(
@@ -131,21 +132,22 @@
 //         return pw.Row(
 //           crossAxisAlignment: pw.CrossAxisAlignment.stretch,
 //           children: [
-//             // ── Sidebar ────────────────────────────────────────────────
+//             // ── Sidebar (narrower to save space) ────────────────────────
 //             pw.Container(
-//               width: 170,
-//               padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 26),
+//               width: 155,   // reduced from 170
+//               padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 20),
 //               decoration: const pw.BoxDecoration(color: _navy),
 //               child: pw.Column(
 //                 crossAxisAlignment: pw.CrossAxisAlignment.center,
 //                 children: [
+//                   // Avatar
 //                   pw.Container(
-//                     width: 90,
-//                     height: 90,
+//                     width: 80,
+//                     height: 80,
 //                     decoration: pw.BoxDecoration(
 //                       shape: pw.BoxShape.circle,
 //                       color: PdfColors.blueGrey800,
-//                       border: pw.Border.all(color: _white, width: 3),
+//                       border: pw.Border.all(color: _white, width: 2.5),
 //                       image: staff.imageBase64 != null
 //                           ? pw.DecorationImage(
 //                         image: pw.MemoryImage(base64Decode(staff.imageBase64!)),
@@ -157,40 +159,74 @@
 //                         ? pw.Center(
 //                       child: pw.Text(
 //                         _initials(staff.name),
-//                         style: pw.TextStyle(fontSize: 28, font: boldFont, color: _white),
+//                         style: pw.TextStyle(fontSize: 26, font: boldFont, color: _white),
 //                       ),
 //                     )
 //                         : null,
 //                   ),
-//                   pw.SizedBox(height: 14),
-//                   pw.Text('STAFF MEMBER', textAlign: pw.TextAlign.center,
-//                       style: pw.TextStyle(fontSize: 13, font: boldFont, color: _white, letterSpacing: 0.5)),
-//                   pw.SizedBox(height: 4),
-//                   pw.Text(staff.name, textAlign: pw.TextAlign.center, maxLines: 2,
-//                       style: pw.TextStyle(fontSize: 10, font: regularFont, color: PdfColors.grey400)),
 //                   pw.SizedBox(height: 10),
+//
+//                   // ── Name (replaces "STAFF MEMBER") ──
+//                   pw.Text(
+//                     staff.name,
+//                     textAlign: pw.TextAlign.center,
+//                     maxLines: 2,
+//                     style: pw.TextStyle(
+//                       fontSize: 13,
+//                       font: boldFont,
+//                       color: _white,
+//                       letterSpacing: 0.5,
+//                     ),
+//                   ),
+//
+//                   // ── Designation (if provided) ──
+//                   if (staff.designation != null && staff.designation!.trim().isNotEmpty)
+//                     pw.Padding(
+//                       padding: const pw.EdgeInsets.only(top: 4),
+//                       child: pw.Text(
+//                         staff.designation!,
+//                         textAlign: pw.TextAlign.center,
+//                         maxLines: 1,
+//                         style: pw.TextStyle(
+//                           fontSize: 9,
+//                           font: regularFont,
+//                           color: PdfColors.grey400,
+//                         ),
+//                       ),
+//                     ),
+//
+//                   pw.SizedBox(height: 10),
+//
+//                   // Status pills
 //                   pw.Wrap(
 //                     alignment: pw.WrapAlignment.center,
 //                     spacing: 6,
 //                     runSpacing: 6,
 //                     children: [
 //                       _pill(text: staff.isTerminated ? 'Terminated' : 'Active',
-//                           bg: staff.isTerminated ? _red : _green, fg: _white, font: boldFont),
+//                           bg: staff.isTerminated ? _red : _green,
+//                           fg: _white, font: boldFont),
 //                       _pill(text: isTeacher ? 'Teacher' : 'Staff',
 //                           bg: PdfColors.blueGrey700, fg: _white, font: boldFont),
 //                     ],
 //                   ),
-//                   pw.SizedBox(height: 18),
+//                   pw.SizedBox(height: 14),
 //                   pw.Divider(color: PdfColors.blueGrey700, thickness: 0.7),
-//                   pw.SizedBox(height: 12),
-//                   _sidebarInfoBlock(const pw.IconData(0xe853), 'CNIC', staff.cnic, iconFont: iconFont, regularFont: regularFont, boldFont: boldFont),
 //                   pw.SizedBox(height: 10),
-//                   _sidebarInfoBlock(const pw.IconData(0xe935), 'Registered', 'Joined ${_fmtDate(staff.joiningDate)}', iconFont: iconFont, regularFont: regularFont, boldFont: boldFont),
-//                   pw.SizedBox(height: 18),
 //
+//                   // Sidebar info blocks (CNIC & Joining)
+//                   _sidebarInfoBlock(const pw.IconData(0xe853), 'CNIC', staff.cnic,
+//                       iconFont: iconFont, regularFont: regularFont, boldFont: boldFont),
+//                   pw.SizedBox(height: 8),
+//                   _sidebarInfoBlock(const pw.IconData(0xe935), 'Registered',
+//                       'Joined ${_fmtDate(staff.joiningDate)}',
+//                       iconFont: iconFont, regularFont: regularFont, boldFont: boldFont),
+//                   pw.SizedBox(height: 14),
+//
+//                   // Employment history box
 //                   pw.Container(
 //                     width: double.infinity,
-//                     padding: const pw.EdgeInsets.all(10),
+//                     padding: const pw.EdgeInsets.all(8),
 //                     decoration: pw.BoxDecoration(
 //                       color: _navyDark,
 //                       borderRadius: pw.BorderRadius.circular(8),
@@ -200,10 +236,17 @@
 //                       crossAxisAlignment: pw.CrossAxisAlignment.start,
 //                       children: [
 //                         pw.Text('EMPLOYMENT HISTORY',
-//                             style: pw.TextStyle(fontSize: 8.5, font: boldFont, color: PdfColors.grey400, letterSpacing: 0.4)),
-//                         pw.SizedBox(height: 8),
+//                             style: pw.TextStyle(
+//                                 fontSize: 8, font: boldFont,
+//                                 color: PdfColors.grey400, letterSpacing: 0.4)),
+//                         pw.SizedBox(height: 6),
 //                         ...historyEvents.asMap().entries.map((entry) {
-//                           return _historyTile(entry.value, entry.key == historyEvents.length - 1, boldFont: boldFont, regularFont: regularFont);
+//                           return _historyTile(
+//                             entry.value,
+//                             entry.key == historyEvents.length - 1,
+//                             boldFont: boldFont,
+//                             regularFont: regularFont,
+//                           );
 //                         }),
 //                       ],
 //                     ),
@@ -212,14 +255,14 @@
 //               ),
 //             ),
 //
-//             // ── Main content ──────────────────────────────────────────
+//             // ── Main content (reduced padding) ─────────────────────────
 //             pw.Expanded(
 //               child: pw.Padding(
-//                 padding: const pw.EdgeInsets.fromLTRB(24, 26, 24, 26),
+//                 padding: const pw.EdgeInsets.fromLTRB(18, 20, 18, 20),
 //                 child: pw.Column(
 //                   crossAxisAlignment: pw.CrossAxisAlignment.start,
 //                   children: [
-//                     // Header
+//                     // Header (smaller)
 //                     pw.Row(
 //                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
 //                       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -227,46 +270,47 @@
 //                         pw.Column(
 //                           crossAxisAlignment: pw.CrossAxisAlignment.start,
 //                           children: [
-//                             pw.Text('STAFF PROFILE', style: pw.TextStyle(fontSize: 22, font: decorativeFont, color: _navy)),
-//                             pw.SizedBox(height: 4),
-//                             pw.Container(width: 60, height: 2, color: _blue),
-//                             pw.SizedBox(height: 4),
-//                             pw.Row(
-//                               children: [
-//                                 pw.Text('Staff Details Summary', style: pw.TextStyle(fontSize: 10, font: regularFont, color: PdfColors.grey600)),
-//                               ],
-//                             ),
+//                             pw.Text('STAFF PROFILE',
+//                                 style: pw.TextStyle(fontSize: 20,
+//                                     font: decorativeFont, color: _navy)),
+//                             pw.SizedBox(height: 3),
+//                             pw.Container(width: 50, height: 1.5, color: _blue),
 //                           ],
 //                         ),
-//
 //                       ],
 //                     ),
 //                     pw.SizedBox(height: 4),
 //
-//                     if (staff.isTerminated) ...[_terminatedBanner(staff, font: regularFont, boldFont: boldFont), pw.SizedBox(height: 4)],
+//                     // Termination banner (if applicable)
+//                     if (staff.isTerminated) ...[
+//                       _terminatedBanner(staff, font: regularFont, boldFont: boldFont),
+//                       pw.SizedBox(height: 4),
+//                     ],
 //
-//                     // Personal Info
+//                     // Personal Information (without CNIC)
 //                     _sectionCard(
 //                       icon: const pw.IconData(0xe853), iconFont: iconFont,
-//                       iconColor: _blue, iconBg: _blueLight, title: 'PERSONAL INFORMATION',
+//                       iconColor: _blue, iconBg: _blueLight,
+//                       title: 'PERSONAL INFORMATION',
 //                       font: regularFont, boldFont: boldFont,
 //                       rows: [
 //                         _row('Father / Husband', staff.fatherOrHusbandName),
-//                         _row('CNIC', staff.cnic),
+//                         // CNIC removed (already in sidebar)
 //                         _row('Date of Birth', _fmtDate(staff.dob)),
 //                         _row('Gender', staff.gender),
 //                         _row('Marital Status', staff.maritalStatus),
-//                         _row('Blood Group', staff.bloodGroup ?? '-'),
+//                         _row('Blood Group', staff.bloodGroup ?? '–'),
 //                         _row('Religion', staff.religion),
 //                         _row('Nationality', staff.nationality),
 //                       ],
 //                     ),
-//                     pw.SizedBox(height: 5),
+//                     pw.SizedBox(height: 4),
 //
-//                     // Contact Info
+//                     // Contact Information
 //                     _sectionCard(
 //                       icon: const pw.IconData(0xe0b0), iconFont: iconFont,
-//                       iconColor: _blue, iconBg: _blueLight, title: 'CONTACT INFORMATION',
+//                       iconColor: _blue, iconBg: _blueLight,
+//                       title: 'CONTACT INFORMATION',
 //                       font: regularFont, boldFont: boldFont,
 //                       rows: [
 //                         _row('Address', staff.address),
@@ -274,69 +318,76 @@
 //                         _row('Emergency', staff.emergencyPhone),
 //                       ],
 //                     ),
-//                     pw.SizedBox(height: 5),
+//                     pw.SizedBox(height: 4),
 //
 //                     // Job Details
 //                     _sectionCard(
 //                       icon: const pw.IconData(0xe8f9), iconFont: iconFont,
-//                       iconColor: _blue, iconBg: _blueLight, title: 'JOB DETAILS',
+//                       iconColor: _blue, iconBg: _blueLight,
+//                       title: 'JOB DETAILS',
 //                       font: regularFont, boldFont: boldFont,
 //                       rows: [
 //                         _row('Employment Type', staff.employmentType),
-//                         _row('Salary', 'PKR ${_formatMoney(staff.salary)}', highlight: true),
-//                         if (staff.reference != null && staff.reference!.isNotEmpty) _row('Reference', staff.reference!),
+//                         _row('Salary', 'PKR ${_formatMoney(staff.salary)}',
+//                             highlight: true),
+//                         if (staff.reference != null && staff.reference!.isNotEmpty)
+//                           _row('Reference', staff.reference!),
 //                       ],
 //                     ),
 //
-//                     // Subjects
+//                     // Subjects (only if assigned)
 //                     if (staff.subjects.isNotEmpty) ...[
-//                       pw.SizedBox(height: 5),
+//                       pw.SizedBox(height: 4),
 //                       _chipCard(
 //                         icon: const pw.IconData(0xe80c), iconFont: iconFont,
-//                         iconColor: const PdfColor.fromInt(0xFF534AB7), iconBg: const PdfColor.fromInt(0xFFF0EFFE),
-//                         title: 'ASSIGNED SUBJECTS', count: staff.subjects.length,
-//                         chipColor: const PdfColor.fromInt(0xFF534AB7), chipBg: const PdfColor.fromInt(0xFFF0EFFE),
-//                         labels: staff.subjects, font: regularFont, boldFont: boldFont,
-//                       ),
-//                     ],
-//
-//                     // Classes
-//                     if (staff.assignedClasses.isNotEmpty) ...[
-//                       pw.SizedBox(height: 5),
-//                       _chipCard(
-//                         icon: const pw.IconData(0xe86f), iconFont: iconFont,
-//                         iconColor: _green, iconBg: _greenLight,
-//                         title: 'ASSIGNED CLASSES', count: staff.assignedClasses.length,
-//                         chipColor: _green, chipBg: _greenLight,
-//                         labels: staff.assignedClasses.map((id) => classIdToName[id] ?? id).toList(),
+//                         iconColor: const PdfColor.fromInt(0xFF534AB7),
+//                         iconBg: const PdfColor.fromInt(0xFFF0EFFE),
+//                         title: 'ASSIGNED SUBJECTS',
+//                         count: staff.subjects.length,
+//                         chipColor: const PdfColor.fromInt(0xFF534AB7),
+//                         chipBg: const PdfColor.fromInt(0xFFF0EFFE),
+//                         labels: staff.subjects,
 //                         font: regularFont, boldFont: boldFont,
 //                       ),
 //                     ],
 //
-//                     // Notes
+//                     // Assigned Classes (only if assigned)
+//                     if (staff.assignedClasses.isNotEmpty) ...[
+//                       pw.SizedBox(height: 4),
+//                       _chipCard(
+//                         icon: const pw.IconData(0xe86f), iconFont: iconFont,
+//                         iconColor: _green, iconBg: _greenLight,
+//                         title: 'ASSIGNED CLASSES',
+//                         count: staff.assignedClasses.length,
+//                         chipColor: _green, chipBg: _greenLight,
+//                         labels: staff.assignedClasses
+//                             .map((id) => classIdToName[id] ?? id)
+//                             .toList(),
+//                         font: regularFont, boldFont: boldFont,
+//                       ),
+//                     ],
+//
+//                     // Notes (only if provided)
 //                     if (staff.note != null && staff.note!.isNotEmpty) ...[
-//                       pw.SizedBox(height: 5),
+//                       pw.SizedBox(height: 4),
 //                       _noteCard(staff.note!, font: regularFont, boldFont: boldFont),
 //                     ],
 //
+//                     // Flexible spacer pushes footer to the bottom
 //                     pw.Spacer(),
 //
-//                     pw.Divider(color: _grey200, thickness: 1),
-//                     pw.SizedBox(height: 7),
-//                     pw.Row(
-//                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-//                       children: [
-//                         pw.Text('Developed by Ali Haider | 0300-7465064', style: pw.TextStyle(fontSize: 9, font: regularFont, color: PdfColors.grey600)),
-//                         pw.Column(
-//                           crossAxisAlignment: pw.CrossAxisAlignment.end,
-//                           children: [
-//                             pw.Container(width: 130, height: 0.7, color: PdfColors.grey400),
-//                             pw.SizedBox(height: 3),
-//                             pw.Text('Authorized Signature', style: pw.TextStyle(fontSize: 8.5, font: regularFont, color: PdfColors.grey500)),
-//                           ],
+//                     // ── Centred footer ──
+//                     pw.Center(
+//                       child: pw.Text(
+//                         'Developed by Ali Haider | 0300-7465064',
+//                         style: pw.TextStyle(
+//                           fontSize: 8.5,
+//                           font: regularFont,
+//                           color: PdfColors.grey600,
 //                         ),
-//                       ],
+//                       ),
 //                     ),
+//                     pw.SizedBox(height: 4),
 //                   ],
 //                 ),
 //               ),
@@ -351,32 +402,35 @@
 // }
 //
 // // ─────────────────────────────────────────────────────────────────────────
-// // Helpers
+// // Helper widgets (adjusted for compactness)
 // // ─────────────────────────────────────────────────────────────────────────
+//
 // pw.Widget _pill({required String text, required PdfColor bg, required PdfColor fg, required pw.Font font}) {
 //   return pw.Container(
-//     padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+//     padding: const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 2),
 //     decoration: pw.BoxDecoration(color: bg, borderRadius: pw.BorderRadius.circular(20)),
-//     child: pw.Text(text, style: pw.TextStyle(fontSize: 8, font: font, color: fg)),
+//     child: pw.Text(text, style: pw.TextStyle(fontSize: 7.5, font: font, color: fg)),
 //   );
 // }
 //
-// pw.Widget _sidebarInfoBlock(pw.IconData icon, String label, String value, {required pw.Font iconFont, required pw.Font regularFont, required pw.Font boldFont}) {
+// pw.Widget _sidebarInfoBlock(pw.IconData icon, String label, String value,
+//     {required pw.Font iconFont, required pw.Font regularFont, required pw.Font boldFont}) {
 //   return pw.Row(
 //     crossAxisAlignment: pw.CrossAxisAlignment.start,
 //     children: [
 //       pw.Container(
-//         width: 20, height: 20,
-//         decoration: pw.BoxDecoration(color: PdfColors.blueGrey700, borderRadius: pw.BorderRadius.circular(5)),
-//         child: pw.Center(child: pw.Icon(icon, font: iconFont, size: 10, color: _white)),
+//         width: 18, height: 18,
+//         decoration: pw.BoxDecoration(color: PdfColors.blueGrey700, borderRadius: pw.BorderRadius.circular(4)),
+//         child: pw.Center(child: pw.Icon(icon, font: iconFont, size: 9, color: _white)),
 //       ),
-//       pw.SizedBox(width: 7),
+//       pw.SizedBox(width: 6),
 //       pw.Expanded(
 //         child: pw.Column(
 //           crossAxisAlignment: pw.CrossAxisAlignment.start,
 //           children: [
-//             pw.Text(label, style: pw.TextStyle(fontSize: 7.5, font: regularFont, color: PdfColors.grey500)),
-//             pw.Text(value, style: pw.TextStyle(fontSize: 8.5, font: boldFont, color: _white)),
+//             pw.Text(label, style: pw.TextStyle(fontSize: 7, font: regularFont, color: PdfColors.grey500)),
+//             pw.SizedBox(height: 1),
+//             pw.Text(value, style: pw.TextStyle(fontSize: 8, font: boldFont, color: _white)),
 //           ],
 //         ),
 //       ),
@@ -394,21 +448,21 @@
 //     default: label = e.type; color = PdfColors.grey400;
 //   }
 //   return pw.Padding(
-//     padding: const pw.EdgeInsets.only(bottom: 8),
+//     padding: const pw.EdgeInsets.only(bottom: 6),
 //     child: pw.Row(
 //       crossAxisAlignment: pw.CrossAxisAlignment.start,
 //       children: [
 //         pw.Column(children: [
-//           pw.Container(width: 7, height: 7, decoration: pw.BoxDecoration(color: color, shape: pw.BoxShape.circle)),
-//           if (!isLast) pw.Container(width: 1, height: 20, color: PdfColors.grey500),
+//           pw.Container(width: 6, height: 6, decoration: pw.BoxDecoration(color: color, shape: pw.BoxShape.circle)),
+//           if (!isLast) pw.Container(width: 1, height: 18, color: PdfColors.grey500),
 //         ]),
-//         pw.SizedBox(width: 7),
+//         pw.SizedBox(width: 6),
 //         pw.Expanded(
 //           child: pw.Column(
 //             crossAxisAlignment: pw.CrossAxisAlignment.start,
 //             children: [
-//               pw.Text(label, style: pw.TextStyle(fontSize: 8.5, font: boldFont, color: _white)),
-//               pw.Text(_fmtDate(e.date), style: pw.TextStyle(fontSize: 7.5, font: regularFont, color: PdfColors.grey500)),
+//               pw.Text(label, style: pw.TextStyle(fontSize: 8, font: boldFont, color: _white)),
+//               pw.Text(_fmtDate(e.date), style: pw.TextStyle(fontSize: 7, font: regularFont, color: PdfColors.grey500)),
 //             ],
 //           ),
 //         ),
@@ -420,23 +474,29 @@
 // pw.Widget _terminatedBanner(StaffMember staff, {required pw.Font font, required pw.Font boldFont}) {
 //   return pw.Container(
 //     width: double.infinity,
-//     padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+//     padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
 //     decoration: pw.BoxDecoration(
-//       color: _redLight, borderRadius: pw.BorderRadius.circular(8), border: pw.Border.all(color: _red, width: 0.6),
+//       color: _redLight,
+//       borderRadius: pw.BorderRadius.circular(6),
+//       border: pw.Border.all(color: _red, width: 0.6),
 //     ),
 //     child: pw.Column(
 //       crossAxisAlignment: pw.CrossAxisAlignment.start,
 //       children: [
-//         pw.Text('Deactivated / Terminated', style: pw.TextStyle(fontSize: 10.5, font: boldFont, color: _red)),
+//         pw.Text('Deactivated / Terminated',
+//             style: pw.TextStyle(fontSize: 9.5, font: boldFont, color: _red)),
 //         if (staff.terminationDate != null && staff.terminationDate!.isNotEmpty)
-//           pw.Text('Terminated on: ${_fmtDate(staff.terminationDate)}', style: pw.TextStyle(fontSize: 9, font: font, color: PdfColors.grey700)),
+//           pw.Text('Terminated on: ${_fmtDate(staff.terminationDate)}',
+//               style: pw.TextStyle(fontSize: 8.5, font: font, color: PdfColors.grey700)),
 //         if (staff.terminationNote != null && staff.terminationNote!.isNotEmpty)
-//           pw.Text('Note: ${staff.terminationNote}', style: pw.TextStyle(fontSize: 8.5, font: font, color: PdfColors.grey600)),
+//           pw.Text('Note: ${staff.terminationNote}',
+//               style: pw.TextStyle(fontSize: 8, font: font, color: PdfColors.grey600)),
 //       ],
 //     ),
 //   );
 // }
 //
+// // Simple key‑value row for section cards
 // class _KV { final String label; final String value; final bool highlight; _KV(this.label, this.value, {this.highlight = false}); }
 // _KV _row(String label, String value, {bool highlight = false}) => _KV(label, value, highlight: highlight);
 //
@@ -448,36 +508,51 @@
 // }) {
 //   return pw.Container(
 //     width: double.infinity,
-//     decoration: pw.BoxDecoration(color: _white, borderRadius: pw.BorderRadius.circular(10), border: pw.Border.all(color: _grey200, width: 0.8)),
+//     decoration: pw.BoxDecoration(
+//       color: _white,
+//       borderRadius: pw.BorderRadius.circular(8),
+//       border: pw.Border.all(color: _grey200, width: 0.7),
+//     ),
 //     child: pw.Column(
 //       crossAxisAlignment: pw.CrossAxisAlignment.start,
 //       children: [
 //         pw.Padding(
-//           padding: const pw.EdgeInsets.fromLTRB(14, 12, 14, 8),
+//           padding: const pw.EdgeInsets.fromLTRB(12, 10, 12, 6),
 //           child: pw.Row(
 //             children: [
-//               pw.Container(width: 22, height: 22, decoration: pw.BoxDecoration(color: iconColor, shape: pw.BoxShape.circle), child: pw.Center(child: pw.Icon(icon, font: iconFont, size: 11, color: _white))),
-//               pw.SizedBox(width: 8),
-//               pw.Text(title, style: pw.TextStyle(fontSize: 10.5, font: boldFont, color: _grey900)),
+//               pw.Container(
+//                 width: 18, height: 18,
+//                 decoration: pw.BoxDecoration(color: iconColor, shape: pw.BoxShape.circle),
+//                 child: pw.Center(child: pw.Icon(icon, font: iconFont, size: 9, color: _white)),
+//               ),
+//               pw.SizedBox(width: 6),
+//               pw.Text(title,
+//                   style: pw.TextStyle(fontSize: 9.5, font: boldFont, color: _grey900)),
 //             ],
 //           ),
 //         ),
-//         pw.Divider(height: 1, color: _grey100, thickness: 1),
+//         pw.Divider(height: 1, color: _grey100, thickness: 0.8),
 //         ...rows.asMap().entries.map((entry) {
 //           final i = entry.key; final r = entry.value; final isLast = i == rows.length - 1;
 //           return pw.Column(
 //             children: [
 //               pw.Padding(
-//                 padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+//                 padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
 //                 child: pw.Row(
 //                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
 //                   children: [
-//                     pw.Text(r.label, style: pw.TextStyle(fontSize: 9.5, font: font, color: _grey500)),
-//                     pw.Text(r.value, style: pw.TextStyle(fontSize: 10, font: r.highlight ? boldFont : font, color: r.highlight ? _blue : _grey900)),
+//                     pw.Text(r.label,
+//                         style: pw.TextStyle(fontSize: 8.5, font: font, color: _grey500)),
+//                     pw.Text(r.value,
+//                         style: pw.TextStyle(
+//                           fontSize: 9,
+//                           font: r.highlight ? boldFont : font,
+//                           color: r.highlight ? _blue : _grey900,
+//                         )),
 //                   ],
 //                 ),
 //               ),
-//               if (!isLast) pw.Divider(height: 1, indent: 14, endIndent: 14, color: _grey100),
+//               if (!isLast) pw.Divider(height: 1, indent: 12, endIndent: 12, color: _grey100),
 //             ],
 //           );
 //         }),
@@ -495,27 +570,48 @@
 // }) {
 //   return pw.Container(
 //     width: double.infinity,
-//     padding: const pw.EdgeInsets.all(14),
-//     decoration: pw.BoxDecoration(color: _white, borderRadius: pw.BorderRadius.circular(10), border: pw.Border.all(color: _grey200, width: 0.8)),
+//     padding: const pw.EdgeInsets.all(12),
+//     decoration: pw.BoxDecoration(
+//       color: _white,
+//       borderRadius: pw.BorderRadius.circular(8),
+//       border: pw.Border.all(color: _grey200, width: 0.7),
+//     ),
 //     child: pw.Column(
 //       crossAxisAlignment: pw.CrossAxisAlignment.start,
 //       children: [
 //         pw.Row(
 //           children: [
-//             pw.Container(width: 22, height: 22, decoration: pw.BoxDecoration(color: iconColor, shape: pw.BoxShape.circle), child: pw.Center(child: pw.Icon(icon, font: iconFont, size: 11, color: _white))),
-//             pw.SizedBox(width: 8),
-//             pw.Text(title, style: pw.TextStyle(fontSize: 10.5, font: boldFont, color: _grey900)),
+//             pw.Container(
+//               width: 18, height: 18,
+//               decoration: pw.BoxDecoration(color: iconColor, shape: pw.BoxShape.circle),
+//               child: pw.Center(child: pw.Icon(icon, font: iconFont, size: 9, color: _white)),
+//             ),
+//             pw.SizedBox(width: 6),
+//             pw.Text(title,
+//                 style: pw.TextStyle(fontSize: 9.5, font: boldFont, color: _grey900)),
 //             pw.Spacer(),
-//             pw.Container(padding: const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 2), decoration: pw.BoxDecoration(color: chipBg, borderRadius: pw.BorderRadius.circular(10)), child: pw.Text('$count', style: pw.TextStyle(fontSize: 9, font: boldFont, color: chipColor))),
+//             pw.Container(
+//               padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+//               decoration: pw.BoxDecoration(
+//                 color: chipBg, borderRadius: pw.BorderRadius.circular(8),
+//               ),
+//               child: pw.Text('$count',
+//                   style: pw.TextStyle(fontSize: 8, font: boldFont, color: chipColor)),
+//             ),
 //           ],
 //         ),
-//         pw.SizedBox(height: 10),
+//         pw.SizedBox(height: 8),
 //         pw.Wrap(
-//           spacing: 6, runSpacing: 6,
+//           spacing: 5, runSpacing: 5,
 //           children: labels.map((label) => pw.Container(
-//             padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-//             decoration: pw.BoxDecoration(color: chipBg, borderRadius: pw.BorderRadius.circular(20), border: pw.Border.all(color: chipColor, width: 0.6)),
-//             child: pw.Text(label, style: pw.TextStyle(fontSize: 9, font: boldFont, color: chipColor)),
+//             padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+//             decoration: pw.BoxDecoration(
+//               color: chipBg,
+//               borderRadius: pw.BorderRadius.circular(16),
+//               border: pw.Border.all(color: chipColor, width: 0.6),
+//             ),
+//             child: pw.Text(label,
+//                 style: pw.TextStyle(fontSize: 8, font: boldFont, color: chipColor)),
 //           )).toList(),
 //         ),
 //       ],
@@ -526,14 +622,20 @@
 // pw.Widget _noteCard(String note, {required pw.Font font, required pw.Font boldFont}) {
 //   return pw.Container(
 //     width: double.infinity,
-//     padding: const pw.EdgeInsets.all(14),
-//     decoration: pw.BoxDecoration(color: PdfColor.fromInt(0xFFFFFBEB), borderRadius: pw.BorderRadius.circular(10), border: pw.Border.all(color: PdfColor.fromInt(0xFFFDE68A), width: 0.8)),
+//     padding: const pw.EdgeInsets.all(12),
+//     decoration: pw.BoxDecoration(
+//       color: PdfColor.fromInt(0xFFFFFBEB),
+//       borderRadius: pw.BorderRadius.circular(8),
+//       border: pw.Border.all(color: PdfColor.fromInt(0xFFFDE68A), width: 0.7),
+//     ),
 //     child: pw.Column(
 //       crossAxisAlignment: pw.CrossAxisAlignment.start,
 //       children: [
-//         pw.Text('NOTES', style: pw.TextStyle(fontSize: 10.5, font: boldFont, color: PdfColor.fromInt(0xFF92400E))),
-//         pw.SizedBox(height: 6),
-//         pw.Text(note, style: pw.TextStyle(fontSize: 9.5, font: font, color: PdfColor.fromInt(0xFF78350F))),
+//         pw.Text('NOTES',
+//             style: pw.TextStyle(fontSize: 9.5, font: boldFont, color: PdfColor.fromInt(0xFF92400E))),
+//         pw.SizedBox(height: 5),
+//         pw.Text(note,
+//             style: pw.TextStyle(fontSize: 8.5, font: font, color: PdfColor.fromInt(0xFF78350F))),
 //       ],
 //     ),
 //   );
@@ -547,6 +649,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart' as pw_fonts;
 
 import '../../models/teacher.dart';
+import '../../models/employee_trasaction_model.dart';   // ← new import for transactions
 
 // ─────────────────────────────────────────────────────────────────────────
 // Color palette (unchanged)
@@ -565,6 +668,25 @@ const _grey200 = PdfColor.fromInt(0xFFEEEEF5);
 const _grey100 = PdfColor.fromInt(0xFFF5F5FA);
 const _white = PdfColors.white;
 
+// Category colours & icons
+const _kCategoryIcons = <String, int>{
+  'Advance': 0xe3a3,           // payments_outlined
+  'Loan': 0xe3a0,              // account_balance_outlined
+  'Expense': 0xe8b6,           // receipt_long_outlined
+  'Fine': 0xe8e6,              // gavel_outlined
+  'Reimbursement': 0xe95c,     // assignment_return_outlined
+  'Others': 0xe5d4,            // more_horiz_rounded
+};
+
+const _kCategoryColors = <String, PdfColor>{
+  'Advance': PdfColor.fromInt(0xFF185FA5),
+  'Loan': PdfColor.fromInt(0xFF854F0B),
+  'Expense': PdfColor.fromInt(0xFF993C1D),
+  'Fine': PdfColor.fromInt(0xFF993556),
+  'Reimbursement': PdfColor.fromInt(0xFF0F6E56),
+  'Others': PdfColor.fromInt(0xFF5F5E5A),
+};
+
 String _fmtDate(String? iso) {
   if (iso == null || iso.isEmpty) return '--';
   try {
@@ -575,13 +697,6 @@ String _fmtDate(String? iso) {
   } catch (_) {
     return iso;
   }
-}
-
-String _todayStr() {
-  final d = DateTime.now();
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return '${d.day} ${months[d.month - 1]} ${d.year}';
 }
 
 String _initials(String name) {
@@ -607,6 +722,12 @@ String _formatMoney(num value) {
     }
   }
   return buffer.toString().split('').reversed.join();
+}
+
+String _formatTransactionDate(DateTime date) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return '${date.day} ${months[date.month - 1]} ${date.year}';
 }
 
 List<StatusEvent> _buildHistoryEvents(StaffMember staff) {
@@ -637,9 +758,6 @@ List<StatusEvent> _buildHistoryEvents(StaffMember staff) {
   return events;
 }
 
-// ════════════════════════════════════════════════════
-// ★ CACHE Font (unchanged)
-// ════════════════════════════════════════════════════
 class _FontCache {
   static pw.Font? _iconFont;
   static Future<pw.Font> get iconFont async {
@@ -649,20 +767,21 @@ class _FontCache {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// ★ UPDATED: now accepts optional transactions list
+// ─────────────────────────────────────────────────────────────────────────
 Future<Uint8List> generateStaffProfilePdf(
     StaffMember staff,
-    Map<String, String> classIdToName,
-    ) async {
+    Map<String, String> classIdToName, {
+      List<StaffTransaction>? transactions,   // ← new parameter
+    }) async {
   final pdf = pw.Document();
   final historyEvents = _buildHistoryEvents(staff);
   final isTeacher = staff.type == 'teacher';
 
-  // Default text fonts
   final regularFont = pw.Font.helvetica();
   final boldFont = pw.Font.helveticaBold();
   final decorativeFont = pw.Font.timesBold();
-
-  // Icon font (cached)
   final iconFont = await _FontCache.iconFont;
 
   pdf.addPage(
@@ -673,9 +792,9 @@ Future<Uint8List> generateStaffProfilePdf(
         return pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.stretch,
           children: [
-            // ── Sidebar (narrower to save space) ────────────────────────
+            // ── Sidebar ────────────────────────────────────────────────
             pw.Container(
-              width: 155,   // reduced from 170
+              width: 155,
               padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 20),
               decoration: const pw.BoxDecoration(color: _navy),
               child: pw.Column(
@@ -707,7 +826,7 @@ Future<Uint8List> generateStaffProfilePdf(
                   ),
                   pw.SizedBox(height: 10),
 
-                  // ── Name (replaces "STAFF MEMBER") ──
+                  // Name
                   pw.Text(
                     staff.name,
                     textAlign: pw.TextAlign.center,
@@ -720,7 +839,6 @@ Future<Uint8List> generateStaffProfilePdf(
                     ),
                   ),
 
-                  // ── Designation (if provided) ──
                   if (staff.designation != null && staff.designation!.trim().isNotEmpty)
                     pw.Padding(
                       padding: const pw.EdgeInsets.only(top: 4),
@@ -755,16 +873,12 @@ Future<Uint8List> generateStaffProfilePdf(
                   pw.Divider(color: PdfColors.blueGrey700, thickness: 0.7),
                   pw.SizedBox(height: 10),
 
-                  // Sidebar info blocks (CNIC & Joining)
+                  // ── Sidebar: CNIC only (Registered removed) ──
                   _sidebarInfoBlock(const pw.IconData(0xe853), 'CNIC', staff.cnic,
-                      iconFont: iconFont, regularFont: regularFont, boldFont: boldFont),
-                  pw.SizedBox(height: 8),
-                  _sidebarInfoBlock(const pw.IconData(0xe935), 'Registered',
-                      'Joined ${_fmtDate(staff.joiningDate)}',
                       iconFont: iconFont, regularFont: regularFont, boldFont: boldFont),
                   pw.SizedBox(height: 14),
 
-                  // Employment history box
+                  // ── Employment history ──
                   pw.Container(
                     width: double.infinity,
                     padding: const pw.EdgeInsets.all(8),
@@ -777,8 +891,7 @@ Future<Uint8List> generateStaffProfilePdf(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         pw.Text('EMPLOYMENT HISTORY',
-                            style: pw.TextStyle(
-                                fontSize: 8, font: boldFont,
+                            style: pw.TextStyle(fontSize: 8, font: boldFont,
                                 color: PdfColors.grey400, letterSpacing: 0.4)),
                         pw.SizedBox(height: 6),
                         ...historyEvents.asMap().entries.map((entry) {
@@ -792,18 +905,28 @@ Future<Uint8List> generateStaffProfilePdf(
                       ],
                     ),
                   ),
+                  pw.SizedBox(height: 12),
+
+                  // ── NEW: Transaction History (if available) ──
+                  if (transactions != null && transactions.isNotEmpty)
+                    _transactionHistoryBlock(
+                      transactions: transactions,
+                      iconFont: iconFont,
+                      boldFont: boldFont,
+                      regularFont: regularFont,
+                    ),
                 ],
               ),
             ),
 
-            // ── Main content (reduced padding) ─────────────────────────
+            // ── Main content ─────────────────────────────────────────
             pw.Expanded(
               child: pw.Padding(
                 padding: const pw.EdgeInsets.fromLTRB(18, 20, 18, 20),
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    // Header (smaller)
+                    // Header
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -822,7 +945,6 @@ Future<Uint8List> generateStaffProfilePdf(
                     ),
                     pw.SizedBox(height: 4),
 
-                    // Termination banner (if applicable)
                     if (staff.isTerminated) ...[
                       _terminatedBanner(staff, font: regularFont, boldFont: boldFont),
                       pw.SizedBox(height: 4),
@@ -836,7 +958,6 @@ Future<Uint8List> generateStaffProfilePdf(
                       font: regularFont, boldFont: boldFont,
                       rows: [
                         _row('Father / Husband', staff.fatherOrHusbandName),
-                        // CNIC removed (already in sidebar)
                         _row('Date of Birth', _fmtDate(staff.dob)),
                         _row('Gender', staff.gender),
                         _row('Marital Status', staff.maritalStatus),
@@ -847,7 +968,6 @@ Future<Uint8List> generateStaffProfilePdf(
                     ),
                     pw.SizedBox(height: 4),
 
-                    // Contact Information
                     _sectionCard(
                       icon: const pw.IconData(0xe0b0), iconFont: iconFont,
                       iconColor: _blue, iconBg: _blueLight,
@@ -861,7 +981,6 @@ Future<Uint8List> generateStaffProfilePdf(
                     ),
                     pw.SizedBox(height: 4),
 
-                    // Job Details
                     _sectionCard(
                       icon: const pw.IconData(0xe8f9), iconFont: iconFont,
                       iconColor: _blue, iconBg: _blueLight,
@@ -876,7 +995,6 @@ Future<Uint8List> generateStaffProfilePdf(
                       ],
                     ),
 
-                    // Subjects (only if assigned)
                     if (staff.subjects.isNotEmpty) ...[
                       pw.SizedBox(height: 4),
                       _chipCard(
@@ -892,7 +1010,6 @@ Future<Uint8List> generateStaffProfilePdf(
                       ),
                     ],
 
-                    // Assigned Classes (only if assigned)
                     if (staff.assignedClasses.isNotEmpty) ...[
                       pw.SizedBox(height: 4),
                       _chipCard(
@@ -908,16 +1025,14 @@ Future<Uint8List> generateStaffProfilePdf(
                       ),
                     ],
 
-                    // Notes (only if provided)
                     if (staff.note != null && staff.note!.isNotEmpty) ...[
                       pw.SizedBox(height: 4),
                       _noteCard(staff.note!, font: regularFont, boldFont: boldFont),
                     ],
 
-                    // Flexible spacer pushes footer to the bottom
                     pw.Spacer(),
 
-                    // ── Centred footer ──
+                    // Centred footer
                     pw.Center(
                       child: pw.Text(
                         'Developed by Ali Haider | 0300-7465064',
@@ -943,9 +1058,117 @@ Future<Uint8List> generateStaffProfilePdf(
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Helper widgets (adjusted for compactness)
+// NEW: Transaction history block in sidebar
 // ─────────────────────────────────────────────────────────────────────────
+pw.Widget _transactionHistoryBlock({
+  required List<StaffTransaction> transactions,
+  required pw.Font iconFont,
+  required pw.Font boldFont,
+  required pw.Font regularFont,
+}) {
+  // Sort by date descending (most recent first)
+  final sorted = List<StaffTransaction>.from(transactions)
+    ..sort((a, b) => b.date.compareTo(a.date));
+  // Limit to last 10 to avoid overflow
+  final display = sorted.take(10).toList();
 
+  return pw.Container(
+    width: double.infinity,
+    padding: const pw.EdgeInsets.all(8),
+    decoration: pw.BoxDecoration(
+      color: _navyDark,
+      borderRadius: pw.BorderRadius.circular(8),
+      border: pw.Border.all(color: PdfColors.blueGrey700, width: 0.6),
+    ),
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('TRANSACTION HISTORY',
+            style: pw.TextStyle(fontSize: 8, font: boldFont,
+                color: PdfColors.grey400, letterSpacing: 0.4)),
+        pw.SizedBox(height: 6),
+        ...display.map((txn) => _transactionTile(txn, iconFont: iconFont, regularFont: regularFont, boldFont: boldFont)),
+      ],
+    ),
+  );
+}
+
+pw.Widget _transactionTile(
+    StaffTransaction txn, {
+      required pw.Font iconFont,
+      required pw.Font regularFont,
+      required pw.Font boldFont,
+    }) {
+  final catIconCode = _kCategoryIcons[txn.category] ?? 0xe5d4; // more_horiz as fallback
+  final catColor = _kCategoryColors[txn.category] ?? PdfColors.grey400;
+  final dateStr = _formatTransactionDate(txn.date);
+  final amountStr = 'Rs ${_formatMoney(txn.amount)}';
+
+  return pw.Padding(
+    padding: const pw.EdgeInsets.only(bottom: 6),
+    child: pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        // Left icon column
+        pw.Column(
+          children: [
+            pw.Container(
+              width: 14, height: 14,
+              decoration: pw.BoxDecoration(
+                color: catColor.withAlpha(80),
+                shape: pw.BoxShape.circle,
+              ),
+              child: pw.Center(
+                child: pw.Icon(
+                  pw.IconData(catIconCode),
+                  font: iconFont,
+                  size: 8,
+                  color: catColor,
+                ),
+              ),
+            ),
+            // Small line separator between items (not between last)
+            if (false) pw.Container(width: 1, height: 10, color: PdfColors.grey500), // not needed with padding separation
+          ],
+        ),
+        pw.SizedBox(width: 6),
+        pw.Expanded(
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Expanded(
+                    child: pw.Text(
+                      txn.displayCategory,
+                      style: pw.TextStyle(fontSize: 8, font: boldFont, color: _white),
+                      maxLines: 1,
+                      overflow: pw.TextOverflow.clip,   // ← FIXED
+                    ),
+                  ),
+                  pw.Text(
+                    amountStr,
+                    style: pw.TextStyle(fontSize: 8, font: boldFont, color: _white),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                dateStr,
+                style: pw.TextStyle(fontSize: 7, font: regularFont, color: PdfColors.grey500),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Existing helpers (unchanged except minor adjustments)
+// ─────────────────────────────────────────────────────────────────────────
 pw.Widget _pill({required String text, required PdfColor bg, required PdfColor fg, required pw.Font font}) {
   return pw.Container(
     padding: const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -1037,7 +1260,6 @@ pw.Widget _terminatedBanner(StaffMember staff, {required pw.Font font, required 
   );
 }
 
-// Simple key‑value row for section cards
 class _KV { final String label; final String value; final bool highlight; _KV(this.label, this.value, {this.highlight = false}); }
 _KV _row(String label, String value, {bool highlight = false}) => _KV(label, value, highlight: highlight);
 
