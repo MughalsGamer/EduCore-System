@@ -1394,6 +1394,8 @@ class _ByPersonTabState extends State<_ByPersonTab> {
       summary: provider.monthSummary,
       year: _selectedYear,
       month: _selectedMonth,
+      context: context, // yeh add karein loading spinner ke liye
+
     );
   }
 

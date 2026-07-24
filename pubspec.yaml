@@ -27,6 +27,7 @@ dependencies:
   shimmer:
   open_file:
   universal_platform:
+  share_plus:
 
 
 

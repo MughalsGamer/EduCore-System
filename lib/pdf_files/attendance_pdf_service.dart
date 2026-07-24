@@ -1,3 +1,4 @@
+//
 // import 'dart:convert';
 // import 'dart:io';
 // import 'package:flutter/foundation.dart'; // for kIsWeb
@@ -8,12 +9,53 @@
 // import 'package:pdf/widgets.dart' as pw;
 //
 // // Only import 'dart:html' on web
-// import 'dart:html' as html;      // will be ignored on non-web
+// import 'dart:html' as html; // will be ignored on non-web
 //
-// import '../../models/teacher.dart';          // adjust path
+// import '../../models/teacher.dart'; // adjust path
 // import '../../models/attendance_model.dart'; // adjust path
 //
-// /// Generates an A4‑landscape PDF of a staff member’s monthly attendance.
+// // ──────────────────────────────────────────────────
+// //  COLOR PALETTE — matches app's status colors
+// // ──────────────────────────────────────────────────
+// const PdfColor _kNavy = PdfColor.fromInt(0xFF1E1B4B);
+// const PdfColor _kNavyLight = PdfColor.fromInt(0xFF312E7D);
+// const PdfColor _kPurple = PdfColor.fromInt(0xFF534AB7);
+// const PdfColor _kPurpleDark = PdfColor.fromInt(0xFF433CA0);
+// const PdfColor _kInk = PdfColor.fromInt(0xFF1F2937);
+// const PdfColor _kSlate = PdfColor.fromInt(0xFF64748B);
+// const PdfColor _kBorder = PdfColor.fromInt(0xFFE2E8F0);
+// const PdfColor _kSurface = PdfColor.fromInt(0xFFF8FAFC);
+// const PdfColor _kWhite = PdfColor.fromInt(0xFFFFFFFF);
+//
+// const PdfColor _kGreen = PdfColor.fromInt(0xFF166534);
+// const PdfColor _kGreenBg = PdfColor.fromInt(0xFFEFFCF3);
+// const PdfColor _kRed = PdfColor.fromInt(0xFFB91C1C);
+// const PdfColor _kRedBg = PdfColor.fromInt(0xFFFEF2F2);
+// const PdfColor _kOrange = PdfColor.fromInt(0xFFB45309);
+// const PdfColor _kOrangeBg = PdfColor.fromInt(0xFFFFFBEB);
+// const PdfColor _kBlue = PdfColor.fromInt(0xFF1D4ED8);
+// const PdfColor _kBlueBg = PdfColor.fromInt(0xFFEFF6FF);
+// const PdfColor _kPurpleAccent = PdfColor.fromInt(0xFF6D28D9);
+// const PdfColor _kPurpleBg = PdfColor.fromInt(0xFFF5F3FF);
+// const PdfColor _kGrey = PdfColor.fromInt(0xFF475569);
+// const PdfColor _kGreyBg = PdfColor.fromInt(0xFFF1F5F9);
+//
+// Map<String, dynamic> _statusMeta(String key) {
+//   const list = <Map<String, dynamic>>[
+//     {'key': 'present', 'label': 'Present', 'color': _kGreen, 'bg': _kGreenBg, 'badge': '1'},
+//     {'key': 'absent', 'label': 'Absent', 'color': _kRed, 'bg': _kRedBg, 'badge': '2'},
+//     {'key': 'late', 'label': 'Late', 'color': _kOrange, 'bg': _kOrangeBg, 'badge': '3'},
+//     {'key': 'leave', 'label': 'Leave', 'color': _kBlue, 'bg': _kBlueBg, 'badge': '4'},
+//     {'key': 'half_day', 'label': 'Half Day', 'color': _kPurpleAccent, 'bg': _kPurpleBg, 'badge': '5'},
+//     {'key': 'holiday', 'label': 'Holiday', 'color': _kGrey, 'bg': _kGreyBg, 'badge': '6'},
+//   ];
+//   return list.firstWhere((s) => s['key'] == key, orElse: () => list[0]);
+// }
+//
+// /// Generates an A4-landscape PDF of a staff member's monthly attendance,
+// /// styled to match the app's dark navy/purple brand theme, with the
+// /// staff photo up top and the attendance log split into two columns so
+// /// everything fits on a single page.
 // /// On mobile/desktop: saves to temp folder & opens automatically.
 // /// On web: triggers a browser download.
 // Future<void> generateAndOpenAttendancePdf({
@@ -35,34 +77,59 @@
 //   final attendancePercent =
 //   workingDays == 0 ? 0.0 : (present / workingDays) * 100;
 //
-//   // ── 2. Build PDF ───────────────────────────────
+//   // ── 2. Decode staff photo (if any) ─────────────
+//   pw.MemoryImage? staffImage;
+//   final picBase64 = staff.imageBase64;
+//   if (picBase64 != null && picBase64.isNotEmpty) {
+//     try {
+//       staffImage = pw.MemoryImage(base64Decode(picBase64));
+//     } catch (_) {
+//       staffImage = null;
+//     }
+//   }
+//
+//   // ── 3. Build PDF ───────────────────────────────
 //   final pdf = pw.Document();
 //   pdf.addPage(
-//     pw.MultiPage(
+//     pw.Page(
 //       pageFormat: PdfPageFormat.a4.landscape,
-//       margin: const pw.EdgeInsets.all(24),
-//       build: (context) => [
-//         _pdfHeader(staff, year, month),
-//         pw.SizedBox(height: 14),
-//         _pdfSummaryRow(
-//           present: present,
-//           absent: absent,
-//           leave: leave,
-//           late: late,
-//           halfDay: halfDay,
-//           holiday: holiday,
-//           workingDays: workingDays,
-//           percent: attendancePercent,
-//         ),
-//         pw.SizedBox(height: 20),
-//         _pdfTable(records),
-//       ],
+//       margin: const pw.EdgeInsets.all(0),
+//       build: (context) => pw.Row(
+//         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+//         children: [
+//           _buildSidebar(staff, staffImage, year, month),
+//           pw.Expanded(
+//             child: pw.Container(
+//               padding: const pw.EdgeInsets.fromLTRB(20, 18, 20, 14),
+//               child: pw.Column(
+//                 crossAxisAlignment: pw.CrossAxisAlignment.start,
+//                 children: [
+//                   _buildSummaryRow(
+//                     present: present,
+//                     absent: absent,
+//                     leave: leave,
+//                     late: late,
+//                     halfDay: halfDay,
+//                     holiday: holiday,
+//                     workingDays: workingDays,
+//                     percent: attendancePercent,
+//                   ),
+//                   pw.SizedBox(height: 12),
+//                   pw.Expanded(child: _buildTwoColumnTable(records)),
+//                   pw.SizedBox(height: 8),
+//                   _buildFooter(),
+//                 ],
+//               ),
+//             ),
+//           ),
+//         ],
+//       ),
 //     ),
 //   );
 //
 //   final pdfBytes = await pdf.save();
 //
-//   // ── 3. Save / open based on platform ──────────
+//   // ── 4. Save / open based on platform ──────────
 //   final monthYear = DateFormat('yyyy_MM').format(DateTime(year, month));
 //   final fileName = 'attendance_${staff.name}_$monthYear.pdf';
 //
@@ -75,7 +142,7 @@
 //       ..click();
 //     html.Url.revokeObjectUrl(url);
 //   } else {
-//     // MOBILE / DESKTOP
+//     // MOBILE / DESKTOP — save then auto-open
 //     final dir = await getTemporaryDirectory();
 //     final file = File('${dir.path}/$fileName');
 //     await file.writeAsBytes(pdfBytes);
@@ -84,49 +151,130 @@
 // }
 //
 // // ──────────────────────────────────────────────────
-// //  PDF WIDGET HELPERS (unchanged from before)
+// //  SIDEBAR — dark navy panel with photo + staff info
 // // ──────────────────────────────────────────────────
-//
-// pw.Widget _pdfHeader(StaffMember staff, int year, int month) {
+// pw.Widget _buildSidebar(
+//     StaffMember staff, pw.MemoryImage? staffImage, int year, int month) {
 //   return pw.Container(
-//     padding: const pw.EdgeInsets.all(14),
-//     decoration: pw.BoxDecoration(
-//       color: const PdfColor.fromInt(0xFF534AB7),
-//       borderRadius: pw.BorderRadius.circular(8),
+//     width: 165,
+//     padding: const pw.EdgeInsets.fromLTRB(16, 22, 16, 16),
+//     decoration: const pw.BoxDecoration(
+//       gradient: pw.LinearGradient(
+//         colors: [_kNavy, _kPurpleDark],
+//         begin: pw.Alignment.topCenter,
+//         end: pw.Alignment.bottomCenter,
+//       ),
 //     ),
-//     child: pw.Row(
-//       crossAxisAlignment: pw.CrossAxisAlignment.center,
+//     child: pw.Column(
+//       crossAxisAlignment: pw.CrossAxisAlignment.start,
 //       children: [
-//         pw.Text(
-//           staff.name,
-//           style: pw.TextStyle(
-//             fontSize: 22,
-//             fontWeight: pw.FontWeight.bold,
-//             color: const PdfColor.fromInt(0xFFFFFFFF),
+//         // Photo
+//         pw.Center(
+//           child: pw.Container(
+//             width: 78,
+//             height: 78,
+//             decoration: pw.BoxDecoration(
+//               shape: pw.BoxShape.circle,
+//               color: _kWhite,
+//               border: pw.Border.all(color: _kWhite, width: 2.5),
+//             ),
+//             child: pw.ClipOval(
+//               child: staffImage != null
+//                   ? pw.Image(staffImage, fit: pw.BoxFit.cover)
+//                   : pw.Center(
+//                 child: pw.Text(
+//                   staff.name.isNotEmpty
+//                       ? staff.name[0].toUpperCase()
+//                       : '?',
+//                   style: pw.TextStyle(
+//                     fontSize: 28,
+//                     fontWeight: pw.FontWeight.bold,
+//                     color: _kPurple,
+//                   ),
+//                 ),
+//               ),
+//             ),
 //           ),
 //         ),
+//         pw.SizedBox(height: 14),
+//         pw.Center(
+//           child: pw.Text(
+//             staff.name,
+//             textAlign: pw.TextAlign.center,
+//             style: pw.TextStyle(
+//               fontSize: 15,
+//               fontWeight: pw.FontWeight.bold,
+//               color: _kWhite,
+//             ),
+//           ),
+//         ),
+//         pw.SizedBox(height: 6),
+//         pw.Center(
+//           child: pw.Container(
+//             padding:
+//             const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+//             decoration: pw.BoxDecoration(
+//               color: _kWhite.shade(0.16),
+//               borderRadius: pw.BorderRadius.circular(20),
+//             ),
+//             child: pw.Text(
+//               staff.type.toLowerCase() == 'teacher' ? 'Teacher' : 'Staff',
+//               style: pw.TextStyle(fontSize: 9, color: _kWhite),
+//             ),
+//           ),
+//         ),
+//         pw.SizedBox(height: 22),
+//         pw.Divider(color: _kWhite.shade(0.2), thickness: 0.7),
+//         pw.SizedBox(height: 14),
+//
+//         _sidebarInfoRow('Designation',
+//             (staff.designation != null && staff.designation!.trim().isNotEmpty)
+//                 ? staff.designation!
+//                 : '-'),
+//         pw.SizedBox(height: 12),
+//         _sidebarInfoRow('Period', DateFormat('MMMM yyyy').format(DateTime(year, month))),
+//
 //         pw.Spacer(),
+//         pw.Divider(color: _kWhite.shade(0.2), thickness: 0.7),
+//         pw.SizedBox(height: 8),
 //         pw.Text(
-//           DateFormat('MMMM yyyy').format(DateTime(year, month)),
-//           style: pw.TextStyle(
-//             fontSize: 15,
-//             color: const PdfColor.fromInt(0xFFFFFFFF),
-//           ),
-//         ),
-//         pw.SizedBox(width: 16),
-//         pw.Text(
-//           staff.type.toLowerCase() == 'teacher' ? 'Teacher' : 'Staff',
-//           style: pw.TextStyle(
-//             fontSize: 15,
-//             color: const PdfColor.fromInt(0xFFFFFFFF),
-//           ),
+//           'Generated ${DateFormat('dd MMM yyyy').format(DateTime.now())}',
+//           style: pw.TextStyle(fontSize: 7.5, color: _kWhite.shade(0.6)),
 //         ),
 //       ],
 //     ),
 //   );
 // }
 //
-// pw.Widget _pdfSummaryRow({
+// pw.Widget _sidebarInfoRow(String label, String value) {
+//   return pw.Column(
+//     crossAxisAlignment: pw.CrossAxisAlignment.start,
+//     children: [
+//       pw.Text(
+//         label.toUpperCase(),
+//         style: pw.TextStyle(
+//           fontSize: 7.5,
+//           color: _kWhite.shade(0.55),
+//           letterSpacing: 0.5,
+//         ),
+//       ),
+//       pw.SizedBox(height: 3),
+//       pw.Text(
+//         value,
+//         style: pw.TextStyle(
+//           fontSize: 10.5,
+//           fontWeight: pw.FontWeight.bold,
+//           color: _kWhite,
+//         ),
+//       ),
+//     ],
+//   );
+// }
+//
+// // ──────────────────────────────────────────────────
+// //  SUMMARY STAT CARDS
+// // ──────────────────────────────────────────────────
+// pw.Widget _buildSummaryRow({
 //   required int present,
 //   required int absent,
 //   required int leave,
@@ -136,314 +284,1096 @@
 //   required int workingDays,
 //   required double percent,
 // }) {
-//   final items = [
-//     ('Working Days', '$workingDays'),
-//     ('Present', '$present'),
-//     ('Absent', '$absent'),
-//     ('Leave', '$leave'),
-//     ('Late', '$late'),
-//     ('Half Day', '$halfDay'),
-//     ('Holidays', '$holiday'),
-//     ('Attendance %', '${percent.toStringAsFixed(1)}%'),
+//   final items = <Map<String, dynamic>>[
+//     {'label': 'Working Days', 'value': '$workingDays', 'color': _kPurple, 'bg': PdfColor.fromInt(0xFFF0EFFE)},
+//     {'label': 'Present', 'value': '$present', 'color': _kGreen, 'bg': _kGreenBg},
+//     {'label': 'Absent', 'value': '$absent', 'color': _kRed, 'bg': _kRedBg},
+//     {'label': 'Leave', 'value': '$leave', 'color': _kBlue, 'bg': _kBlueBg},
+//     {'label': 'Late', 'value': '$late', 'color': _kOrange, 'bg': _kOrangeBg},
+//     {'label': 'Half Day', 'value': '$halfDay', 'color': _kPurpleAccent, 'bg': _kPurpleBg},
+//     {'label': 'Holidays', 'value': '$holiday', 'color': _kGrey, 'bg': _kGreyBg},
+//     {'label': 'Attendance %', 'value': '${percent.toStringAsFixed(1)}%', 'color': _kPurple, 'bg': PdfColor.fromInt(0xFFF0EFFE)},
 //   ];
 //
-//   return pw.Wrap(
-//     spacing: 8,
-//     runSpacing: 8,
-//     children: items.map((e) {
-//       return pw.Container(
-//         padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-//         decoration: pw.BoxDecoration(
-//           border: pw.Border.all(color: const PdfColor.fromInt(0xFFE2E8F0)),
-//           borderRadius: pw.BorderRadius.circular(6),
-//         ),
-//         child: pw.Column(
-//           mainAxisSize: pw.MainAxisSize.min,
-//           children: [
-//             pw.Text(
-//               e.$2,
-//               style: pw.TextStyle(
-//                 fontSize: 13,
-//                 fontWeight: pw.FontWeight.bold,
-//                 color: const PdfColor.fromInt(0xFF1F2937),
+//   return pw.Row(
+//     children: items.map((item) {
+//       final isLast = item == items.last;
+//       return pw.Expanded(
+//         child: pw.Container(
+//           margin: pw.EdgeInsets.only(right: isLast ? 0 : 6),
+//           padding: const pw.EdgeInsets.symmetric(vertical: 9),
+//           decoration: pw.BoxDecoration(
+//             color: item['bg'] as PdfColor,
+//             borderRadius: pw.BorderRadius.circular(8),
+//             border: pw.Border.all(
+//                 color: (item['color'] as PdfColor).shade(0.7), width: 0.6),
+//           ),
+//           child: pw.Column(
+//             children: [
+//               pw.Text(
+//                 item['value'] as String,
+//                 style: pw.TextStyle(
+//                   fontSize: 14,
+//                   fontWeight: pw.FontWeight.bold,
+//                   color: item['color'] as PdfColor,
+//                 ),
 //               ),
-//             ),
-//             pw.SizedBox(height: 4),
-//             pw.Text(
-//               e.$1,
-//               style: pw.TextStyle(
-//                 fontSize: 9,
-//                 color: const PdfColor.fromInt(0xFF64748B),
+//               pw.SizedBox(height: 3),
+//               pw.Text(
+//                 item['label'] as String,
+//                 textAlign: pw.TextAlign.center,
+//                 style: pw.TextStyle(fontSize: 7, color: _kSlate),
 //               ),
-//             ),
-//           ],
+//             ],
+//           ),
 //         ),
 //       );
 //     }).toList(),
 //   );
 // }
 //
-// pw.Widget _pdfTable(List<AttendanceRecord> records) {
+// // ──────────────────────────────────────────────────
+// //  TWO-COLUMN ATTENDANCE TABLE (fits full month on 1 page)
+// // ──────────────────────────────────────────────────
+// pw.Widget _buildTwoColumnTable(List<AttendanceRecord> records) {
 //   final sorted = [...records]..sort((a, b) => a.date.compareTo(b.date));
 //
-//   return pw.TableHelper.fromTextArray(
-//     headerStyle: pw.TextStyle(
-//       fontWeight: pw.FontWeight.bold,
-//       fontSize: 10,
-//       color: const PdfColor.fromInt(0xFFFFFFFF),
+//   final half = (sorted.length / 2).ceil();
+//   final left = sorted.sublist(0, half);
+//   final right = sorted.sublist(half);
+//
+//   return pw.Container(
+//     decoration: pw.BoxDecoration(
+//       border: pw.Border.all(color: _kBorder),
+//       borderRadius: pw.BorderRadius.circular(8),
 //     ),
-//     headerDecoration: const pw.BoxDecoration(
-//       color: PdfColor.fromInt(0xFF534AB7),
+//     child: pw.Row(
+//       crossAxisAlignment: pw.CrossAxisAlignment.start,
+//       children: [
+//         pw.Expanded(child: _buildColumn(left, startIndex: 1)),
+//         pw.Container(width: 0.8, color: _kBorder),
+//         pw.Expanded(child: _buildColumn(right, startIndex: half + 1)),
+//       ],
 //     ),
-//     cellStyle: pw.TextStyle(
-//       fontSize: 9,
-//       color: const PdfColor.fromInt(0xFF1F2937),
-//     ),
-//     cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-//     columnWidths: {
-//       0: const pw.FixedColumnWidth(24),
-//       1: const pw.FixedColumnWidth(80),
-//       2: const pw.FixedColumnWidth(90),
-//       3: const pw.FixedColumnWidth(130),
-//       4: const pw.FlexColumnWidth(1),
-//     },
-//     headers: ['#', 'Date', 'Day', 'Status', 'Remarks'],
-//     data: List<List<String>>.generate(sorted.length, (i) {
-//       final r = sorted[i];
-//       DateTime? dt;
-//       try {
-//         dt = DateTime.parse(r.date);
-//       } catch (_) {}
-//       // reuse _statusMeta (must be defined in this file)
-//       final meta = _statusMeta(r.status);
-//       return [
-//         '${i + 1}',
-//         dt != null ? DateFormat('dd-MMM-yyyy').format(dt) : r.date,
-//         dt != null ? DateFormat('EEEE').format(dt) : '-',
-//         meta['label'] as String,
-//         r.remarks.isEmpty ? '-' : r.remarks,
-//       ];
-//     }),
 //   );
 // }
 //
-// // ── Status meta (copy from your screen to keep service self-contained) ──
-// const List<Map<String, Object>> _statusList = [
-//   {'key': 'present', 'label': 'Present'},
-//   {'key': 'absent', 'label': 'Absent'},
-//   {'key': 'late', 'label': 'Late'},
-//   {'key': 'leave', 'label': 'Leave'},
-//   {'key': 'half_day', 'label': 'Half Day'},
-//   {'key': 'holiday', 'label': 'Holiday'},
-// ];
+// pw.Widget _buildColumn(List<AttendanceRecord> rows, {required int startIndex}) {
+//   return pw.Column(
+//     crossAxisAlignment: pw.CrossAxisAlignment.start,
+//     children: [
+//       // Header
+//       pw.Container(
+//         padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+//         decoration: const pw.BoxDecoration(color: _kPurpleDark),
+//         child: pw.Row(
+//           children: [
+//             pw.SizedBox(width: 16, child: pw.Text('#', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+//             pw.Expanded(flex: 3, child: pw.Text('DATE', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+//             pw.Expanded(flex: 3, child: pw.Text('DAY', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+//             pw.Expanded(flex: 3, child: pw.Text('STATUS', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+//             pw.Expanded(flex: 3, child: pw.Text('REMARKS', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+//           ],
+//         ),
+//       ),
+//       // Rows
+//       ...List.generate(rows.length, (i) {
+//         final r = rows[i];
+//         DateTime? dt;
+//         try {
+//           dt = DateTime.parse(r.date);
+//         } catch (_) {}
+//         final meta = _statusMeta(r.status);
 //
-// Map<String, Object> _statusMeta(String key) {
-//   return _statusList.firstWhere(
-//         (s) => s['key'] == key,
-//     orElse: () => _statusList[0],
+//         return pw.Container(
+//           padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+//           decoration: pw.BoxDecoration(
+//             color: i.isEven ? _kWhite : _kSurface,
+//             border: const pw.Border(bottom: pw.BorderSide(color: _kBorder, width: 0.4)),
+//           ),
+//           child: pw.Row(
+//             crossAxisAlignment: pw.CrossAxisAlignment.center,
+//             children: [
+//               pw.SizedBox(
+//                 width: 16,
+//                 child: pw.Text('${startIndex + i}', style: pw.TextStyle(fontSize: 7.5, color: _kSlate)),
+//               ),
+//               pw.Expanded(
+//                 flex: 3,
+//                 child: pw.Text(
+//                   dt != null ? DateFormat('dd-MMM').format(dt) : r.date,
+//                   style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kInk),
+//                 ),
+//               ),
+//               pw.Expanded(
+//                 flex: 3,
+//                 child: pw.Text(
+//                   dt != null ? DateFormat('EEE').format(dt) : '-',
+//                   style: pw.TextStyle(fontSize: 7.5, color: _kSlate),
+//                 ),
+//               ),
+//               pw.Expanded(
+//                 flex: 3,
+//                 child: pw.Container(
+//                   padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+//                   decoration: pw.BoxDecoration(
+//                     color: meta['bg'] as PdfColor,
+//                     borderRadius: pw.BorderRadius.circular(8),
+//                   ),
+//                   child: pw.Text(
+//                     meta['label'] as String,
+//                     style: pw.TextStyle(fontSize: 6.8, fontWeight: pw.FontWeight.bold, color: meta['color'] as PdfColor),
+//                   ),
+//                 ),
+//               ),
+//               pw.Expanded(
+//                 flex: 3,
+//                 child: pw.Text(
+//                   r.remarks.isEmpty ? '-' : r.remarks,
+//                   style: pw.TextStyle(fontSize: 7.2, color: _kInk),
+//                   maxLines: 1,
+//                   overflow: pw.TextOverflow.clip,
+//                 ),
+//               ),
+//             ],
+//           ),
+//         );
+//       }),
+//     ],
 //   );
 // }
+//
+// // ──────────────────────────────────────────────────
+// //  FOOTER
+// // ──────────────────────────────────────────────────
+// pw.Widget _buildFooter() {
+//   return pw.Row(
+//     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+//     children: [
+//       pw.Text(
+//         'EduCore School Management System',
+//         style: pw.TextStyle(fontSize: 7, color: _kSlate),
+//       ),
+//       pw.Text(
+//         'Auto-generated attendance report',
+//         style: pw.TextStyle(fontSize: 7, color: _kSlate),
+//       ),
+//     ],
+//   );
+// }
+//
+//
+//
+//
+
+//2nd code
+// import 'dart:convert';
+// import 'dart:io';
+// import 'package:flutter/foundation.dart'; // for kIsWeb
+// import 'package:intl/intl.dart';
+// import 'package:path_provider/path_provider.dart';
+// import 'package:open_file/open_file.dart';
+// import 'package:pdf/pdf.dart';
+// import 'package:pdf/widgets.dart' as pw;
+//
+// // Only import 'dart:html' on web
+// import 'dart:html' as html; // will be ignored on non-web
+//
+// import '../../models/teacher.dart'; // adjust path
+// import '../../models/attendance_model.dart'; // adjust path
+//
+// // ──────────────────────────────────────────────────
+// //  COLOR PALETTE — matches app's status colors
+// // ──────────────────────────────────────────────────
+// const PdfColor _kNavy = PdfColor.fromInt(0xFF1E1B4B);
+// const PdfColor _kNavyLight = PdfColor.fromInt(0xFF312E7D);
+// const PdfColor _kPurple = PdfColor.fromInt(0xFF534AB7);
+// const PdfColor _kPurpleDark = PdfColor.fromInt(0xFF433CA0);
+// const PdfColor _kInk = PdfColor.fromInt(0xFF1F2937);
+// const PdfColor _kSlate = PdfColor.fromInt(0xFF64748B);
+// const PdfColor _kBorder = PdfColor.fromInt(0xFFE2E8F0);
+// const PdfColor _kSurface = PdfColor.fromInt(0xFFF8FAFC);
+// const PdfColor _kWhite = PdfColor.fromInt(0xFFFFFFFF);
+// const PdfColor _kGold = PdfColor.fromInt(0xFFFBBF24);
+//
+// const PdfColor _kGreen = PdfColor.fromInt(0xFF166534);
+// const PdfColor _kGreenBg = PdfColor.fromInt(0xFFEFFCF3);
+// const PdfColor _kRed = PdfColor.fromInt(0xFFB91C1C);
+// const PdfColor _kRedBg = PdfColor.fromInt(0xFFFEF2F2);
+// const PdfColor _kOrange = PdfColor.fromInt(0xFFB45309);
+// const PdfColor _kOrangeBg = PdfColor.fromInt(0xFFFFFBEB);
+// const PdfColor _kBlue = PdfColor.fromInt(0xFF1D4ED8);
+// const PdfColor _kBlueBg = PdfColor.fromInt(0xFFEFF6FF);
+// const PdfColor _kPurpleAccent = PdfColor.fromInt(0xFF6D28D9);
+// const PdfColor _kPurpleBg = PdfColor.fromInt(0xFFF5F3FF);
+// const PdfColor _kGrey = PdfColor.fromInt(0xFF475569);
+// const PdfColor _kGreyBg = PdfColor.fromInt(0xFFF1F5F9);
+//
+// Map<String, dynamic> _statusMeta(String key) {
+//   const list = <Map<String, dynamic>>[
+//     {'key': 'present', 'label': 'Present', 'color': _kGreen, 'bg': _kGreenBg, 'badge': '1'},
+//     {'key': 'absent', 'label': 'Absent', 'color': _kRed, 'bg': _kRedBg, 'badge': '2'},
+//     {'key': 'late', 'label': 'Late', 'color': _kOrange, 'bg': _kOrangeBg, 'badge': '3'},
+//     {'key': 'leave', 'label': 'Leave', 'color': _kBlue, 'bg': _kBlueBg, 'badge': '4'},
+//     {'key': 'half_day', 'label': 'Half Day', 'color': _kPurpleAccent, 'bg': _kPurpleBg, 'badge': '5'},
+//     {'key': 'holiday', 'label': 'Holiday', 'color': _kGrey, 'bg': _kGreyBg, 'badge': '6'},
+//   ];
+//   return list.firstWhere((s) => s['key'] == key, orElse: () => list[0]);
+// }
+//
+// /// Generates an A4-landscape PDF of a staff member's monthly attendance,
+// /// styled to match the app's dark navy/purple brand theme, with the
+// /// staff photo up top and the attendance log split into two columns so
+// /// everything fits on a single page.
+// /// On mobile/desktop: saves to temp folder & opens automatically.
+// /// On web: triggers a browser download AND opens the file in a new tab.
+// Future<void> generateAndOpenAttendancePdf({
+//   required StaffMember staff,
+//   required List<AttendanceRecord> records,
+//   required Map<String, int> summary,
+//   required int year,
+//   required int month,
+// }) async {
+//   // ── 1. Compute summary values ──────────────────
+//   final total = summary['total'] ?? 0;
+//   final present = summary['present'] ?? 0;
+//   final absent = summary['absent'] ?? 0;
+//   final leave = summary['leave'] ?? 0;
+//   final late = summary['late'] ?? 0;
+//   final halfDay = summary['half_day'] ?? 0;
+//   final holiday = summary['holiday'] ?? 0;
+//   final workingDays = total - holiday;
+//   final attendancePercent =
+//   workingDays == 0 ? 0.0 : (present / workingDays) * 100;
+//
+//   // ── 2. Decode staff photo (if any) ─────────────
+//   pw.MemoryImage? staffImage;
+//   final picBase64 = staff.imageBase64;
+//   if (picBase64 != null && picBase64.isNotEmpty) {
+//     try {
+//       staffImage = pw.MemoryImage(base64Decode(picBase64));
+//     } catch (_) {
+//       staffImage = null;
+//     }
+//   }
+//
+//   // ── 3. Build PDF ───────────────────────────────
+//   final pdf = pw.Document();
+//   pdf.addPage(
+//     pw.Page(
+//       pageFormat: PdfPageFormat.a4.landscape,
+//       margin: const pw.EdgeInsets.all(0),
+//       build: (context) => pw.Row(
+//         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+//         children: [
+//           _buildSidebar(staff, staffImage, year, month),
+//           pw.Expanded(
+//             child: pw.Container(
+//               padding: const pw.EdgeInsets.fromLTRB(20, 18, 20, 14),
+//               child: pw.Column(
+//                 crossAxisAlignment: pw.CrossAxisAlignment.start,
+//                 children: [
+//                   _buildSummaryRow(
+//                     present: present,
+//                     absent: absent,
+//                     leave: leave,
+//                     late: late,
+//                     halfDay: halfDay,
+//                     holiday: holiday,
+//                     workingDays: workingDays,
+//                     percent: attendancePercent,
+//                   ),
+//                   pw.SizedBox(height: 12),
+//                   pw.Expanded(child: _buildTwoColumnTable(records)),
+//                   pw.SizedBox(height: 8),
+//                   _buildFooter(),
+//                 ],
+//               ),
+//             ),
+//           ),
+//         ],
+//       ),
+//     ),
+//   );
+//
+//   final pdfBytes = await pdf.save();
+//
+//   // ── 4. Save / open based on platform ──────────
+//   final monthYear = DateFormat('yyyy_MM').format(DateTime(year, month));
+//   // Sanitize file name so special characters in staff.name don't break saving
+//   final safeStaffName = staff.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+//   final fileName = 'attendance_${safeStaffName}_$monthYear.pdf';
+//
+//   if (kIsWeb) {
+//     // WEB: trigger download AND auto-open the PDF in a new browser tab.
+//     final blob = html.Blob([pdfBytes], 'application/pdf');
+//     final url = html.Url.createObjectUrlFromBlob(blob);
+//
+//     // 1) Auto-open in a new tab so the user can view it immediately.
+//     html.window.open(url, '_blank');
+//
+//     // 2) Also trigger a download with a friendly file name.
+//     final anchor = html.AnchorElement(href: url)
+//       ..setAttribute('download', fileName)
+//       ..click();
+//
+//     // Revoke slightly later so the new tab has time to load the blob URL.
+//     Future.delayed(const Duration(seconds: 5), () {
+//       html.Url.revokeObjectUrl(url);
+//     });
+//   } else {
+//     // MOBILE / DESKTOP — save then auto-open
+//     try {
+//       final dir = await getTemporaryDirectory();
+//       final file = File('${dir.path}/$fileName');
+//       await file.writeAsBytes(pdfBytes, flush: true);
+//
+//       final result = await OpenFile.open(file.path);
+//
+//       // If the OS couldn't find an app to open the PDF, surface it instead
+//       // of failing silently, so the caller/UI can show a message if needed.
+//       if (result.type != ResultType.done) {
+//         // ignore: avoid_print
+//         print(
+//           'Could not auto-open attendance PDF: ${result.type} - ${result.message}',
+//         );
+//       }
+//     } catch (e) {
+//       // ignore: avoid_print
+//       print('Failed to save/open attendance PDF: $e');
+//       rethrow;
+//     }
+//   }
+// }
+//
+// // ──────────────────────────────────────────────────
+// //  SIDEBAR — dark navy panel with photo + staff info
+// // ──────────────────────────────────────────────────
+// pw.Widget _buildSidebar(
+//     StaffMember staff, pw.MemoryImage? staffImage, int year, int month) {
+//   final hasDesignation =
+//       staff.designation != null && staff.designation!.trim().isNotEmpty;
+//
+//   return pw.Container(
+//     width: 165,
+//     padding: const pw.EdgeInsets.fromLTRB(16, 22, 16, 16),
+//     decoration: const pw.BoxDecoration(
+//       gradient: pw.LinearGradient(
+//         colors: [_kNavy, _kPurpleDark],
+//         begin: pw.Alignment.topCenter,
+//         end: pw.Alignment.bottomCenter,
+//       ),
+//     ),
+//     child: pw.Column(
+//       crossAxisAlignment: pw.CrossAxisAlignment.start,
+//       children: [
+//         // Photo
+//         pw.Center(
+//           child: pw.Container(
+//             width: 78,
+//             height: 78,
+//             decoration: pw.BoxDecoration(
+//               shape: pw.BoxShape.circle,
+//               color: _kWhite,
+//               border: pw.Border.all(color: _kWhite, width: 2.5),
+//             ),
+//             child: pw.ClipOval(
+//               child: staffImage != null
+//                   ? pw.Image(staffImage, fit: pw.BoxFit.cover)
+//                   : pw.Center(
+//                 child: pw.Text(
+//                   staff.name.isNotEmpty
+//                       ? staff.name[0].toUpperCase()
+//                       : '?',
+//                   style: pw.TextStyle(
+//                     fontSize: 28,
+//                     fontWeight: pw.FontWeight.bold,
+//                     color: _kPurple,
+//                   ),
+//                 ),
+//               ),
+//             ),
+//           ),
+//         ),
+//         pw.SizedBox(height: 14),
+//
+//         // Name
+//         pw.Center(
+//           child: pw.Text(
+//             staff.name,
+//             textAlign: pw.TextAlign.center,
+//             style: pw.TextStyle(
+//               fontSize: 15,
+//               fontWeight: pw.FontWeight.bold,
+//               color: _kWhite,
+//             ),
+//           ),
+//         ),
+//
+//         // Designation — shown as plain, clearly legible text directly
+//         // under the name (gold accent on dark navy = high contrast).
+//         // Falls back to the staff type (Teacher/Staff) only if no
+//         // designation is set, so this line is never empty/confusing.
+//         pw.SizedBox(height: 4),
+//         pw.Center(
+//           child: pw.Text(
+//             hasDesignation
+//                 ? staff.designation!
+//                 : (staff.type.toLowerCase() == 'teacher'
+//                 ? 'Teacher'
+//                 : 'Staff'),
+//             textAlign: pw.TextAlign.center,
+//             style: pw.TextStyle(
+//               fontSize: 9.5,
+//               fontWeight: pw.FontWeight.bold,
+//               color: _kGold,
+//               letterSpacing: 0.3,
+//             ),
+//           ),
+//         ),
+//
+//         pw.SizedBox(height: 20),
+//         pw.Divider(color: _kWhite.shade(0.2), thickness: 0.7),
+//         pw.SizedBox(height: 14),
+//
+//         _sidebarInfoRow(
+//           'Designation',
+//           hasDesignation ? staff.designation! : '-',
+//         ),
+//         pw.SizedBox(height: 12),
+//         _sidebarInfoRow(
+//           'Period',
+//           DateFormat('MMMM yyyy').format(DateTime(year, month)),
+//         ),
+//
+//         pw.Spacer(),
+//         pw.Divider(color: _kWhite.shade(0.2), thickness: 0.7),
+//         pw.SizedBox(height: 8),
+//         pw.Text(
+//           'Generated ${DateFormat('dd MMM yyyy').format(DateTime.now())}',
+//           style: pw.TextStyle(fontSize: 7.5, color: _kWhite.shade(0.6)),
+//         ),
+//       ],
+//     ),
+//   );
+// }
+//
+// pw.Widget _sidebarInfoRow(String label, String value) {
+//   return pw.Column(
+//     crossAxisAlignment: pw.CrossAxisAlignment.start,
+//     children: [
+//       pw.Text(
+//         label.toUpperCase(),
+//         style: pw.TextStyle(
+//           fontSize: 7.5,
+//           color: _kWhite.shade(0.55),
+//           letterSpacing: 0.5,
+//         ),
+//       ),
+//       pw.SizedBox(height: 3),
+//       pw.Text(
+//         value,
+//         style: pw.TextStyle(
+//           fontSize: 10.5,
+//           fontWeight: pw.FontWeight.bold,
+//           color: _kWhite,
+//         ),
+//       ),
+//     ],
+//   );
+// }
+//
+// // ──────────────────────────────────────────────────
+// //  SUMMARY STAT CARDS
+// // ──────────────────────────────────────────────────
+// pw.Widget _buildSummaryRow({
+//   required int present,
+//   required int absent,
+//   required int leave,
+//   required int late,
+//   required int halfDay,
+//   required int holiday,
+//   required int workingDays,
+//   required double percent,
+// }) {
+//   final items = <Map<String, dynamic>>[
+//     {'label': 'Working Days', 'value': '$workingDays', 'color': _kPurple, 'bg': PdfColor.fromInt(0xFFF0EFFE)},
+//     {'label': 'Present', 'value': '$present', 'color': _kGreen, 'bg': _kGreenBg},
+//     {'label': 'Absent', 'value': '$absent', 'color': _kRed, 'bg': _kRedBg},
+//     {'label': 'Leave', 'value': '$leave', 'color': _kBlue, 'bg': _kBlueBg},
+//     {'label': 'Late', 'value': '$late', 'color': _kOrange, 'bg': _kOrangeBg},
+//     {'label': 'Half Day', 'value': '$halfDay', 'color': _kPurpleAccent, 'bg': _kPurpleBg},
+//     {'label': 'Holidays', 'value': '$holiday', 'color': _kGrey, 'bg': _kGreyBg},
+//     {'label': 'Attendance %', 'value': '${percent.toStringAsFixed(1)}%', 'color': _kPurple, 'bg': PdfColor.fromInt(0xFFF0EFFE)},
+//   ];
+//
+//   return pw.Row(
+//     children: items.map((item) {
+//       final isLast = item == items.last;
+//       return pw.Expanded(
+//         child: pw.Container(
+//           margin: pw.EdgeInsets.only(right: isLast ? 0 : 6),
+//           padding: const pw.EdgeInsets.symmetric(vertical: 9),
+//           decoration: pw.BoxDecoration(
+//             color: item['bg'] as PdfColor,
+//             borderRadius: pw.BorderRadius.circular(8),
+//             border: pw.Border.all(
+//                 color: (item['color'] as PdfColor).shade(0.7), width: 0.6),
+//           ),
+//           child: pw.Column(
+//             children: [
+//               pw.Text(
+//                 item['value'] as String,
+//                 style: pw.TextStyle(
+//                   fontSize: 14,
+//                   fontWeight: pw.FontWeight.bold,
+//                   color: item['color'] as PdfColor,
+//                 ),
+//               ),
+//               pw.SizedBox(height: 3),
+//               pw.Text(
+//                 item['label'] as String,
+//                 textAlign: pw.TextAlign.center,
+//                 style: pw.TextStyle(fontSize: 7, color: _kSlate),
+//               ),
+//             ],
+//           ),
+//         ),
+//       );
+//     }).toList(),
+//   );
+// }
+//
+// // ──────────────────────────────────────────────────
+// //  TWO-COLUMN ATTENDANCE TABLE (fits full month on 1 page)
+// // ──────────────────────────────────────────────────
+// pw.Widget _buildTwoColumnTable(List<AttendanceRecord> records) {
+//   final sorted = [...records]..sort((a, b) => a.date.compareTo(b.date));
+//
+//   if (sorted.isEmpty) {
+//     // Guard against an empty month so the table area never renders blank
+//     // without explanation.
+//     return pw.Container(
+//       alignment: pw.Alignment.center,
+//       decoration: pw.BoxDecoration(
+//         border: pw.Border.all(color: _kBorder),
+//         borderRadius: pw.BorderRadius.circular(8),
+//       ),
+//       child: pw.Text(
+//         'No attendance records found for this period.',
+//         style: pw.TextStyle(fontSize: 10, color: _kSlate),
+//       ),
+//     );
+//   }
+//
+//   final half = (sorted.length / 2).ceil();
+//   final left = sorted.sublist(0, half);
+//   final right = sorted.sublist(half);
+//
+//   return pw.Container(
+//     decoration: pw.BoxDecoration(
+//       border: pw.Border.all(color: _kBorder),
+//       borderRadius: pw.BorderRadius.circular(8),
+//     ),
+//     child: pw.Row(
+//       crossAxisAlignment: pw.CrossAxisAlignment.start,
+//       children: [
+//         pw.Expanded(child: _buildColumn(left, startIndex: 1)),
+//         pw.Container(width: 0.8, color: _kBorder),
+//         pw.Expanded(child: _buildColumn(right, startIndex: half + 1)),
+//       ],
+//     ),
+//   );
+// }
+//
+// pw.Widget _buildColumn(List<AttendanceRecord> rows, {required int startIndex}) {
+//   return pw.Column(
+//     crossAxisAlignment: pw.CrossAxisAlignment.start,
+//     children: [
+//       // Header
+//       pw.Container(
+//         padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+//         decoration: const pw.BoxDecoration(color: _kPurpleDark),
+//         child: pw.Row(
+//           children: [
+//             pw.SizedBox(width: 16, child: pw.Text('#', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+//             pw.Expanded(flex: 3, child: pw.Text('DATE', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+//             pw.Expanded(flex: 3, child: pw.Text('DAY', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+//             pw.Expanded(flex: 3, child: pw.Text('STATUS', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+//             pw.Expanded(flex: 3, child: pw.Text('REMARKS', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+//           ],
+//         ),
+//       ),
+//       // Rows
+//       ...List.generate(rows.length, (i) {
+//         final r = rows[i];
+//         DateTime? dt;
+//         try {
+//           dt = DateTime.parse(r.date);
+//         } catch (_) {
+//           dt = null;
+//         }
+//         final meta = _statusMeta(r.status);
+//
+//         return pw.Container(
+//           padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+//           decoration: pw.BoxDecoration(
+//             color: i.isEven ? _kWhite : _kSurface,
+//             border: const pw.Border(bottom: pw.BorderSide(color: _kBorder, width: 0.4)),
+//           ),
+//           child: pw.Row(
+//             crossAxisAlignment: pw.CrossAxisAlignment.center,
+//             children: [
+//               pw.SizedBox(
+//                 width: 16,
+//                 child: pw.Text('${startIndex + i}', style: pw.TextStyle(fontSize: 7.5, color: _kSlate)),
+//               ),
+//               pw.Expanded(
+//                 flex: 3,
+//                 child: pw.Text(
+//                   dt != null ? DateFormat('dd-MMM').format(dt) : r.date,
+//                   style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kInk),
+//                 ),
+//               ),
+//               pw.Expanded(
+//                 flex: 3,
+//                 child: pw.Text(
+//                   dt != null ? DateFormat('EEE').format(dt) : '-',
+//                   style: pw.TextStyle(fontSize: 7.5, color: _kSlate),
+//                 ),
+//               ),
+//               pw.Expanded(
+//                 flex: 3,
+//                 child: pw.Container(
+//                   padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+//                   decoration: pw.BoxDecoration(
+//                     color: meta['bg'] as PdfColor,
+//                     borderRadius: pw.BorderRadius.circular(8),
+//                   ),
+//                   child: pw.Text(
+//                     meta['label'] as String,
+//                     style: pw.TextStyle(fontSize: 6.8, fontWeight: pw.FontWeight.bold, color: meta['color'] as PdfColor),
+//                   ),
+//                 ),
+//               ),
+//               pw.Expanded(
+//                 flex: 3,
+//                 child: pw.Text(
+//                   r.remarks.isEmpty ? '-' : r.remarks,
+//                   style: pw.TextStyle(fontSize: 7.2, color: _kInk),
+//                   maxLines: 1,
+//                   overflow: pw.TextOverflow.clip,
+//                 ),
+//               ),
+//             ],
+//           ),
+//         );
+//       }),
+//     ],
+//   );
+// }
+//
+// // ──────────────────────────────────────────────────
+// //  FOOTER
+// // ──────────────────────────────────────────────────
+// pw.Widget _buildFooter() {
+//   return pw.Row(
+//     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+//     children: [
+//       pw.Text(
+//         'EduCore School Management System',
+//         style: pw.TextStyle(fontSize: 7, color: _kSlate),
+//       ),
+//       pw.Text(
+//         'Auto-generated attendance report',
+//         style: pw.TextStyle(fontSize: 7, color: _kSlate),
+//       ),
+//     ],
+//   );
+// }
+
 
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart'; // for kIsWeb
+import 'package:flutter/material.dart'; // for the loading dialog
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-// Only for web download
-import 'dart:html' as html;
+// Only import 'dart:html' on web
+import 'dart:html' as html; // will be ignored on non-web
 
-import '../../models/teacher.dart';
-import '../../models/attendance_model.dart';
+import '../../models/teacher.dart'; // adjust path
+import '../../models/attendance_model.dart'; // adjust path
 
-/// Generates an A4‑landscape PDF with colourful two‑column attendance cards,
-/// summary, and employee photo. Saves & opens on mobile/desktop, downloads on web.
+// ──────────────────────────────────────────────────
+//  COLOR PALETTE — matches app's status colors
+// ──────────────────────────────────────────────────
+const PdfColor _kNavy = PdfColor.fromInt(0xFF1E1B4B);
+const PdfColor _kNavyLight = PdfColor.fromInt(0xFF312E7D);
+const PdfColor _kPurple = PdfColor.fromInt(0xFF534AB7);
+const PdfColor _kPurpleDark = PdfColor.fromInt(0xFF433CA0);
+const PdfColor _kInk = PdfColor.fromInt(0xFF1F2937);
+const PdfColor _kSlate = PdfColor.fromInt(0xFF64748B);
+const PdfColor _kBorder = PdfColor.fromInt(0xFFE2E8F0);
+const PdfColor _kSurface = PdfColor.fromInt(0xFFF8FAFC);
+const PdfColor _kWhite = PdfColor.fromInt(0xFFFFFFFF);
+const PdfColor _kGold = PdfColor.fromInt(0xFFFBBF24);
+
+const PdfColor _kGreen = PdfColor.fromInt(0xFF166534);
+const PdfColor _kGreenBg = PdfColor.fromInt(0xFFEFFCF3);
+const PdfColor _kRed = PdfColor.fromInt(0xFFB91C1C);
+const PdfColor _kRedBg = PdfColor.fromInt(0xFFFEF2F2);
+const PdfColor _kOrange = PdfColor.fromInt(0xFFB45309);
+const PdfColor _kOrangeBg = PdfColor.fromInt(0xFFFFFBEB);
+const PdfColor _kBlue = PdfColor.fromInt(0xFF1D4ED8);
+const PdfColor _kBlueBg = PdfColor.fromInt(0xFFEFF6FF);
+const PdfColor _kPurpleAccent = PdfColor.fromInt(0xFF6D28D9);
+const PdfColor _kPurpleBg = PdfColor.fromInt(0xFFF5F3FF);
+const PdfColor _kGrey = PdfColor.fromInt(0xFF475569);
+const PdfColor _kGreyBg = PdfColor.fromInt(0xFFF1F5F9);
+
+Map<String, dynamic> _statusMeta(String key) {
+  const list = <Map<String, dynamic>>[
+    {'key': 'present', 'label': 'Present', 'color': _kGreen, 'bg': _kGreenBg, 'badge': '1'},
+    {'key': 'absent', 'label': 'Absent', 'color': _kRed, 'bg': _kRedBg, 'badge': '2'},
+    {'key': 'late', 'label': 'Late', 'color': _kOrange, 'bg': _kOrangeBg, 'badge': '3'},
+    {'key': 'leave', 'label': 'Leave', 'color': _kBlue, 'bg': _kBlueBg, 'badge': '4'},
+    {'key': 'half_day', 'label': 'Half Day', 'color': _kPurpleAccent, 'bg': _kPurpleBg, 'badge': '5'},
+    {'key': 'holiday', 'label': 'Holiday', 'color': _kGrey, 'bg': _kGreyBg, 'badge': '6'},
+  ];
+  return list.firstWhere((s) => s['key'] == key, orElse: () => list[0]);
+}
+
+/// Generates an A4-landscape PDF of a staff member's monthly attendance,
+/// styled to match the app's dark navy/purple brand theme, with the
+/// staff photo up top and the attendance log split into two columns so
+/// everything fits on a single page.
+///
+/// If [context] is provided, a tiny loading indicator is shown while the
+/// PDF is built and saved, and is dismissed as soon as the file is ready.
+///
+/// On mobile/desktop: saves to temp folder & opens automatically.
+/// On web: triggers a browser download AND opens the file in a new tab.
 Future<void> generateAndOpenAttendancePdf({
   required StaffMember staff,
   required List<AttendanceRecord> records,
   required Map<String, int> summary,
   required int year,
   required int month,
+  BuildContext? context,
 }) async {
-  // ── 1. Compute summary values ──────────────────
-  final total = summary['total'] ?? 0;
-  final present = summary['present'] ?? 0;
-  final absent = summary['absent'] ?? 0;
-  final leave = summary['leave'] ?? 0;
-  final late = summary['late'] ?? 0;
-  final halfDay = summary['half_day'] ?? 0;
-  final holiday = summary['holiday'] ?? 0;
-  final workingDays = total - holiday;
-  final attendancePercent =
-  workingDays == 0 ? 0.0 : (present / workingDays) * 100;
-
-  // ── 2. Build PDF document ──────────────────────
-  final pdf = pw.Document();
-
-  // Decode staff photo once
-  pw.MemoryImage? staffPhoto;
-  if (staff.imageBase64 != null && staff.imageBase64!.isNotEmpty) {
-    try {
-      final bytes = base64Decode(staff.imageBase64!);
-      staffPhoto = pw.MemoryImage(Uint8List.fromList(bytes));
-    } catch (_) {}
+  bool dialogShown = false;
+  if (context != null && context.mounted) {
+    dialogShown = true;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _PdfGeneratingDialog(),
+    );
+    // Let the dialog actually paint before doing any heavy work below.
+    await Future.delayed(const Duration(milliseconds: 50));
   }
 
-  // Sort records by date
-  final sorted = [...records]..sort((a, b) => a.date.compareTo(b.date));
+  try {
+    // ── 1. Compute summary values ──────────────────
+    final total = summary['total'] ?? 0;
+    final present = summary['present'] ?? 0;
+    final absent = summary['absent'] ?? 0;
+    final leave = summary['leave'] ?? 0;
+    final late = summary['late'] ?? 0;
+    final halfDay = summary['half_day'] ?? 0;
+    final holiday = summary['holiday'] ?? 0;
+    final workingDays = total - holiday;
+    final attendancePercent =
+    workingDays == 0 ? 0.0 : (present / workingDays) * 100;
 
-  pdf.addPage(
-    pw.MultiPage(
-      pageFormat: PdfPageFormat.a4.landscape,
-      margin: const pw.EdgeInsets.all(24),
-      build: (context) {
-        // Start with header and summary (these fit on every page)
-        final pageWidgets = <pw.Widget>[
-          _pdfHeader(context, staff, year, month, staffPhoto),
-          pw.SizedBox(height: 14),
-          _pdfSummaryRow(
-            present: present,
-            absent: absent,
-            leave: leave,
-            late: late,
-            halfDay: halfDay,
-            holiday: holiday,
-            workingDays: workingDays,
-            percent: attendancePercent,
-          ),
-          pw.SizedBox(height: 20),
-        ];
+    // ── 2. Decode staff photo (if any) ─────────────
+    pw.MemoryImage? staffImage;
+    final picBase64 = staff.imageBase64;
+    if (picBase64 != null && picBase64.isNotEmpty) {
+      try {
+        staffImage = pw.MemoryImage(base64Decode(picBase64));
+      } catch (_) {
+        staffImage = null;
+      }
+    }
 
-        // Build rows of two cards each – MultiPage will split automatically
-        for (int i = 0; i < sorted.length; i += 2) {
-          final left = _singlePdfCard(sorted[i], staffPhoto);
-          final right = (i + 1 < sorted.length)
-              ? _singlePdfCard(sorted[i + 1], staffPhoto)
-              : pw.SizedBox(width: 1); // empty placeholder
-
-          pageWidgets.add(
-            pw.Padding(
-              padding: const pw.EdgeInsets.only(bottom: 8),
-              child: pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Expanded(child: left),
-                  pw.SizedBox(width: 10),
-                  pw.Expanded(child: right),
-                ],
+    // ── 3. Build PDF ───────────────────────────────
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(0),
+        build: (pdfContext) => pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+          children: [
+            _buildSidebar(staff, staffImage, year, month),
+            pw.Expanded(
+              child: pw.Container(
+                padding: const pw.EdgeInsets.fromLTRB(20, 18, 20, 14),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    _buildSummaryRow(
+                      present: present,
+                      absent: absent,
+                      leave: leave,
+                      late: late,
+                      halfDay: halfDay,
+                      holiday: holiday,
+                      workingDays: workingDays,
+                      percent: attendancePercent,
+                    ),
+                    pw.SizedBox(height: 12),
+                    pw.Expanded(child: _buildTwoColumnTable(records)),
+                    pw.SizedBox(height: 8),
+                    _buildFooter(),
+                  ],
+                ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+
+    // pdf.save() is already asynchronous and yields back to the event
+    // loop internally, so the UI thread stays responsive without needing
+    // a background isolate (which was the actual source of the freeze —
+    // spawning/serializing to a new isolate on some devices can itself
+    // stall far longer than just building the PDF directly here).
+    final pdfBytes = await pdf.save();
+
+    // ── 4. Save / open based on platform ──────────
+    final monthYear = DateFormat('yyyy_MM').format(DateTime(year, month));
+    final safeStaffName = staff.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final fileName = 'attendance_${safeStaffName}_$monthYear.pdf';
+
+    if (kIsWeb) {
+      // WEB: trigger download AND auto-open the PDF in a new browser tab.
+      final blob = html.Blob([pdfBytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+
+      html.window.open(url, '_blank');
+
+      html.AnchorElement(href: url)
+        ..setAttribute('download', fileName)
+        ..click();
+
+      Future.delayed(const Duration(seconds: 5), () {
+        html.Url.revokeObjectUrl(url);
+      });
+    } else {
+      // MOBILE / DESKTOP — save then auto-open
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/$fileName');
+      await file.writeAsBytes(pdfBytes, flush: true);
+
+      // Dismiss the loader as soon as the file is actually saved — don't
+      // make the user wait on the OS's own viewer-launch time.
+      if (dialogShown && context != null && context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        dialogShown = false;
+      }
+
+      // Fire-and-forget: let the OS open the PDF without blocking us.
+      OpenFile.open(file.path).then((result) {
+        if (result.type != ResultType.done) {
+          // ignore: avoid_print
+          print(
+            'Could not auto-open attendance PDF: ${result.type} - ${result.message}',
           );
         }
-        return pageWidgets;
-      },
-    ),
-  );
+      });
+    }
+  } catch (e) {
+    // ignore: avoid_print
+    print('Failed to save/open attendance PDF: $e');
+    rethrow;
+  } finally {
+    if (dialogShown && context != null && context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+  }
+}
 
-  final pdfBytes = await pdf.save();
-  final monthYear = DateFormat('yyyy_MM').format(DateTime(year, month));
-  final fileName = 'attendance_${staff.name}_$monthYear.pdf';
+/// Tiny, instantly-visible loading indicator shown while the PDF is being
+/// generated. Kept intentionally minimal so it costs nothing to build and
+/// appears the instant the button is tapped.
+class _PdfGeneratingDialog extends StatelessWidget {
+  const _PdfGeneratingDialog();
 
-  // ── 3. Save & open ─────────────────────────────
-  if (kIsWeb) {
-    final blob = html.Blob([pdfBytes], 'application/pdf');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement(href: url)
-      ..setAttribute('download', fileName)
-      ..click();
-    html.Url.revokeObjectUrl(url);
-  } else {
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/$fileName');
-    await file.writeAsBytes(pdfBytes);
-    await OpenFile.open(file.path);
+  @override
+  Widget build(BuildContext context) {
+    return const Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(14)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 28, vertical: 22),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.6),
+            ),
+            SizedBox(width: 16),
+            Text('Preparing attendance PDF…'),
+          ],
+        ),
+      ),
+    );
   }
 }
 
 // ──────────────────────────────────────────────────
-//  PDF WIDGET HELPERS
+//  SIDEBAR — dark navy panel with photo + staff info
 // ──────────────────────────────────────────────────
-
-pw.Widget _pdfHeader(pw.Context context, StaffMember staff, int year,
-    int month, pw.MemoryImage? photo) {
-  final fadedWhite = PdfColor.fromInt(0xFFFFFFFF).withOpacity(0.9);
+pw.Widget _buildSidebar(
+    StaffMember staff, pw.MemoryImage? staffImage, int year, int month) {
+  final hasDesignation =
+      staff.designation != null && staff.designation!.trim().isNotEmpty;
 
   return pw.Container(
-    padding: const pw.EdgeInsets.all(16),
-    decoration: pw.BoxDecoration(
-      color: const PdfColor.fromInt(0xFF534AB7),
-      borderRadius: pw.BorderRadius.circular(8),
+    width: 165,
+    padding: const pw.EdgeInsets.fromLTRB(16, 22, 16, 16),
+    decoration: const pw.BoxDecoration(
+      gradient: pw.LinearGradient(
+        colors: [_kNavy, _kPurpleDark],
+        begin: pw.Alignment.topCenter,
+        end: pw.Alignment.bottomCenter,
+      ),
     ),
-    child: pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.center,
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.ClipOval(
-          child: photo != null
-              ? pw.Image(photo, width: 44, height: 44, fit: pw.BoxFit.cover)
-              : pw.Container(
-            width: 44,
-            height: 44,
-            alignment: pw.Alignment.center,
-            decoration: const pw.BoxDecoration(
-              color: PdfColor.fromInt(0xFFF0EFFE),
+        // Photo
+        pw.Center(
+          child: pw.Container(
+            width: 78,
+            height: 78,
+            decoration: pw.BoxDecoration(
               shape: pw.BoxShape.circle,
+              color: _kWhite,
+              border: pw.Border.all(color: _kWhite, width: 2.5),
             ),
-            child: pw.Text(
-              staff.name.isNotEmpty
-                  ? staff.name[0].toUpperCase()
-                  : '?',
-              style: pw.TextStyle(
-                fontSize: 20,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColor.fromInt(0xFF534AB7),
+            child: pw.ClipOval(
+              child: staffImage != null
+                  ? pw.Image(staffImage, fit: pw.BoxFit.cover)
+                  : pw.Center(
+                child: pw.Text(
+                  staff.name.isNotEmpty
+                      ? staff.name[0].toUpperCase()
+                      : '?',
+                  style: pw.TextStyle(
+                    fontSize: 28,
+                    fontWeight: pw.FontWeight.bold,
+                    color: _kPurple,
+                  ),
+                ),
               ),
             ),
           ),
         ),
-        pw.SizedBox(width: 14),
-        pw.Expanded(
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            mainAxisSize: pw.MainAxisSize.min,
-            children: [
-              pw.Text(
-                staff.name,
-                style: pw.TextStyle(
-                  fontSize: 20,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColor.fromInt(0xFFFFFFFF),
-                ),
-              ),
-              pw.SizedBox(height: 4),
-              pw.Text(
-                staff.type.toLowerCase() == 'teacher' ? 'Teacher' : 'Staff',
-                style: pw.TextStyle(
-                  fontSize: 13,
-                  color: fadedWhite,
-                ),
-              ),
-            ],
+        pw.SizedBox(height: 14),
+
+        // Name
+        pw.Center(
+          child: pw.Text(
+            staff.name,
+            textAlign: pw.TextAlign.center,
+            style: pw.TextStyle(
+              fontSize: 15,
+              fontWeight: pw.FontWeight.bold,
+              color: _kWhite,
+            ),
           ),
         ),
-        pw.Text(
+
+        // Designation — plain, clearly legible text directly under the
+        // name (gold on dark navy = high contrast, unlike the old
+        // low-contrast white-on-white pill).
+        pw.SizedBox(height: 4),
+        pw.Center(
+          child: pw.Text(
+            hasDesignation
+                ? staff.designation!
+                : (staff.type.toLowerCase() == 'teacher'
+                ? 'Teacher'
+                : 'Staff'),
+            textAlign: pw.TextAlign.center,
+            style: pw.TextStyle(
+              fontSize: 9.5,
+              fontWeight: pw.FontWeight.bold,
+              color: _kGold,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
+
+        pw.SizedBox(height: 20),
+        pw.Divider(color: _kWhite.shade(0.2), thickness: 0.7),
+        pw.SizedBox(height: 14),
+
+        _sidebarInfoRow(
+          'Designation',
+          hasDesignation ? staff.designation! : '-',
+        ),
+        pw.SizedBox(height: 12),
+        _sidebarInfoRow(
+          'Period',
           DateFormat('MMMM yyyy').format(DateTime(year, month)),
-          style: pw.TextStyle(
-            fontSize: 16,
-            fontWeight: pw.FontWeight.bold,
-            color: PdfColor.fromInt(0xFFFFFFFF),
-          ),
+        ),
+
+        pw.Spacer(),
+        pw.Divider(color: _kWhite.shade(0.2), thickness: 0.7),
+        pw.SizedBox(height: 8),
+        pw.Text(
+          'Generated ${DateFormat('dd MMM yyyy').format(DateTime.now())}',
+          style: pw.TextStyle(fontSize: 7.5, color: _kWhite.shade(0.6)),
         ),
       ],
     ),
   );
 }
 
-pw.Widget _pdfSummaryRow({
+pw.Widget _sidebarInfoRow(String label, String value) {
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.Text(
+        label.toUpperCase(),
+        style: pw.TextStyle(
+          fontSize: 7.5,
+          color: _kWhite.shade(0.55),
+          letterSpacing: 0.5,
+        ),
+      ),
+      pw.SizedBox(height: 3),
+      pw.Text(
+        value,
+        style: pw.TextStyle(
+          fontSize: 10.5,
+          fontWeight: pw.FontWeight.bold,
+          color: _kWhite,
+        ),
+      ),
+    ],
+  );
+}
+
+// ──────────────────────────────────────────────────
+//  SUMMARY STAT CARDS
+// ──────────────────────────────────────────────────
+pw.Widget _buildSummaryRow({
   required int present,
   required int absent,
   required int leave,
@@ -453,222 +1383,196 @@ pw.Widget _pdfSummaryRow({
   required int workingDays,
   required double percent,
 }) {
-  final items = [
-    ('Working Days', '$workingDays'),
-    ('Present', '$present'),
-    ('Absent', '$absent'),
-    ('Leave', '$leave'),
-    ('Late', '$late'),
-    ('Half Day', '$halfDay'),
-    ('Holidays', '$holiday'),
-    ('Attendance %', '${percent.toStringAsFixed(1)}%'),
+  final items = <Map<String, dynamic>>[
+    {'label': 'Working Days', 'value': '$workingDays', 'color': _kPurple, 'bg': PdfColor.fromInt(0xFFF0EFFE)},
+    {'label': 'Present', 'value': '$present', 'color': _kGreen, 'bg': _kGreenBg},
+    {'label': 'Absent', 'value': '$absent', 'color': _kRed, 'bg': _kRedBg},
+    {'label': 'Leave', 'value': '$leave', 'color': _kBlue, 'bg': _kBlueBg},
+    {'label': 'Late', 'value': '$late', 'color': _kOrange, 'bg': _kOrangeBg},
+    {'label': 'Half Day', 'value': '$halfDay', 'color': _kPurpleAccent, 'bg': _kPurpleBg},
+    {'label': 'Holidays', 'value': '$holiday', 'color': _kGrey, 'bg': _kGreyBg},
+    {'label': 'Attendance %', 'value': '${percent.toStringAsFixed(1)}%', 'color': _kPurple, 'bg': PdfColor.fromInt(0xFFF0EFFE)},
   ];
 
-  return pw.Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    children: items.map((e) {
-      return pw.Container(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: pw.BoxDecoration(
-          border: pw.Border.all(color: const PdfColor.fromInt(0xFFE2E8F0)),
-          borderRadius: pw.BorderRadius.circular(6),
-        ),
-        child: pw.Column(
-          mainAxisSize: pw.MainAxisSize.min,
-          children: [
-            pw.Text(
-              e.$2,
-              style: pw.TextStyle(
-                fontSize: 12,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColor.fromInt(0xFF1F2937),
+  return pw.Row(
+    children: items.map((item) {
+      final isLast = item == items.last;
+      return pw.Expanded(
+        child: pw.Container(
+          margin: pw.EdgeInsets.only(right: isLast ? 0 : 6),
+          padding: const pw.EdgeInsets.symmetric(vertical: 9),
+          decoration: pw.BoxDecoration(
+            color: item['bg'] as PdfColor,
+            borderRadius: pw.BorderRadius.circular(8),
+            border: pw.Border.all(
+                color: (item['color'] as PdfColor).shade(0.7), width: 0.6),
+          ),
+          child: pw.Column(
+            children: [
+              pw.Text(
+                item['value'] as String,
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                  color: item['color'] as PdfColor,
+                ),
               ),
-            ),
-            pw.SizedBox(height: 3),
-            pw.Text(
-              e.$1,
-              style: pw.TextStyle(
-                fontSize: 8,
-                color: PdfColor.fromInt(0xFF64748B),
+              pw.SizedBox(height: 3),
+              pw.Text(
+                item['label'] as String,
+                textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(fontSize: 7, color: _kSlate),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }).toList(),
   );
 }
 
-// ── Compact card (fits two per row) ──────────────
-pw.Widget _singlePdfCard(
-    AttendanceRecord record, pw.MemoryImage? staffPhoto) {
-  final meta = _statusMeta(record.status);
-  final PdfColor statusColor = _colorFromHex(meta['colorHex'] as String);
-  final PdfColor statusBg = _colorFromHex(meta['bgHex'] as String);
-  final String label = meta['label'] as String;
+// ──────────────────────────────────────────────────
+//  TWO-COLUMN ATTENDANCE TABLE (fits full month on 1 page)
+// ──────────────────────────────────────────────────
+pw.Widget _buildTwoColumnTable(List<AttendanceRecord> records) {
+  final sorted = [...records]..sort((a, b) => a.date.compareTo(b.date));
 
-  DateTime? date;
-  try {
-    date = DateTime.parse(record.date);
-  } catch (_) {}
+  if (sorted.isEmpty) {
+    return pw.Container(
+      alignment: pw.Alignment.center,
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: _kBorder),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Text(
+        'No attendance records found for this period.',
+        style: pw.TextStyle(fontSize: 10, color: _kSlate),
+      ),
+    );
+  }
 
-  final PdfColor borderColor = _applyOpacity(statusColor, 0.4);
+  final half = (sorted.length / 2).ceil();
+  final left = sorted.sublist(0, half);
+  final right = sorted.sublist(half);
 
   return pw.Container(
-    padding: const pw.EdgeInsets.all(8),   // reduced padding
     decoration: pw.BoxDecoration(
-      color: statusBg,
+      border: pw.Border.all(color: _kBorder),
       borderRadius: pw.BorderRadius.circular(8),
-      border: pw.Border.all(color: borderColor),
     ),
     child: pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        // Small avatar (24x24)
-        pw.ClipOval(
-          child: staffPhoto != null
-              ? pw.Image(staffPhoto, width: 24, height: 24,
-              fit: pw.BoxFit.cover)
-              : pw.Container(
-            width: 24,
-            height: 24,
-            alignment: pw.Alignment.center,
-            decoration: const pw.BoxDecoration(
-              color: PdfColor.fromInt(0xFFF0EFFE),
-              shape: pw.BoxShape.circle,
-            ),
-            child: pw.Text(
-              record.staffName.isNotEmpty
-                  ? record.staffName[0].toUpperCase()
-                  : '?',
-              style: pw.TextStyle(
-                fontSize: 10,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColor.fromInt(0xFF534AB7),
-              ),
-            ),
-          ),
-        ),
-        pw.SizedBox(width: 8),
-        // Date & day + optional remarks (max 1 line)
-        pw.Expanded(
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              if (date != null)
-                pw.Text(
-                  '${DateFormat('dd MMM yyyy').format(date)}  ${DateFormat('EEEE').format(date)}',
-                  style: pw.TextStyle(
-                    fontSize: 10,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColor.fromInt(0xFF1F2937),
-                  ),
-                ),
-              if (record.remarks.isNotEmpty) ...[
-                pw.SizedBox(height: 2),
-                pw.Text(
-                  record.remarks,
-                  style: pw.TextStyle(
-                    fontSize: 8,
-                    color: PdfColor.fromInt(0xFF374151),
-                  ),
-                  maxLines: 1,
-                  overflow: pw.TextOverflow.clip,
-                ),
-              ],
-            ],
-          ),
-        ),
-        pw.SizedBox(width: 6),
-        // Status badge
-        pw.Container(
-          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: pw.BoxDecoration(
-            color: statusColor,
-            borderRadius: pw.BorderRadius.circular(10),
-          ),
-          child: pw.Text(
-            label,
-            style: pw.TextStyle(
-              fontSize: 8,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColor.fromInt(0xFFFFFFFF),
-            ),
-          ),
-        ),
+        pw.Expanded(child: _buildColumn(left, startIndex: 1)),
+        pw.Container(width: 0.8, color: _kBorder),
+        pw.Expanded(child: _buildColumn(right, startIndex: half + 1)),
       ],
     ),
   );
 }
 
-// ── Colour helpers ───────────────────────────────
-PdfColor _colorFromHex(String hex) {
-  if (hex.isEmpty) return const PdfColor.fromInt(0xFF534AB7);
-  try {
-    final intVal = int.parse(hex.replaceFirst('#', ''), radix: 16);
-    return PdfColor.fromInt(intVal);
-  } catch (_) {
-    return const PdfColor.fromInt(0xFF534AB7);
-  }
-}
+pw.Widget _buildColumn(List<AttendanceRecord> rows, {required int startIndex}) {
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      // Header
+      pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: const pw.BoxDecoration(color: _kPurpleDark),
+        child: pw.Row(
+          children: [
+            pw.SizedBox(width: 16, child: pw.Text('#', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+            pw.Expanded(flex: 3, child: pw.Text('DATE', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+            pw.Expanded(flex: 3, child: pw.Text('DAY', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+            pw.Expanded(flex: 3, child: pw.Text('STATUS', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+            pw.Expanded(flex: 3, child: pw.Text('REMARKS', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kWhite))),
+          ],
+        ),
+      ),
+      // Rows
+      ...List.generate(rows.length, (i) {
+        final r = rows[i];
+        DateTime? dt;
+        try {
+          dt = DateTime.parse(r.date);
+        } catch (_) {
+          dt = null;
+        }
+        final meta = _statusMeta(r.status);
 
-PdfColor _applyOpacity(PdfColor color, double opacity) {
-  return PdfColor(
-    color.red / 255,
-    color.green / 255,
-    color.blue / 255,
-    opacity,
+        return pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: pw.BoxDecoration(
+            color: i.isEven ? _kWhite : _kSurface,
+            border: const pw.Border(bottom: pw.BorderSide(color: _kBorder, width: 0.4)),
+          ),
+          child: pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.SizedBox(
+                width: 16,
+                child: pw.Text('${startIndex + i}', style: pw.TextStyle(fontSize: 7.5, color: _kSlate)),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: pw.Text(
+                  dt != null ? DateFormat('dd-MMM').format(dt) : r.date,
+                  style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _kInk),
+                ),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: pw.Text(
+                  dt != null ? DateFormat('EEE').format(dt) : '-',
+                  style: pw.TextStyle(fontSize: 7.5, color: _kSlate),
+                ),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  decoration: pw.BoxDecoration(
+                    color: meta['bg'] as PdfColor,
+                    borderRadius: pw.BorderRadius.circular(8),
+                  ),
+                  child: pw.Text(
+                    meta['label'] as String,
+                    style: pw.TextStyle(fontSize: 6.8, fontWeight: pw.FontWeight.bold, color: meta['color'] as PdfColor),
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: pw.Text(
+                  r.remarks.isEmpty ? '-' : r.remarks,
+                  style: pw.TextStyle(fontSize: 7.2, color: _kInk),
+                  maxLines: 1,
+                  overflow: pw.TextOverflow.clip,
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    ],
   );
 }
 
-extension PdfColorOpacity on PdfColor {
-  PdfColor withOpacity(double opacity) => _applyOpacity(this, opacity);
-}
-
-// ── Status definitions ──────────────────────────
-const List<Map<String, Object>> _statusList = [
-  {
-    'key': 'present',
-    'label': 'Present',
-    'colorHex': '#166534',
-    'bgHex': '#EFFCF3'
-  },
-  {
-    'key': 'absent',
-    'label': 'Absent',
-    'colorHex': '#B91C1C',
-    'bgHex': '#FEF2F2'
-  },
-  {
-    'key': 'late',
-    'label': 'Late',
-    'colorHex': '#B45309',
-    'bgHex': '#FFFBEB'
-  },
-  {
-    'key': 'leave',
-    'label': 'Leave',
-    'colorHex': '#1D4ED8',
-    'bgHex': '#EFF6FF'
-  },
-  {
-    'key': 'half_day',
-    'label': 'Half Day',
-    'colorHex': '#6D28D9',
-    'bgHex': '#F5F3FF'
-  },
-  {
-    'key': 'holiday',
-    'label': 'Holiday',
-    'colorHex': '#475569',
-    'bgHex': '#F1F5F9'
-  },
-];
-
-Map<String, Object> _statusMeta(String key) {
-  return _statusList.firstWhere(
-        (s) => s['key'] == key,
-    orElse: () => _statusList[0],
+// ──────────────────────────────────────────────────
+//  FOOTER
+// ──────────────────────────────────────────────────
+pw.Widget _buildFooter() {
+  return pw.Row(
+    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+    children: [
+      pw.Text(
+        'EduCore School Management System',
+        style: pw.TextStyle(fontSize: 7, color: _kSlate),
+      ),
+      pw.Text(
+        'Auto-generated attendance report',
+        style: pw.TextStyle(fontSize: 7, color: _kSlate),
+      ),
+    ],
   );
 }
