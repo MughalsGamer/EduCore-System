@@ -8,6 +8,7 @@ import '../../providers/teacher_provider.dart'; // Your existing provider
 import '../../providers/attendance_provider.dart'; // Our new provider
 import 'attendance_history_screen.dart'; // ★ NEW — By Date / By Person history view
 import '../../main.dart' show routeObserver;
+import 'attendance_report_screen.dart';
 import 'bulk_attendance_screen.dart'; // ★ NEW — global RouteObserver for RouteAware
 
 // ============================================================
@@ -236,15 +237,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> with RouteAware {
           padding: const EdgeInsets.only(right: 16),
           child: OutlinedButton.icon(
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Reports feature coming soon')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AttendanceReportScreen()),
               );
             },
             icon: const Icon(Icons.bar_chart_outlined, size: 16),
             label: const Text('Reports',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             style: OutlinedButton.styleFrom(
-              foregroundColor: _kSlate,
+              foregroundColor: _kPrimary,
               side: const BorderSide(color: _kBorder),
               padding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

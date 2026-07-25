@@ -1570,7 +1570,7 @@ pw.Widget _buildFooter() {
         style: pw.TextStyle(fontSize: 7, color: _kSlate),
       ),
       pw.Text(
-        'Auto-generated attendance report',
+        'Developed by Ali Haider | 0300-7465064',
         style: pw.TextStyle(fontSize: 7, color: _kSlate),
       ),
     ],
