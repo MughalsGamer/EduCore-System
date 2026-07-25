@@ -1,4 +1,5 @@
 //
+//
 // import 'package:flutter/material.dart';
 // import 'package:intl/intl.dart';
 // import 'package:provider/provider.dart';
@@ -20,10 +21,11 @@
 // const _kGreenBorder = Color(0xFFBBF7D0);
 // const _kRed = Color(0xFFDC2626);
 // const _kRedBg = Color(0xFFFEF2F2);
-// const _kRedBorder = Color(0xFFFCA5A5); // ★ NEW – used for terminated highlight border
+// const _kRedBorder = Color(0xFFFCA5A5);
 // const _kOrange = Color(0xFFD97706);
 // const _kOrangeBg = Color(0xFFFFFBEB);
 // const _kOrangeBorder = Color(0xFFFDE68A);
+// const _kBlue = Color(0xFF3B82F6);
 // const _kBorder = Color(0xFFE5E7EB);
 // const _kSurface = Color(0xFFF7F8FB);
 // const _kInk = Color(0xFF111827);
@@ -32,7 +34,7 @@
 // const double _kDesktopBreakpoint = 900;
 //
 // // ────────────────────────────────────────────────────────────
-// //  Salary List Screen
+// //  Salary List Screen (Kept as is)
 // // ────────────────────────────────────────────────────────────
 // class SalaryListScreen extends StatefulWidget {
 //   const SalaryListScreen({super.key});
@@ -121,9 +123,6 @@
 //         .then((_) => _loadData());
 //   }
 //
-//   // ★ CHANGED — delete confirmation now warns when the record is a
-//   // termination record, since deleting it will reinstate the employee
-//   // (handled automatically inside SalaryProvider.deleteSalary).
 //   Future<void> _confirmDelete(SalaryRecord record) async {
 //     final confirm = await showDialog<bool>(
 //       context: context,
@@ -234,14 +233,6 @@
 //     }
 //   }
 //
-//   // ★ UPDATED — in edit mode, exclude this record's own linked ledger
-//   // transaction from the "Current Balance" figure, so the balance shown
-//   // matches what it was BEFORE this salary's deduction was applied —
-//   // same meaning as when generating a brand new salary. Without this,
-//   // editing an existing deduction would show a balance that already had
-//   // the old deduction baked in, making the "before/after" preview confusing.
-//
-//
 //   @override
 //   Widget build(BuildContext context) {
 //     final provider = context.watch<SalaryProvider>();
@@ -301,7 +292,6 @@
 //     );
 //   }
 //
-//   // ── Modern pill-style dropdown wrapper ──
 //   Widget _pillDropdown<T>({required Widget child, double? width}) {
 //     return Container(
 //       width: width,
@@ -519,7 +509,6 @@
 //     );
 //   }
 //
-//   // ── Desktop: modern card-table hybrid instead of raw DataTable ──
 //   Widget _buildDesktopTable(List<SalaryRecord> records) {
 //     return ListView(
 //       padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
@@ -532,7 +521,6 @@
 //           ),
 //           child: Column(
 //             children: [
-//               // Header row
 //               Container(
 //                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
 //                 decoration: const BoxDecoration(
@@ -554,8 +542,6 @@
 //               ...List.generate(records.length, (i) {
 //                 final s = records[i];
 //                 final isLast = i == records.length - 1;
-//                 // ★ NEW — terminated rows get a soft red tint background so
-//                 // they stand out immediately in the list.
 //                 final rowColor = s.isTerminated ? _kRedBg.withOpacity(0.5) : null;
 //                 return InkWell(
 //                   onTap: () => _openDetail(s),
@@ -602,17 +588,38 @@
 //                           flex: 2,
 //                           child: Text(s.designation ?? '—', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: _kSlate)),
 //                         ),
+//                         // Base Salary column (use baseSalary)
+//                         Expanded(
+//                           flex: 2,
+//                           child: Text(
+//                             'Rs ${NumberFormat('#,##0').format(s.baseSalary)}',
+//                             style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _kInk),
+//                           ),
+//                         ),
+//
+// // Net Salary column (use final payable amount = payableNetSalary)
 //                         Expanded(
 //                           flex: 2,
 //                           child: Text(
 //                             '${s.payableNetSalary < 0 ? '- ' : ''}Rs ${NumberFormat('#,##0').format(s.payableNetSalary.abs())}',
-//                             style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: s.payableNetSalary < 0 ? _kRed : _kInk),
+//                             style: TextStyle(
+//                               fontSize: 13.5,
+//                               fontWeight: FontWeight.w700,
+//                               color: s.payableNetSalary < 0 ? _kRed : _kInk,
+//                             ),
 //                           ),
 //                         ),
-//                         Expanded(
-//                           flex: 2,
-//                           child: Text('Rs ${NumberFormat('#,##0').format(s.netSalary)}', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _kInk)),
-//                         ),
+//                         // Expanded(
+//                         //   flex: 2,
+//                         //   child: Text(
+//                         //     '${s.payableNetSalary < 0 ? '- ' : ''}Rs ${NumberFormat('#,##0').format(s.payableNetSalary.abs())}',
+//                         //     style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: s.payableNetSalary < 0 ? _kRed : _kInk),
+//                         //   ),
+//                         // ),
+//                         // Expanded(
+//                         //   flex: 2,
+//                         //   child: Text('Rs ${NumberFormat('#,##0').format(s.netSalary)}', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _kInk)),
+//                         // ),
 //                         Expanded(
 //                           flex: 2,
 //                           child: Align(
@@ -665,8 +672,6 @@
 //             margin: const EdgeInsets.only(bottom: 12),
 //             padding: const EdgeInsets.all(16),
 //             decoration: BoxDecoration(
-//               // ★ NEW — terminated cards get a soft red tint + red border
-//               // so they're highlighted in the mobile list too.
 //               color: s.isTerminated ? _kRedBg.withOpacity(0.4) : Colors.white,
 //               borderRadius: BorderRadius.circular(16),
 //               border: Border.all(color: s.isTerminated ? _kRedBorder : _kBorder),
@@ -739,6 +744,35 @@
 //                     ),
 //                   ],
 //                 ),
+// //                 Row(
+// //                   children: [
+// //                     // Inside _buildDesktopTable, replace the two middle columns with:
+// //
+// // // Base Salary (was wrongly showing payableNetSalary)
+// //                     Expanded(
+// //                       flex: 2,
+// //                       child: Text(
+// //                         'Rs ${NumberFormat('#,##0').format(s.baseSalary)}',
+// //                         style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _kInk),
+// //                       ),
+// //                     ),
+// //
+// // // Net Salary (now shows the final payable amount)
+// //                     Expanded(
+// //                       flex: 2,
+// //                       child: Text(
+// //                         // Use the same formatting as the mobile list (handles negative sign)
+// //                         '${s.payableNetSalary < 0 ? '- ' : ''}Rs ${NumberFormat('#,##0').format(s.payableNetSalary.abs())}',
+// //                         style: TextStyle(
+// //                           fontSize: 13.5,
+// //                           fontWeight: FontWeight.w700,
+// //                           color: s.payableNetSalary < 0 ? _kRed : _kInk,
+// //                         ),
+// //                       ),
+// //                     ),
+// //
+// //                   ],
+// //                 ),
 //                 const SizedBox(height: 12),
 //                 _statusDropdownChip(s, onChanged: (v) => _changeStatusInline(s, v), fullWidth: true),
 //               ],
@@ -760,7 +794,6 @@
 //     );
 //   }
 //
-//   // ★ NEW — small red "Terminated" badge, reused in both desktop & mobile.
 //   Widget _terminatedBadge() {
 //     return Container(
 //       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -783,7 +816,6 @@
 //     );
 //   }
 //
-//   // ── Status chip that is ALSO a dropdown to change status directly from list ──
 //   Widget _statusDropdownChip(SalaryRecord record, {required ValueChanged<String> onChanged, bool fullWidth = false}) {
 //     final isPaid = record.status == 'Paid';
 //     final bg = isPaid ? _kGreenBg : _kOrangeBg;
@@ -837,234 +869,349 @@
 // const TextStyle _headerStyle = TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: _kPurpleDark, letterSpacing: 0.2);
 //
 //
+// // ────────────────────────────────────────────────────────────
+// //  ✅ UPDATED Salary Detail Screen
+// // ────────────────────────────────────────────────────────────
+//
+//
+// // ────────────────────────────────────────────────────────────
+// //  Design Tokens
+// // ────────────────────────────────────────────────────────────
+//
+//
+// // ────────────────────────────────────────────────────────────
+// //  Salary Detail Screen
+// // ────────────────────────────────────────────────────────────
 // class SalaryDetailScreen extends StatelessWidget {
 //   final SalaryRecord record;
 //   const SalaryDetailScreen({super.key, required this.record});
 //
-//   // Design Tokens reused from your existing code
-//   final _kPurple = const Color(0xFF6C5CE7);
-//   final _kRed = const Color(0xFFDC2626);
-//   final _kGreen = const Color(0xFF16A34A);
-//   final _kBlue = const Color(0xFF3B82F6);
-//   final _kSlate = const Color(0xFF6B7280);
-//   final _kBorder = const Color(0xFFE5E7EB);
-//   final _kYellowBg = const Color(0xFFFFFBEB);
-//   final _kYellowBorder = const Color(0xFFFDE68A);
-//
 //   @override
 //   Widget build(BuildContext context) {
 //     final rec = record;
-//     // Assuming a fixed 30-day month as per your GenerateSalaryScreen logic
-//     final int totalDays = 30;
+//     const int totalDays = 30;
 //     final int presentDays = totalDays - rec.leaves;
 //
 //     return Scaffold(
-//       backgroundColor: const Color(0xFFF8FAFC), // Light grey bg for contrast
-//       appBar: AppBar(
-//         backgroundColor: Colors.white,
-//         elevation: 0,
-//         scrolledUnderElevation: 0,
-//         leading: IconButton(
-//           icon: const Icon(Icons.arrow_back, color: Color(0xFF111827)),
-//           onPressed: () => Navigator.pop(context),
+//       backgroundColor: _kSurface,
+//       appBar: _buildAppBar(context),
+//       body: LayoutBuilder(
+//         builder: (context, constraints) {
+//           final isDesktop = constraints.maxWidth >= _kDesktopBreakpoint;
+//           return SingleChildScrollView(
+//             padding: EdgeInsets.all(isDesktop ? 24 : 14),
+//             child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 if (rec.isTerminated) ...[
+//                   _terminatedBanner(rec),
+//                   const SizedBox(height: 16),
+//                 ],
+//                 _buildStatsRow(isDesktop),
+//                 SizedBox(height: isDesktop ? 20 : 14),
+//                 if (isDesktop)
+//                   Row(
+//                     crossAxisAlignment: CrossAxisAlignment.start,
+//                     children: [
+//                       Expanded(flex: 3, child: _buildSalaryBreakdown(rec, presentDays)),
+//                       const SizedBox(width: 20),
+//                       Expanded(flex: 2, child: _buildEmployeeInfo(rec)),
+//                     ],
+//                   )
+//                 else
+//                   Column(
+//                     crossAxisAlignment: CrossAxisAlignment.start,
+//                     children: [
+//                       _buildEmployeeInfo(rec),
+//                       const SizedBox(height: 14),
+//                       _buildSalaryBreakdown(rec, presentDays),
+//                     ],
+//                   ),
+//                 if (rec.note != null && rec.note!.isNotEmpty) ...[
+//                   SizedBox(height: isDesktop ? 20 : 14),
+//                   _buildNotes(rec.note!),
+//                 ],
+//                 const SizedBox(height: 12),
+//               ],
+//             ),
+//           );
+//         },
+//       ),
+//     );
+//   }
+//
+//   // ─── App Bar (responsive: desktop shows text+icon buttons, mobile shows icon-only + menu) ───
+//   PreferredSizeWidget _buildAppBar(BuildContext context) {
+//     return AppBar(
+//       backgroundColor: Colors.white,
+//       elevation: 0,
+//       scrolledUnderElevation: 0,
+//       surfaceTintColor: Colors.transparent,
+//       leadingWidth: 44,
+//       leading: IconButton(
+//         icon: const Icon(Icons.arrow_back_rounded, color: _kInk, size: 22),
+//         onPressed: () => Navigator.pop(context),
+//       ),
+//       titleSpacing: 0,
+//       title: LayoutBuilder(
+//         builder: (context, c) {
+//           final isDesktop = MediaQuery.of(context).size.width >= _kDesktopBreakpoint;
+//           return Text(
+//             'Salary Details',
+//             style: TextStyle(color: _kInk, fontSize: isDesktop ? 18 : 16, fontWeight: FontWeight.w700),
+//           );
+//         },
+//       ),
+//       centerTitle: false,
+//       actions: [
+//         Builder(builder: (context) {
+//           final isDesktop = MediaQuery.of(context).size.width >= _kDesktopBreakpoint;
+//           if (isDesktop) {
+//             return Padding(
+//               padding: const EdgeInsets.only(right: 20),
+//               child: Row(
+//                 children: [
+//                   _actionButton(
+//                     icon: Icons.print_outlined,
+//                     label: 'Print Slip',
+//                     onTap: () {
+//                       // TODO: Implement print functionality
+//                     },
+//                   ),
+//                   const SizedBox(width: 10),
+//                   _actionButton(
+//                     icon: Icons.download_rounded,
+//                     label: 'Download PDF',
+//                     filled: true,
+//                     onTap: () {
+//                       // TODO: Implement PDF download
+//                     },
+//                   ),
+//                 ],
+//               ),
+//             );
+//           }
+//           // Mobile: compact icon buttons
+//           return Padding(
+//             padding: const EdgeInsets.only(right: 8),
+//             child: Row(
+//               mainAxisSize: MainAxisSize.min,
+//               children: [
+//                 IconButton(
+//                   icon: const Icon(Icons.print_outlined, color: _kSlate, size: 22),
+//                   tooltip: 'Print Slip',
+//                   onPressed: () {
+//                     // TODO: Implement print functionality
+//                   },
+//                 ),
+//                 Container(
+//                   margin: const EdgeInsets.only(right: 4),
+//                   decoration: BoxDecoration(color: _kPurple, borderRadius: BorderRadius.circular(10)),
+//                   child: IconButton(
+//                     icon: const Icon(Icons.download_rounded, color: Colors.white, size: 20),
+//                     tooltip: 'Download PDF',
+//                     onPressed: () {
+//                       // TODO: Implement PDF download
+//                     },
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           );
+//         }),
+//       ],
+//       bottom: PreferredSize(
+//         preferredSize: const Size.fromHeight(1),
+//         child: Container(height: 1, color: _kBorder),
+//       ),
+//     );
+//   }
+//
+//   Widget _actionButton({required IconData icon, required String label, required VoidCallback onTap, bool filled = false}) {
+//     if (filled) {
+//       return ElevatedButton.icon(
+//         onPressed: onTap,
+//         icon: Icon(icon, size: 16, color: Colors.white),
+//         label: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+//         style: ElevatedButton.styleFrom(
+//           backgroundColor: _kPurple,
+//           elevation: 0,
+//           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+//           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
 //         ),
-//         title: const Text(
-//           'Salary Details',
-//           style: TextStyle(
-//             color: Color(0xFF111827),
-//             fontSize: 18,
-//             fontWeight: FontWeight.w700,
-//           ),
-//         ),
-//         centerTitle: true,
-//         actions: [
-//           // Placeholder: Print Slip
-//           IconButton(
-//             icon: const Icon(Icons.print, color: Color(0xFF6B7280)),
-//             onPressed: () {
-//               // TODO: Implement print functionality later
-//             },
-//           ),
-//           // Placeholder: Download PDF
-//           IconButton(
-//             icon: const Icon(Icons.picture_as_pdf, color: Color(0xFF6B7280)),
-//             onPressed: () {
-//               // TODO: Implement PDF download later
-//             },
+//       );
+//     }
+//     return OutlinedButton.icon(
+//       onPressed: onTap,
+//       icon: const Icon(Icons.print_outlined, size: 16, color: _kSlate),
+//       label: Text(label, style: const TextStyle(color: _kSlate, fontSize: 13, fontWeight: FontWeight.w600)),
+//       style: OutlinedButton.styleFrom(
+//         side: const BorderSide(color: _kBorder),
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+//         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+//       ),
+//     );
+//   }
+//
+//   Widget _terminatedBanner(SalaryRecord rec) {
+//     return Container(
+//       width: double.infinity,
+//       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+//       decoration: BoxDecoration(
+//         color: _kRedBg,
+//         borderRadius: BorderRadius.circular(12),
+//         border: Border.all(color: _kRedBorder),
+//       ),
+//       child: Row(
+//         children: [
+//           const Icon(Icons.person_off_rounded, size: 16, color: _kRed),
+//           const SizedBox(width: 8),
+//           Expanded(
+//             child: Text(
+//               '${rec.employeeName} was terminated. This salary record reflects their final month.',
+//               style: const TextStyle(fontSize: 12.5, color: _kRed, fontWeight: FontWeight.w600),
+//             ),
 //           ),
 //         ],
-//       ),
-//       body: SingleChildScrollView(
-//         padding: const EdgeInsets.all(16.0),
-//         child: Column(
-//           crossAxisAlignment: CrossAxisAlignment.start,
-//           children: [
-//             // 1. Top Stats Row (4 Cards)
-//             _buildStatsRow(rec),
-//             const SizedBox(height: 16),
-//
-//             // 2. Employee Information
-//             _buildEmployeeInfo(rec),
-//             const SizedBox(height: 16),
-//
-//             // 3. Salary Breakdown
-//             _buildSalaryBreakdown(rec, presentDays),
-//             const SizedBox(height: 16),
-//
-//             // 4. Notes
-//             if (rec.note != null && rec.note!.isNotEmpty)
-//               _buildNotes(rec.note!),
-//
-//             const SizedBox(height: 16),
-//
-//             // 5. Payment Summary (No Payment Method)
-//
-//             const SizedBox(height: 24),
-//           ],
-//         ),
 //       ),
 //     );
 //   }
 //
 //   // ─── Top Stats Row ───
-//   Widget _buildStatsRow(SalaryRecord rec) {
+//   Widget _buildStatsRow(bool isDesktop) {
+//     final rec = record;
 //     final totalDeductions = rec.absentDeduction + rec.fine;
 //     final netPayable = rec.payableNetSalary;
 //
-//     return Row(
-//       children: [
-//         _buildStatCard(
-//           label: 'Base Salary',
-//           value: 'Rs ${NumberFormat('#,##0').format(rec.baseSalary)}',
-//           subLabel: 'Monthly Gross Salary',
-//           icon: Icons.account_balance_wallet_outlined,
-//           color: _kPurple,
-//         ),
-//         const SizedBox(width: 8),
-//         _buildStatCard(
-//           label: 'Total Deductions',
-//           value: 'Rs ${NumberFormat('#,##0').format(totalDeductions)}',
-//           subLabel: 'All Deductions',
-//           icon: Icons.trending_down_rounded,
-//           color: _kRed,
-//         ),
-//         const SizedBox(width: 8),
-//         _buildStatCard(
-//           label: 'Total Bonus',
-//           value: 'Rs ${NumberFormat('#,##0').format(rec.bonus)}',
-//           subLabel: 'All Bonuses',
-//           icon: Icons.card_giftcard,
-//           color: _kGreen,
-//         ),
-//         const SizedBox(width: 8),
-//         _buildStatCard(
-//           label: 'Net Salary',
-//           value: 'Rs ${NumberFormat('#,##0').format(netPayable)}',
-//           subLabel: 'Payable Amount',
-//           icon: Icons.account_balance_rounded,
-//           color: _kBlue,
-//         ),
-//       ],
+//     final cards = [
+//       _StatCardData(
+//         label: 'Base Salary',
+//         value: rec.baseSalary,
+//         subLabel: 'Monthly gross salary',
+//         icon: Icons.account_balance_wallet_outlined,
+//         color: _kPurple,
+//         bg: _kPurpleLight,
+//       ),
+//       _StatCardData(
+//         label: 'Total Deductions',
+//         value: totalDeductions,
+//         subLabel: 'Absences + fines',
+//         icon: Icons.trending_down_rounded,
+//         color: _kRed,
+//         bg: _kRedBg,
+//       ),
+//       _StatCardData(
+//         label: 'Total Bonus',
+//         value: rec.bonus,
+//         subLabel: 'All bonuses',
+//         icon: Icons.card_giftcard_rounded,
+//         color: _kGreen,
+//         bg: _kGreenBg,
+//       ),
+//       _StatCardData(
+//         label: 'Net Salary',
+//         value: netPayable,
+//         subLabel: 'Payable amount',
+//         icon: Icons.account_balance_rounded,
+//         color: _kBlue,
+//         bg: _kBlue,
+//         emphasize: true,
+//       ),
+//     ];
+//
+//     if (isDesktop) {
+//       return Row(
+//         children: List.generate(cards.length, (i) {
+//           return Expanded(
+//             child: Padding(
+//               padding: EdgeInsets.only(right: i == cards.length - 1 ? 0 : 14),
+//               child: _statCard(cards[i]),
+//             ),
+//           );
+//         }),
+//       );
+//     }
+//
+//     // Mobile: 2x2 grid
+//     return LayoutBuilder(
+//       builder: (context, constraints) {
+//         final cardWidth = (constraints.maxWidth - 10) / 2;
+//         return Wrap(
+//           spacing: 10,
+//           runSpacing: 10,
+//           children: cards.map((c) => SizedBox(width: cardWidth, child: _statCard(c))).toList(),
+//         );
+//       },
 //     );
 //   }
 //
-//   Widget _buildStatCard({
-//     required String label,
-//     required String value,
-//     required String subLabel,
-//     required IconData icon,
-//     required Color color,
-//   }) {
-//     return Expanded(
-//       child: Container(
-//         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
-//         decoration: BoxDecoration(
-//           color: Colors.white,
-//           borderRadius: BorderRadius.circular(10),
-//           border: Border.all(color: _kBorder),
-//           boxShadow: [
-//             BoxShadow(
-//               color: Colors.black.withOpacity(0.02),
-//               blurRadius: 4,
-//               offset: const Offset(0, 2),
-//             ),
-//           ],
-//         ),
-//         child: Column(
-//           children: [
-//             Container(
-//               padding: const EdgeInsets.all(6),
-//               decoration: BoxDecoration(
-//                 color: color.withOpacity(0.1),
-//                 shape: BoxShape.circle,
-//               ),
-//               child: Icon(icon, size: 16, color: color),
-//             ),
-//             const SizedBox(height: 4),
-//             Text(
-//               value,
+//   Widget _statCard(_StatCardData data) {
+//     return Container(
+//       padding: const EdgeInsets.all(14),
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.circular(14),
+//         border: Border.all(color: _kBorder),
+//         boxShadow: [
+//           BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+//         ],
+//       ),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Container(
+//             padding: const EdgeInsets.all(8),
+//             decoration: BoxDecoration(color: data.bg, shape: BoxShape.circle),
+//             child: Icon(data.icon, size: 18, color: data.color),
+//           ),
+//           const SizedBox(height: 10),
+//           Text(data.label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: _kInk)),
+//           const SizedBox(height: 2),
+//           FittedBox(
+//             fit: BoxFit.scaleDown,
+//             alignment: Alignment.centerLeft,
+//             child: Text(
+//               '${data.value < 0 ? '- ' : ''}Rs ${NumberFormat('#,##0').format(data.value.abs())}',
 //               style: TextStyle(
-//                 fontSize: 12,
+//                 fontSize: data.emphasize ? 20 : 18,
 //                 fontWeight: FontWeight.w800,
-//                 color: color,
+//                 color: data.color,
 //               ),
-//               maxLines: 1,
-//               overflow: TextOverflow.ellipsis,
 //             ),
-//             const SizedBox(height: 2),
-//             Text(
-//               subLabel,
-//               style: const TextStyle(fontSize: 8, color: Color(0xFF9CA3AF)),
-//               maxLines: 1,
-//               overflow: TextOverflow.ellipsis,
-//             ),
-//           ],
-//         ),
+//           ),
+//           const SizedBox(height: 2),
+//           Text(data.subLabel, style: const TextStyle(fontSize: 10.5, color: _kSlateLight)),
+//         ],
 //       ),
 //     );
 //   }
 //
 //   // ─── Employee Info Card ───
-//   // ─── Fixed Employee Info Card ───
 //   Widget _buildEmployeeInfo(SalaryRecord rec) {
 //     return _buildCard(
 //       title: 'Employee Information',
-//       icon: Icons.person_outline,
+//       icon: Icons.person_outline_rounded,
 //       children: [
-//         // Make sure EVERY string value is wrapped inside Text()
-//         _detailRow('Employee Name', Text(rec.employeeName)),
-//         _detailRow('Employee ID', Text(rec.employeeId ?? 'N/A')),
-//         _detailRow('Designation', Text(rec.designation ?? 'N/A')),
-//
-//         // Since 'department' and 'joiningDate' are not in your model,
-//         // we keep them as placeholders to avoid errors.
-//         _detailRow('Department', Text('N/A')),
-//         _detailRow('Joining Date', Text('-')),
-//
-//         _detailRow('Salary Month', Text(DateFormat('MMMM yyyy').format(DateTime(rec.year, rec.month)))),
-//         _detailRow('Generated Date', Text(DateFormat('dd MMM yyyy').format(rec.generatedDate))),
-//         _detailRow('Status', _statusChip(rec.status)),
+//         _detailRow('Employee Name', rec.employeeName),
+//         _detailRow('Employee ID', rec.employeeId ?? 'N/A'),
+//         _detailRow('Designation', rec.designation ?? 'N/A'),
+//         _detailRow('Department', 'Computer Science'),
+//         _detailRow('Joining Date', '12 Jan 2025'),
+//         _detailRow('Salary Month', DateFormat('MMMM yyyy').format(DateTime(rec.year, rec.month))),
+//         _detailRow('Generated Date', DateFormat('dd MMM yyyy').format(rec.generatedDate)),
+//         Padding(
+//           padding: const EdgeInsets.symmetric(vertical: 8),
+//           child: Row(
+//             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//             children: [
+//               const Text('Status', style: TextStyle(color: _kSlate, fontSize: 13)),
+//               _statusChip(rec.status),
+//             ],
+//           ),
+//         ),
 //       ],
 //     );
 //   }
-//   // Widget _buildEmployeeInfo(SalaryRecord rec) {
-//   //   return _buildCard(
-//   //     title: 'Employee Information',
-//   //     icon: Icons.person_outline,
-//   //     children: [
-//   //       _detailRow('Employee Name', Text(rec.employeeName)),
-//   //       _detailRow('Employee ID', Text(rec.employeeId ?? 'N/A')),
-//   //       _detailRow('Designation', Text(rec.designation ?? 'N/A')),
-//   //       // Replaced missing 'department' with placeholder text to avoid errors
-//   //       _detailRow('Department', Text('N/A')),
-//   //       // Replaced missing 'joiningDate' with placeholder text to avoid errors
-//   //       _detailRow('Joining Date', Text('-')),
-//   //       _detailRow('Salary Month', Text(DateFormat('MMMM yyyy').format(DateTime(rec.year, rec.month)))),
-//   //       _detailRow('Generated Date', Text(DateFormat('dd MMM yyyy').format(rec.generatedDate))),
-//   //       _detailRow('Status', _statusChip(rec.status)),
-//   //     ],
-//   //   );
-//   // }
 //
 //   // ─── Salary Breakdown Card ───
 //   Widget _buildSalaryBreakdown(SalaryRecord rec, int presentDays) {
@@ -1072,46 +1219,49 @@
 //       title: 'Salary Breakdown',
 //       icon: Icons.receipt_long_outlined,
 //       children: [
-//         // Table Header
 //         Container(
-//           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-//           decoration: BoxDecoration(
-//             color: const Color(0xFFF3F4F6),
-//             borderRadius: BorderRadius.circular(6),
-//           ),
+//           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+//           decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8)),
 //           child: Row(
 //             children: [
 //               Expanded(flex: 3, child: Text('Description', style: _breakdownHeaderStyle())),
 //               Expanded(flex: 3, child: Text('Details', style: _breakdownHeaderStyle())),
-//               Expanded(flex: 2, child: Text('Amount', style: _breakdownHeaderStyle(textAlign: TextAlign.right))),
+//               Expanded(flex: 2, child: Text('Amount', textAlign: TextAlign.right, style: _breakdownHeaderStyle())),
 //             ],
 //           ),
 //         ),
-//         const SizedBox(height: 8),
-//
-//         // Data Rows
-//         _breakdownRow('Base Salary', 'Monthly Fixed Salary', 'Rs ${NumberFormat('#,##0').format(rec.baseSalary)}', isBold: true),
-//         _breakdownRow('Present Days', '$presentDays Days', '-'),
-//         _breakdownRow('Absent Days', '${rec.leaves} Days', '-'),
-//         _breakdownRow('Absent Deduction', '${rec.leaves} Days × Rs ${NumberFormat('#,##0').format(rec.perDayRate)}', '-Rs ${NumberFormat('#,##0').format(rec.absentDeduction)}', isRed: true),
-//
+//         const SizedBox(height: 4),
+//         _breakdownRow('Base Salary', 'Monthly fixed salary', 'Rs ${NumberFormat('#,##0').format(rec.baseSalary)}', isBold: true),
+//         _breakdownRow('Present Days', '$presentDays days', '—'),
+//         _breakdownRow('Absent Days', '${rec.leaves} days', '—'),
+//         _breakdownRow(
+//           'Absent Deduction',
+//           '${rec.leaves} days × Rs ${NumberFormat('#,##0').format(rec.perDayRate)}',
+//           '-Rs ${NumberFormat('#,##0').format(rec.absentDeduction)}',
+//           isRed: true,
+//         ),
 //         if (rec.fine > 0)
-//           _breakdownRow('Fine / Deduction', 'Disciplinary Fine', 'Rs ${NumberFormat('#,##0').format(rec.fine)}', isRed: true),
-//
-//         // Skipping "Balance Deduction" row as requested ("ledger details ni chahiya")
-//
+//           _breakdownRow('Fine / Deduction', 'Disciplinary fine', '-Rs ${NumberFormat('#,##0').format(rec.fine)}', isRed: true),
 //         if (rec.bonus > 0)
-//           _breakdownRow('Bonus / Addition', 'Performance Bonus', '+Rs ${NumberFormat('#,##0').format(rec.bonus)}', isGreen: true),
-//
-//         const SizedBox(height: 12),
-//
-//         // Footer Total
+//           _breakdownRow('Bonus / Addition', 'Performance bonus', '+Rs ${NumberFormat('#,##0').format(rec.bonus)}', isGreen: true),
+//         // ★ NEW — Balance deduction row, only shown if this salary had a
+//         // ledger deduction recorded against the employee's balance.
+//         if (rec.recordInLedger && rec.ledgerDeductionAmount != 0)
+//           _breakdownRow(
+//             'Balance Deduction',
+//             'Deducted from employee balance',
+//             '-Rs ${NumberFormat('#,##0').format(rec.ledgerDeductionAmount)}',
+//             isRed: true,
+//           ),
+//         const SizedBox(height: 10),
 //         Container(
-//           padding: const EdgeInsets.all(10),
+//           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
 //           decoration: BoxDecoration(
-//             color: const Color(0xFFEEF2FF),
-//             borderRadius: BorderRadius.circular(8),
-//             border: Border.all(color: const Color(0xFFC7D2FE)),
+//             // ★ NEW — red-tinted box when net payable has gone negative
+//             // (deduction exceeded the calculated net salary).
+//             color: rec.payableNetSalary < 0 ? _kRedBg : _kPurpleLight,
+//             borderRadius: BorderRadius.circular(10),
+//             border: Border.all(color: rec.payableNetSalary < 0 ? _kRedBorder : _kPurpleSoft),
 //           ),
 //           child: Row(
 //             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1121,15 +1271,17 @@
 //                 style: TextStyle(
 //                   fontWeight: FontWeight.w700,
 //                   fontSize: 14,
-//                   color: _kBlue,
+//                   color: rec.payableNetSalary < 0 ? _kRed : _kPurpleDark,
 //                 ),
 //               ),
 //               Text(
-//                 'Rs ${NumberFormat('#,##0').format(rec.payableNetSalary)}',
+//                 // ★ NEW — leading "- " shown when payable amount is negative,
+//                 // instead of formatting it as a positive number.
+//                 '${rec.payableNetSalary < 0 ? '- ' : ''}Rs ${NumberFormat('#,##0').format(rec.payableNetSalary.abs())}',
 //                 style: TextStyle(
 //                   fontWeight: FontWeight.w800,
-//                   fontSize: 15,
-//                   color: _kBlue,
+//                   fontSize: 17,
+//                   color: rec.payableNetSalary < 0 ? _kRed : _kPurpleDark,
 //                 ),
 //               ),
 //             ],
@@ -1138,49 +1290,90 @@
 //       ],
 //     );
 //   }
+//   // Widget _buildSalaryBreakdown(SalaryRecord rec, int presentDays) {
+//   //   return _buildCard(
+//   //     title: 'Salary Breakdown',
+//   //     icon: Icons.receipt_long_outlined,
+//   //     children: [
+//   //       Container(
+//   //         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+//   //         decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8)),
+//   //         child: Row(
+//   //           children: [
+//   //             Expanded(flex: 3, child: Text('Description', style: _breakdownHeaderStyle())),
+//   //             Expanded(flex: 3, child: Text('Details', style: _breakdownHeaderStyle())),
+//   //             Expanded(flex: 2, child: Text('Amount', textAlign: TextAlign.right, style: _breakdownHeaderStyle())),
+//   //           ],
+//   //         ),
+//   //       ),
+//   //       const SizedBox(height: 4),
+//   //       _breakdownRow('Base Salary', 'Monthly fixed salary', 'Rs ${NumberFormat('#,##0').format(rec.baseSalary)}', isBold: true),
+//   //       _breakdownRow('Present Days', '$presentDays days', '—'),
+//   //       _breakdownRow('Absent Days', '${rec.leaves} days', '—'),
+//   //       _breakdownRow(
+//   //         'Absent Deduction',
+//   //         '${rec.leaves} days × Rs ${NumberFormat('#,##0').format(rec.perDayRate)}',
+//   //         '-Rs ${NumberFormat('#,##0').format(rec.absentDeduction)}',
+//   //         isRed: true,
+//   //       ),
+//   //       if (rec.fine > 0)
+//   //         _breakdownRow('Fine / Deduction', 'Disciplinary fine', '-Rs ${NumberFormat('#,##0').format(rec.fine)}', isRed: true),
+//   //       if (rec.bonus > 0)
+//   //         _breakdownRow('Bonus / Addition', 'Performance bonus', '+Rs ${NumberFormat('#,##0').format(rec.bonus)}', isGreen: true),
+//   //       const SizedBox(height: 10),
+//   //       Container(
+//   //         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+//   //         decoration: BoxDecoration(
+//   //           color: _kPurpleLight,
+//   //           borderRadius: BorderRadius.circular(10),
+//   //           border: Border.all(color: _kPurpleSoft),
+//   //         ),
+//   //         child: Row(
+//   //           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//   //           children: [
+//   //             const Text('Net Payable Salary', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _kPurpleDark)),
+//   //             Text(
+//   //               'Rs ${NumberFormat('#,##0').format(rec.payableNetSalary)}',
+//   //               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: _kPurpleDark),
+//   //             ),
+//   //           ],
+//   //         ),
+//   //       ),
+//   //     ],
+//   //   );
+//   // }
 //
 //   // ─── Notes Card ───
 //   Widget _buildNotes(String note) {
-//     // Formatting the note into bullet points (assuming entered with newlines)
 //     final lines = note.split('\n').where((l) => l.trim().isNotEmpty).toList();
 //
 //     return Container(
 //       width: double.infinity,
-//       padding: const EdgeInsets.all(14),
+//       padding: const EdgeInsets.all(16),
 //       decoration: BoxDecoration(
-//         color: _kYellowBg,
-//         borderRadius: BorderRadius.circular(12),
-//         border: Border.all(color: _kYellowBorder),
+//         color: _kOrangeBg,
+//         borderRadius: BorderRadius.circular(14),
+//         border: Border.all(color: _kOrangeBorder),
 //       ),
 //       child: Column(
 //         crossAxisAlignment: CrossAxisAlignment.start,
 //         children: [
 //           Row(
-//             children: [
-//               const Icon(Icons.note_outlined, size: 16, color: Color(0xFFD97706)),
-//               const SizedBox(width: 8),
-//               const Text(
-//                 'Notes',
-//                 style: TextStyle(
-//                   fontWeight: FontWeight.w700,
-//                   fontSize: 13,
-//                   color: Color(0xFF92400E),
-//                 ),
-//               ),
+//             children: const [
+//               Icon(Icons.sticky_note_2_outlined, size: 18, color: _kOrange),
+//               SizedBox(width: 8),
+//               Text('Notes', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF92400E))),
 //             ],
 //           ),
-//           const SizedBox(height: 10),
+//           const SizedBox(height: 12),
 //           ...lines.map((line) => Padding(
-//             padding: const EdgeInsets.only(bottom: 4),
+//             padding: const EdgeInsets.only(bottom: 6),
 //             child: Row(
 //               crossAxisAlignment: CrossAxisAlignment.start,
 //               children: [
-//                 const Text('• ', style: TextStyle(color: Color(0xFF92400E), fontSize: 12)),
+//                 const Text('•  ', style: TextStyle(color: Color(0xFF92400E), fontSize: 14, fontWeight: FontWeight.w700)),
 //                 Expanded(
-//                   child: Text(
-//                     line,
-//                     style: const TextStyle(color: Color(0xFF78350F), fontSize: 12, height: 1.4),
-//                   ),
+//                   child: Text(line, style: const TextStyle(color: Color(0xFF78350F), fontSize: 13, height: 1.5)),
 //                 ),
 //               ],
 //             ),
@@ -1190,37 +1383,20 @@
 //     );
 //   }
 //
-//   // ─── Payment Summary (no Payment Method) ───
-//   // Widget _buildPaymentSummary(SalaryRecord rec) {
-//   //   return _buildCard(
-//   //     title: 'Payment Summary',
-//   //     icon: Icons.account_balance_wallet_outlined,
-//   //     children: [
-//   //       _detailRow('Net Payable Salary', 'Rs ${NumberFormat('#,##0').format(rec.payableNetSalary)}', fontWeight: FontWeight.w700),
-//   //       // Payment Method removed as requested
-//   //       _detailRow('Payment Status', _statusChip(rec.status)),
-//   //     ],
-//   //   );
-//   // }
-//
-//   // ─── Helper Widgets ───
+//   // ─── Shared Helpers ───
 //
 //   Widget _statusChip(String status) {
 //     final isPaid = status == 'Paid';
-//     final bg = isPaid ? const Color(0xFFECFDF3) : const Color(0xFFFFFBEB);
-//     final fg = isPaid ? _kGreen : const Color(0xFFD97706);
-//     final border = isPaid ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A);
+//     final bg = isPaid ? _kGreenBg : _kOrangeBg;
+//     final fg = isPaid ? _kGreen : _kOrange;
+//     final border = isPaid ? _kGreenBorder : _kOrangeBorder;
 //     return Container(
-//       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-//       decoration: BoxDecoration(
-//         color: bg,
-//         borderRadius: BorderRadius.circular(20),
-//         border: Border.all(color: border),
-//       ),
+//       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+//       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20), border: Border.all(color: border)),
 //       child: Row(
 //         mainAxisSize: MainAxisSize.min,
 //         children: [
-//           Icon(isPaid ? Icons.check_circle : Icons.schedule, size: 14, color: fg),
+//           Icon(isPaid ? Icons.check_circle : Icons.schedule, size: 13, color: fg),
 //           const SizedBox(width: 4),
 //           Text(status, style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w700)),
 //         ],
@@ -1234,54 +1410,51 @@
 //       padding: const EdgeInsets.all(16),
 //       decoration: BoxDecoration(
 //         color: Colors.white,
-//         borderRadius: BorderRadius.circular(12),
+//         borderRadius: BorderRadius.circular(14),
 //         border: Border.all(color: _kBorder),
-//         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))],
+//         boxShadow: [
+//           BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+//         ],
 //       ),
 //       child: Column(
 //         crossAxisAlignment: CrossAxisAlignment.start,
 //         children: [
 //           Row(
 //             children: [
-//               Icon(icon, size: 18, color: _kPurple),
+//               Container(
+//                 padding: const EdgeInsets.all(6),
+//                 decoration: BoxDecoration(color: _kPurpleLight, borderRadius: BorderRadius.circular(8)),
+//                 child: Icon(icon, size: 16, color: _kPurple),
+//               ),
 //               const SizedBox(width: 8),
-//               Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF111827))),
+//               Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5, color: _kInk)),
 //             ],
 //           ),
-//           const SizedBox(height: 14),
+//           const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: _kBorder)),
 //           ...children,
 //         ],
 //       ),
 //     );
 //   }
 //
-//   // Widget _detailRow(String label, Widget value, {FontWeight fontWeight = FontWeight.w600}) {
-//   //   return Padding(
-//   //     padding: const EdgeInsets.symmetric(vertical: 6),
-//   //     child: Row(
-//   //       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//   //       children: [
-//   //         Text(label, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13)),
-//   //         DefaultTextStyle.merge(
-//   //           style: TextStyle(fontWeight: fontWeight, fontSize: 13, color: const Color(0xFF111827)),
-//   //           textAlign: TextAlign.right,
-//   //           child: value,
-//   //         ),
-//   //       ],
-//   //     ),
-//   //   );
-//   // }
-//   Widget _detailRow(String label, Widget value, {FontWeight fontWeight = FontWeight.w600}) {
+//   Widget _detailRow(String label, String value) {
 //     return Padding(
-//       padding: const EdgeInsets.symmetric(vertical: 6),
+//       padding: const EdgeInsets.symmetric(vertical: 8),
 //       child: Row(
 //         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//         crossAxisAlignment: CrossAxisAlignment.start,
 //         children: [
-//           Text(label, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13)),
-//           DefaultTextStyle.merge(
-//             style: TextStyle(fontWeight: fontWeight, fontSize: 13, color: const Color(0xFF111827)),
-//             textAlign: TextAlign.right,
-//             child: value, // <--- This MUST accept a Widget, not a String
+//           Expanded(
+//             flex: 2,
+//             child: Text(label, style: const TextStyle(color: _kSlate, fontSize: 13)),
+//           ),
+//           Expanded(
+//             flex: 3,
+//             child: Text(
+//               value,
+//               textAlign: TextAlign.right,
+//               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: _kInk),
+//             ),
 //           ),
 //         ],
 //       ),
@@ -1289,31 +1462,517 @@
 //   }
 //
 //   Widget _breakdownRow(String label, String details, String amount, {bool isBold = false, bool isRed = false, bool isGreen = false}) {
-//     Color textColor = const Color(0xFF111827);
+//     Color textColor = _kInk;
 //     if (isRed) textColor = _kRed;
 //     if (isGreen) textColor = _kGreen;
 //
 //     return Padding(
-//       padding: const EdgeInsets.symmetric(vertical: 6),
+//       padding: const EdgeInsets.symmetric(vertical: 8),
 //       child: Row(
 //         children: [
-//           Expanded(flex: 3, child: Text(label, style: TextStyle(fontWeight: isBold ? FontWeight.w600 : FontWeight.w400, fontSize: 13, color: textColor))),
-//           Expanded(flex: 3, child: Text(details, style: TextStyle(fontSize: 12, color: const Color(0xFF6B7280)))),
-//           Expanded(flex: 2, child: Text(amount, textAlign: TextAlign.right, style: TextStyle(fontWeight: isBold ? FontWeight.w700 : FontWeight.w500, fontSize: 13, color: textColor))),
+//           Expanded(
+//             flex: 3,
+//             child: Text(label, style: TextStyle(fontWeight: isBold ? FontWeight.w600 : FontWeight.w400, fontSize: 13, color: textColor)),
+//           ),
+//           Expanded(
+//             flex: 3,
+//             child: Text(details, style: const TextStyle(fontSize: 12, color: _kSlate)),
+//           ),
+//           Expanded(
+//             flex: 2,
+//             child: Text(
+//               amount,
+//               textAlign: TextAlign.right,
+//               style: TextStyle(fontWeight: isBold ? FontWeight.w700 : FontWeight.w600, fontSize: 13, color: textColor),
+//             ),
+//           ),
 //         ],
 //       ),
 //     );
 //   }
 //
-//   TextStyle _breakdownHeaderStyle({TextAlign textAlign = TextAlign.left}) {
-//     return TextStyle(
-//       fontSize: 11,
-//       fontWeight: FontWeight.w700,
-//       color: const Color(0xFF6B7280),
-//       letterSpacing: 0.3,
-//     );
+//   TextStyle _breakdownHeaderStyle() {
+//     return const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: _kSlate, letterSpacing: 0.3);
 //   }
 // }
+//
+// class _StatCardData {
+//   final String label;
+//   final double value;
+//   final String subLabel;
+//   final IconData icon;
+//   final Color color;
+//   final Color bg;
+//   final bool emphasize;
+//
+//   _StatCardData({
+//     required this.label,
+//     required this.value,
+//     required this.subLabel,
+//     required this.icon,
+//     required this.color,
+//     required this.bg,
+//     this.emphasize = false,
+//   });
+// }
+// // class SalaryDetailScreen extends StatelessWidget {
+// //   final SalaryRecord record;
+// //   const SalaryDetailScreen({super.key, required this.record});
+// //
+// //   @override
+// //   Widget build(BuildContext context) {
+// //     final rec = record;
+// //     final int totalDays = 30; // Assuming standard month
+// //     final int presentDays = totalDays - rec.leaves;
+// //
+// //     return Scaffold(
+// //       backgroundColor: const Color(0xFFF8FAFC),
+// //       appBar: AppBar(
+// //         backgroundColor: Colors.white,
+// //         elevation: 0,
+// //         scrolledUnderElevation: 0,
+// //         leading: IconButton(
+// //           icon: const Icon(Icons.arrow_back, color: Color(0xFF111827)),
+// //           onPressed: () => Navigator.pop(context),
+// //         ),
+// //         title: const Text(
+// //           'Salary Details',
+// //           style: TextStyle(
+// //             color: Color(0xFF111827),
+// //             fontSize: 18,
+// //             fontWeight: FontWeight.w700,
+// //           ),
+// //         ),
+// //         centerTitle: true,
+// //         actions: [
+// //           // Print Slip Button
+// //           OutlinedButton.icon(
+// //             onPressed: () {
+// //               // TODO: Implement print functionality
+// //             },
+// //             icon: const Icon(Icons.print, size: 14, color: _kSlate),
+// //             label: const Text('Print Slip', style: TextStyle(color: _kSlate, fontSize: 13, fontWeight: FontWeight.w600)),
+// //             style: OutlinedButton.styleFrom(
+// //               side: const BorderSide(color: _kBorder),
+// //               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+// //               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+// //             ),
+// //           ),
+// //           const SizedBox(width: 8),
+// //           // Download PDF Button
+// //           OutlinedButton.icon(
+// //             onPressed: () {
+// //               // TODO: Implement PDF download
+// //             },
+// //             icon: const Icon(Icons.download_rounded, size: 14, color: _kSlate),
+// //             label: const Text('Download PDF', style: TextStyle(color: _kSlate, fontSize: 13, fontWeight: FontWeight.w600)),
+// //             style: OutlinedButton.styleFrom(
+// //               side: const BorderSide(color: _kBorder),
+// //               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+// //               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+// //             ),
+// //           ),
+// //           const SizedBox(width: 8),
+// //         ],
+// //       ),
+// //       body: LayoutBuilder(
+// //         builder: (context, constraints) {
+// //           final isDesktop = constraints.maxWidth >= 900;
+// //           return SingleChildScrollView(
+// //             padding: const EdgeInsets.all(16.0),
+// //             child: Column(
+// //               crossAxisAlignment: CrossAxisAlignment.start,
+// //               children: [
+// //                 // 1. Top Stats Row (4 Cards)
+// //                 _buildStatsRow(rec),
+// //                 const SizedBox(height: 24),
+// //
+// //                 // 2. Middle Section (Desktop: Row, Mobile: Column)
+// //                 if (isDesktop)
+// //                   Row(
+// //                     crossAxisAlignment: CrossAxisAlignment.start,
+// //                     children: [
+// //                       Expanded(flex: 2, child: _buildSalaryBreakdown(rec, presentDays)),
+// //                       const SizedBox(width: 20),
+// //                       Expanded(flex: 1, child: _buildEmployeeInfo(rec)),
+// //                     ],
+// //                   )
+// //                 else
+// //                   Column(
+// //                     crossAxisAlignment: CrossAxisAlignment.start,
+// //                     children: [
+// //                       _buildSalaryBreakdown(rec, presentDays),
+// //                       const SizedBox(height: 20),
+// //                       _buildEmployeeInfo(rec),
+// //                     ],
+// //                   ),
+// //
+// //                 const SizedBox(height: 20),
+// //
+// //                 // 3. Notes
+// //                 if (rec.note != null && rec.note!.isNotEmpty)
+// //                   _buildNotes(rec.note!),
+// //               ],
+// //             ),
+// //           );
+// //         },
+// //       ),
+// //     );
+// //   }
+// //
+// //   // ─── Top Stats Row ───
+// //   Widget _buildStatsRow(SalaryRecord rec) {
+// //     final totalDeductions = rec.absentDeduction + rec.fine;
+// //     final netPayable = rec.payableNetSalary;
+// //
+// //     // Use Wrap to handle small screens gracefully (2x2 grid if space gets tight)
+// //     return LayoutBuilder(
+// //       builder: (context, constraints) {
+// //         final isMobile = constraints.maxWidth < 600;
+// //         return Wrap(
+// //           spacing: 12,
+// //           runSpacing: 12,
+// //           children: [
+// //             _buildStatCard(
+// //               label: 'Base Salary',
+// //               value: 'Rs ${NumberFormat('#,##0').format(rec.baseSalary)}',
+// //               subLabel: 'Monthly Gross Salary',
+// //               icon: Icons.account_balance_wallet_outlined,
+// //               color: _kPurple,
+// //               width: isMobile ? (constraints.maxWidth / 2) - 6 : null,
+// //             ),
+// //             _buildStatCard(
+// //               label: 'Total Deductions',
+// //               value: 'Rs ${NumberFormat('#,##0').format(totalDeductions)}',
+// //               subLabel: 'All Deductions',
+// //               icon: Icons.trending_down_rounded,
+// //               color: _kRed,
+// //               width: isMobile ? (constraints.maxWidth / 2) - 6 : null,
+// //             ),
+// //             _buildStatCard(
+// //               label: 'Total Bonus',
+// //               value: 'Rs ${NumberFormat('#,##0').format(rec.bonus)}',
+// //               subLabel: 'All Bonuses',
+// //               icon: Icons.card_giftcard,
+// //               color: _kGreen,
+// //               width: isMobile ? (constraints.maxWidth / 2) - 6 : null,
+// //             ),
+// //             _buildStatCard(
+// //               label: 'Net Salary',
+// //               value: 'Rs ${NumberFormat('#,##0').format(netPayable)}',
+// //               subLabel: 'Payable Amount',
+// //               icon: Icons.account_balance_rounded,
+// //               color: _kBlue,
+// //               width: isMobile ? (constraints.maxWidth / 2) - 6 : null,
+// //             ),
+// //           ],
+// //         );
+// //       },
+// //     );
+// //   }
+// //
+// //   Widget _buildStatCard({
+// //     required String label,
+// //     required String value,
+// //     required String subLabel,
+// //     required IconData icon,
+// //     required Color color,
+// //     double? width,
+// //   }) {
+// //     return Container(
+// //       width: width,
+// //       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+// //       decoration: BoxDecoration(
+// //         color: Colors.white,
+// //         borderRadius: BorderRadius.circular(12),
+// //         border: Border.all(color: _kBorder),
+// //       ),
+// //       child: Column(
+// //         crossAxisAlignment: CrossAxisAlignment.start,
+// //         children: [
+// //           Row(
+// //             children: [
+// //               Container(
+// //                 padding: const EdgeInsets.all(8),
+// //                 decoration: BoxDecoration(
+// //                   color: color.withOpacity(0.1),
+// //                   shape: BoxShape.circle,
+// //                 ),
+// //                 child: Icon(icon, size: 20, color: color),
+// //               ),
+// //               const SizedBox(width: 10),
+// //               Column(
+// //                 crossAxisAlignment: CrossAxisAlignment.start,
+// //                 children: [
+// //                   Text(
+// //                     label,
+// //                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: _kInk),
+// //                   ),
+// //                   Text(
+// //                     subLabel,
+// //                     style: const TextStyle(fontSize: 11, color: _kSlateLight),
+// //                   ),
+// //                 ],
+// //               ),
+// //             ],
+// //           ),
+// //           const SizedBox(height: 12),
+// //           Text(
+// //             value,
+// //             style: TextStyle(
+// //               fontSize: 18,
+// //               fontWeight: FontWeight.w800,
+// //               color: color,
+// //             ),
+// //           ),
+// //         ],
+// //       ),
+// //     );
+// //   }
+// //
+// //   // ─── Employee Info Card ───
+// //   Widget _buildEmployeeInfo(SalaryRecord rec) {
+// //     return _buildCard(
+// //       title: 'Employee Information',
+// //       icon: Icons.person_outline,
+// //       children: [
+// //         _detailRow('Employee Name', Text(rec.employeeName)),
+// //         _detailRow('Employee ID', Text(rec.employeeId ?? 'N/A')),
+// //         _detailRow('Designation', Text(rec.designation ?? 'N/A')),
+// //         _detailRow('Department', Text('Computer Science')), // Hardcoded as per image, or you can use rec.department if available
+// //         _detailRow('Joining Date', Text('12 Jan 2025')),    // Placeholder as per image
+// //         _detailRow('Salary Month', Text(DateFormat('MMMM yyyy').format(DateTime(rec.year, rec.month)))),
+// //         _detailRow('Generated Date', Text(DateFormat('dd MMM yyyy').format(rec.generatedDate))),
+// //         _detailRow('Status', _statusChip(rec.status)),
+// //       ],
+// //     );
+// //   }
+// //
+// //   // ─── Salary Breakdown Card ───
+// //   Widget _buildSalaryBreakdown(SalaryRecord rec, int presentDays) {
+// //     return _buildCard(
+// //       title: 'Salary Breakdown',
+// //       icon: Icons.receipt_long_outlined,
+// //       children: [
+// //         // Table Header
+// //         Container(
+// //           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+// //           decoration: BoxDecoration(
+// //             color: const Color(0xFFF3F4F6),
+// //             borderRadius: BorderRadius.circular(6),
+// //           ),
+// //           child: Row(
+// //             children: [
+// //               Expanded(flex: 3, child: Text('Description', style: _breakdownHeaderStyle())),
+// //               Expanded(flex: 3, child: Text('Details', style: _breakdownHeaderStyle())),
+// //               Expanded(flex: 2, child: Text('Amount', style: _breakdownHeaderStyle(textAlign: TextAlign.right))),
+// //             ],
+// //           ),
+// //         ),
+// //         const SizedBox(height: 8),
+// //
+// //         // Data Rows
+// //         _breakdownRow('Base Salary', 'Monthly Fixed Salary', 'Rs ${NumberFormat('#,##0').format(rec.baseSalary)}', isBold: true),
+// //         _breakdownRow('Present Days', '$presentDays Days', '-'),
+// //         _breakdownRow('Absent Days', '${rec.leaves} Days', '-'),
+// //         _breakdownRow('Absent Deduction', '${rec.leaves} Days × Rs ${NumberFormat('#,##0').format(rec.perDayRate)}', '-Rs ${NumberFormat('#,##0').format(rec.absentDeduction)}', isRed: true),
+// //
+// //         if (rec.fine > 0)
+// //           _breakdownRow('Fine / Deduction', 'Disciplinary Fine', 'Rs ${NumberFormat('#,##0').format(rec.fine)}', isRed: true),
+// //
+// //         if (rec.bonus > 0)
+// //           _breakdownRow('Bonus / Addition', 'Performance Bonus', '+Rs ${NumberFormat('#,##0').format(rec.bonus)}', isGreen: true),
+// //
+// //         const SizedBox(height: 12),
+// //
+// //         // Footer Total (Highlighted Background as in Image)
+// //         Container(
+// //           padding: const EdgeInsets.all(12),
+// //           decoration: BoxDecoration(
+// //             color: _kPurpleLight,
+// //             borderRadius: BorderRadius.circular(8),
+// //             border: Border.all(color: _kPurpleSoft),
+// //           ),
+// //           child: Row(
+// //             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+// //             children: [
+// //               Text(
+// //                 'Net Payable Salary',
+// //                 style: TextStyle(
+// //                   fontWeight: FontWeight.w700,
+// //                   fontSize: 14,
+// //                   color: _kBlue,
+// //                 ),
+// //               ),
+// //               Text(
+// //                 'Rs ${NumberFormat('#,##0').format(rec.payableNetSalary)}',
+// //                 style: TextStyle(
+// //                   fontWeight: FontWeight.w800,
+// //                   fontSize: 15,
+// //                   color: _kBlue,
+// //                 ),
+// //               ),
+// //             ],
+// //           ),
+// //         ),
+// //       ],
+// //     );
+// //   }
+// //
+// //   // ─── Notes Card ───
+// //   Widget _buildNotes(String note) {
+// //     final lines = note.split('\n').where((l) => l.trim().isNotEmpty).toList();
+// //
+// //     return Container(
+// //       width: double.infinity,
+// //       padding: const EdgeInsets.all(16),
+// //       decoration: BoxDecoration(
+// //         color: _kOrangeBg,
+// //         borderRadius: BorderRadius.circular(12),
+// //         border: Border.all(color: _kOrangeBorder),
+// //       ),
+// //       child: Column(
+// //         crossAxisAlignment: CrossAxisAlignment.start,
+// //         children: [
+// //           Row(
+// //             children: [
+// //               const Icon(Icons.note_outlined, size: 18, color: Color(0xFFD97706)),
+// //               const SizedBox(width: 8),
+// //               const Text(
+// //                 'Notes',
+// //                 style: TextStyle(
+// //                   fontWeight: FontWeight.w700,
+// //                   fontSize: 14,
+// //                   color: Color(0xFF92400E),
+// //                 ),
+// //               ),
+// //             ],
+// //           ),
+// //           const SizedBox(height: 12),
+// //           ...lines.map((line) => Padding(
+// //             padding: const EdgeInsets.only(bottom: 6),
+// //             child: Row(
+// //               crossAxisAlignment: CrossAxisAlignment.start,
+// //               children: [
+// //                 const Text('• ', style: TextStyle(color: Color(0xFF92400E), fontSize: 14)),
+// //                 Expanded(
+// //                   child: Text(
+// //                     line,
+// //                     style: const TextStyle(color: Color(0xFF78350F), fontSize: 13, height: 1.5),
+// //                   ),
+// //                 ),
+// //               ],
+// //             ),
+// //           )),
+// //         ],
+// //       ),
+// //     );
+// //   }
+// //
+// //   // ─── Helper Widgets ───
+// //
+// //   Widget _statusChip(String status) {
+// //     final isPaid = status == 'Paid';
+// //     final bg = isPaid ? const Color(0xFFECFDF3) : const Color(0xFFFFFBEB);
+// //     final fg = isPaid ? _kGreen : const Color(0xFFD97706);
+// //     final border = isPaid ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A);
+// //     return Container(
+// //       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+// //       decoration: BoxDecoration(
+// //         color: bg,
+// //         borderRadius: BorderRadius.circular(20),
+// //         border: Border.all(color: border),
+// //       ),
+// //       child: Row(
+// //         mainAxisSize: MainAxisSize.min,
+// //         children: [
+// //           Icon(isPaid ? Icons.check_circle : Icons.schedule, size: 14, color: fg),
+// //           const SizedBox(width: 4),
+// //           Text(status, style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w700)),
+// //         ],
+// //       ),
+// //     );
+// //   }
+// //
+// //   Widget _buildCard({required String title, required IconData icon, required List<Widget> children}) {
+// //     return Container(
+// //       width: double.infinity,
+// //       padding: const EdgeInsets.all(16),
+// //       decoration: BoxDecoration(
+// //         color: Colors.white,
+// //         borderRadius: BorderRadius.circular(12),
+// //         border: Border.all(color: _kBorder),
+// //       ),
+// //       child: Column(
+// //         crossAxisAlignment: CrossAxisAlignment.start,
+// //         children: [
+// //           Row(
+// //             children: [
+// //               Icon(icon, size: 18, color: _kPurple),
+// //               const SizedBox(width: 8),
+// //               Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF111827))),
+// //             ],
+// //           ),
+// //           const Padding(
+// //             padding: EdgeInsets.symmetric(vertical: 12),
+// //             child: Divider(height: 1, color: _kBorder),
+// //           ),
+// //           ...children,
+// //         ],
+// //       ),
+// //     );
+// //   }
+// //
+// //   Widget _detailRow(String label, Widget value, {FontWeight fontWeight = FontWeight.w600}) {
+// //     return Padding(
+// //       padding: const EdgeInsets.symmetric(vertical: 8),
+// //       child: Row(
+// //         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+// //         crossAxisAlignment: CrossAxisAlignment.start,
+// //         children: [
+// //           Expanded(
+// //             flex: 2,
+// //             child: Text(label, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13)),
+// //           ),
+// //           Expanded(
+// //             flex: 3,
+// //             child: DefaultTextStyle.merge(
+// //               style: TextStyle(fontWeight: fontWeight, fontSize: 13, color: const Color(0xFF111827)),
+// //               textAlign: TextAlign.right,
+// //               child: value,
+// //             ),
+// //           ),
+// //         ],
+// //       ),
+// //     );
+// //   }
+// //
+// //   Widget _breakdownRow(String label, String details, String amount, {bool isBold = false, bool isRed = false, bool isGreen = false}) {
+// //     Color textColor = const Color(0xFF111827);
+// //     if (isRed) textColor = _kRed;
+// //     if (isGreen) textColor = _kGreen;
+// //
+// //     return Padding(
+// //       padding: const EdgeInsets.symmetric(vertical: 8),
+// //       child: Row(
+// //         children: [
+// //           Expanded(flex: 3, child: Text(label, style: TextStyle(fontWeight: isBold ? FontWeight.w600 : FontWeight.w400, fontSize: 13, color: textColor))),
+// //           Expanded(flex: 3, child: Text(details, style: TextStyle(fontSize: 12, color: const Color(0xFF6B7280)))),
+// //           Expanded(flex: 2, child: Text(amount, textAlign: TextAlign.right, style: TextStyle(fontWeight: isBold ? FontWeight.w700 : FontWeight.w500, fontSize: 13, color: textColor))),
+// //         ],
+// //       ),
+// //     );
+// //   }
+// //
+// //   TextStyle _breakdownHeaderStyle({TextAlign textAlign = TextAlign.left}) {
+// //     return TextStyle(
+// //       fontSize: 12,
+// //       fontWeight: FontWeight.w700,
+// //       color: const Color(0xFF6B7280),
+// //       letterSpacing: 0.3,
+// //     );
+// //   }
+// // }
 //
 // class _YearPickerDialog extends StatelessWidget {
 //   final int initialYear, minYear, maxYear;
@@ -1371,9 +2030,6 @@
 // extension StringExtension on String {
 //   String capitalize() => isEmpty ? this : '${this[0].toUpperCase()}${substring(1)}';
 // }
-//
-//
-//
 
 
 import 'package:flutter/material.dart';
@@ -1381,6 +2037,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/salary_model.dart';
+import '../../pdf_files/salary_pdf_service.dart';
 import '../../providers/employee_transaction_provider.dart';
 import '../../providers/salary_provider.dart';
 import 'generate_salary_screen.dart';
@@ -1964,7 +2621,6 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
                           flex: 2,
                           child: Text(s.designation ?? '—', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: _kSlate)),
                         ),
-                        // Base Salary column (use baseSalary)
                         Expanded(
                           flex: 2,
                           child: Text(
@@ -1972,8 +2628,6 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
                             style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _kInk),
                           ),
                         ),
-
-// Net Salary column (use final payable amount = payableNetSalary)
                         Expanded(
                           flex: 2,
                           child: Text(
@@ -1985,17 +2639,6 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
                             ),
                           ),
                         ),
-                        // Expanded(
-                        //   flex: 2,
-                        //   child: Text(
-                        //     '${s.payableNetSalary < 0 ? '- ' : ''}Rs ${NumberFormat('#,##0').format(s.payableNetSalary.abs())}',
-                        //     style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: s.payableNetSalary < 0 ? _kRed : _kInk),
-                        //   ),
-                        // ),
-                        // Expanded(
-                        //   flex: 2,
-                        //   child: Text('Rs ${NumberFormat('#,##0').format(s.netSalary)}', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _kInk)),
-                        // ),
                         Expanded(
                           flex: 2,
                           child: Align(
@@ -2120,35 +2763,6 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
                     ),
                   ],
                 ),
-//                 Row(
-//                   children: [
-//                     // Inside _buildDesktopTable, replace the two middle columns with:
-//
-// // Base Salary (was wrongly showing payableNetSalary)
-//                     Expanded(
-//                       flex: 2,
-//                       child: Text(
-//                         'Rs ${NumberFormat('#,##0').format(s.baseSalary)}',
-//                         style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _kInk),
-//                       ),
-//                     ),
-//
-// // Net Salary (now shows the final payable amount)
-//                     Expanded(
-//                       flex: 2,
-//                       child: Text(
-//                         // Use the same formatting as the mobile list (handles negative sign)
-//                         '${s.payableNetSalary < 0 ? '- ' : ''}Rs ${NumberFormat('#,##0').format(s.payableNetSalary.abs())}',
-//                         style: TextStyle(
-//                           fontSize: 13.5,
-//                           fontWeight: FontWeight.w700,
-//                           color: s.payableNetSalary < 0 ? _kRed : _kInk,
-//                         ),
-//                       ),
-//                     ),
-//
-//                   ],
-//                 ),
                 const SizedBox(height: 12),
                 _statusDropdownChip(s, onChanged: (v) => _changeStatusInline(s, v), fullWidth: true),
               ],
@@ -2246,25 +2860,73 @@ const TextStyle _headerStyle = TextStyle(fontWeight: FontWeight.w700, fontSize: 
 
 
 // ────────────────────────────────────────────────────────────
-//  ✅ UPDATED Salary Detail Screen
-// ────────────────────────────────────────────────────────────
-
-
-// ────────────────────────────────────────────────────────────
-//  Design Tokens
-// ────────────────────────────────────────────────────────────
-
-
-// ────────────────────────────────────────────────────────────
 //  Salary Detail Screen
+//  ★ NOW STATEFUL — needed to track PDF loading state for the
+//    Print / Download buttons (spinner while generating).
 // ────────────────────────────────────────────────────────────
-class SalaryDetailScreen extends StatelessWidget {
+class SalaryDetailScreen extends StatefulWidget {
   final SalaryRecord record;
   const SalaryDetailScreen({super.key, required this.record});
 
   @override
+  State<SalaryDetailScreen> createState() => _SalaryDetailScreenState();
+}
+
+class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
+  bool _isDownloading = false;
+  bool _isPrinting = false;
+
+  SalaryRecord get rec => widget.record;
+
+  // ★ NEW — Download PDF: generates the slip and, on web, triggers a
+  // browser download; on mobile/desktop, opens the native share/save
+  // sheet so the user can save it or open it directly in a PDF viewer.
+  Future<void> _handleDownload() async {
+    if (_isDownloading) return;
+    setState(() => _isDownloading = true);
+    try {
+      await SalaryPdfService.downloadAndOpen(rec);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Salary slip downloaded'),
+            backgroundColor: _kGreen,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to download PDF: $e'), backgroundColor: _kRed, behavior: SnackBarBehavior.floating),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDownloading = false);
+    }
+  }
+
+  // ★ NEW — Print Slip: opens the system print dialog (works via the
+  // browser's print dialog on web, and the native print/share sheet
+  // on mobile/desktop).
+  Future<void> _handlePrint() async {
+    if (_isPrinting) return;
+    setState(() => _isPrinting = true);
+    try {
+      await SalaryPdfService.printSlip(rec);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to print: $e'), backgroundColor: _kRed, behavior: SnackBarBehavior.floating),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPrinting = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final rec = record;
     const int totalDays = 30;
     final int presentDays = totalDays - rec.leaves;
 
@@ -2316,7 +2978,7 @@ class SalaryDetailScreen extends StatelessWidget {
     );
   }
 
-  // ─── App Bar (responsive: desktop shows text+icon buttons, mobile shows icon-only + menu) ───
+  // ─── App Bar (responsive: desktop shows text+icon buttons, mobile shows icon-only) ───
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
       backgroundColor: Colors.white,
@@ -2350,18 +3012,16 @@ class SalaryDetailScreen extends StatelessWidget {
                   _actionButton(
                     icon: Icons.print_outlined,
                     label: 'Print Slip',
-                    onTap: () {
-                      // TODO: Implement print functionality
-                    },
+                    loading: _isPrinting,
+                    onTap: _handlePrint,
                   ),
                   const SizedBox(width: 10),
                   _actionButton(
                     icon: Icons.download_rounded,
                     label: 'Download PDF',
                     filled: true,
-                    onTap: () {
-                      // TODO: Implement PDF download
-                    },
+                    loading: _isDownloading,
+                    onTap: _handleDownload,
                   ),
                 ],
               ),
@@ -2374,21 +3034,29 @@ class SalaryDetailScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.print_outlined, color: _kSlate, size: 22),
+                  icon: _isPrinting
+                      ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: _kSlate),
+                  )
+                      : const Icon(Icons.print_outlined, color: _kSlate, size: 22),
                   tooltip: 'Print Slip',
-                  onPressed: () {
-                    // TODO: Implement print functionality
-                  },
+                  onPressed: _isPrinting ? null : _handlePrint,
                 ),
                 Container(
                   margin: const EdgeInsets.only(right: 4),
                   decoration: BoxDecoration(color: _kPurple, borderRadius: BorderRadius.circular(10)),
                   child: IconButton(
-                    icon: const Icon(Icons.download_rounded, color: Colors.white, size: 20),
+                    icon: _isDownloading
+                        ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                        : const Icon(Icons.download_rounded, color: Colors.white, size: 20),
                     tooltip: 'Download PDF',
-                    onPressed: () {
-                      // TODO: Implement PDF download
-                    },
+                    onPressed: _isDownloading ? null : _handleDownload,
                   ),
                 ),
               ],
@@ -2403,14 +3071,27 @@ class SalaryDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _actionButton({required IconData icon, required String label, required VoidCallback onTap, bool filled = false}) {
+  Widget _actionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool filled = false,
+    bool loading = false,
+  }) {
+    final spinner = SizedBox(
+      width: 14,
+      height: 14,
+      child: CircularProgressIndicator(strokeWidth: 2, color: filled ? Colors.white : _kSlate),
+    );
+
     if (filled) {
       return ElevatedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 16, color: Colors.white),
+        onPressed: loading ? null : onTap,
+        icon: loading ? spinner : Icon(icon, size: 16, color: Colors.white),
         label: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
         style: ElevatedButton.styleFrom(
           backgroundColor: _kPurple,
+          disabledBackgroundColor: _kPurple.withOpacity(0.7),
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -2418,8 +3099,8 @@ class SalaryDetailScreen extends StatelessWidget {
       );
     }
     return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: const Icon(Icons.print_outlined, size: 16, color: _kSlate),
+      onPressed: loading ? null : onTap,
+      icon: loading ? spinner : const Icon(Icons.print_outlined, size: 16, color: _kSlate),
       label: Text(label, style: const TextStyle(color: _kSlate, fontSize: 13, fontWeight: FontWeight.w600)),
       style: OutlinedButton.styleFrom(
         side: const BorderSide(color: _kBorder),
@@ -2455,7 +3136,6 @@ class SalaryDetailScreen extends StatelessWidget {
 
   // ─── Top Stats Row ───
   Widget _buildStatsRow(bool isDesktop) {
-    final rec = record;
     final totalDeductions = rec.absentDeduction + rec.fine;
     final netPayable = rec.payableNetSalary;
 
@@ -2620,8 +3300,6 @@ class SalaryDetailScreen extends StatelessWidget {
           _breakdownRow('Fine / Deduction', 'Disciplinary fine', '-Rs ${NumberFormat('#,##0').format(rec.fine)}', isRed: true),
         if (rec.bonus > 0)
           _breakdownRow('Bonus / Addition', 'Performance bonus', '+Rs ${NumberFormat('#,##0').format(rec.bonus)}', isGreen: true),
-        // ★ NEW — Balance deduction row, only shown if this salary had a
-        // ledger deduction recorded against the employee's balance.
         if (rec.recordInLedger && rec.ledgerDeductionAmount != 0)
           _breakdownRow(
             'Balance Deduction',
@@ -2633,8 +3311,6 @@ class SalaryDetailScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           decoration: BoxDecoration(
-            // ★ NEW — red-tinted box when net payable has gone negative
-            // (deduction exceeded the calculated net salary).
             color: rec.payableNetSalary < 0 ? _kRedBg : _kPurpleLight,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: rec.payableNetSalary < 0 ? _kRedBorder : _kPurpleSoft),
@@ -2651,8 +3327,6 @@ class SalaryDetailScreen extends StatelessWidget {
                 ),
               ),
               Text(
-                // ★ NEW — leading "- " shown when payable amount is negative,
-                // instead of formatting it as a positive number.
                 '${rec.payableNetSalary < 0 ? '- ' : ''}Rs ${NumberFormat('#,##0').format(rec.payableNetSalary.abs())}',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
@@ -2666,58 +3340,6 @@ class SalaryDetailScreen extends StatelessWidget {
       ],
     );
   }
-  // Widget _buildSalaryBreakdown(SalaryRecord rec, int presentDays) {
-  //   return _buildCard(
-  //     title: 'Salary Breakdown',
-  //     icon: Icons.receipt_long_outlined,
-  //     children: [
-  //       Container(
-  //         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-  //         decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8)),
-  //         child: Row(
-  //           children: [
-  //             Expanded(flex: 3, child: Text('Description', style: _breakdownHeaderStyle())),
-  //             Expanded(flex: 3, child: Text('Details', style: _breakdownHeaderStyle())),
-  //             Expanded(flex: 2, child: Text('Amount', textAlign: TextAlign.right, style: _breakdownHeaderStyle())),
-  //           ],
-  //         ),
-  //       ),
-  //       const SizedBox(height: 4),
-  //       _breakdownRow('Base Salary', 'Monthly fixed salary', 'Rs ${NumberFormat('#,##0').format(rec.baseSalary)}', isBold: true),
-  //       _breakdownRow('Present Days', '$presentDays days', '—'),
-  //       _breakdownRow('Absent Days', '${rec.leaves} days', '—'),
-  //       _breakdownRow(
-  //         'Absent Deduction',
-  //         '${rec.leaves} days × Rs ${NumberFormat('#,##0').format(rec.perDayRate)}',
-  //         '-Rs ${NumberFormat('#,##0').format(rec.absentDeduction)}',
-  //         isRed: true,
-  //       ),
-  //       if (rec.fine > 0)
-  //         _breakdownRow('Fine / Deduction', 'Disciplinary fine', '-Rs ${NumberFormat('#,##0').format(rec.fine)}', isRed: true),
-  //       if (rec.bonus > 0)
-  //         _breakdownRow('Bonus / Addition', 'Performance bonus', '+Rs ${NumberFormat('#,##0').format(rec.bonus)}', isGreen: true),
-  //       const SizedBox(height: 10),
-  //       Container(
-  //         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-  //         decoration: BoxDecoration(
-  //           color: _kPurpleLight,
-  //           borderRadius: BorderRadius.circular(10),
-  //           border: Border.all(color: _kPurpleSoft),
-  //         ),
-  //         child: Row(
-  //           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  //           children: [
-  //             const Text('Net Payable Salary', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _kPurpleDark)),
-  //             Text(
-  //               'Rs ${NumberFormat('#,##0').format(rec.payableNetSalary)}',
-  //               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: _kPurpleDark),
-  //             ),
-  //           ],
-  //         ),
-  //       ),
-  //     ],
-  //   );
-  // }
 
   // ─── Notes Card ───
   Widget _buildNotes(String note) {
@@ -2891,464 +3513,6 @@ class _StatCardData {
     this.emphasize = false,
   });
 }
-// class SalaryDetailScreen extends StatelessWidget {
-//   final SalaryRecord record;
-//   const SalaryDetailScreen({super.key, required this.record});
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     final rec = record;
-//     final int totalDays = 30; // Assuming standard month
-//     final int presentDays = totalDays - rec.leaves;
-//
-//     return Scaffold(
-//       backgroundColor: const Color(0xFFF8FAFC),
-//       appBar: AppBar(
-//         backgroundColor: Colors.white,
-//         elevation: 0,
-//         scrolledUnderElevation: 0,
-//         leading: IconButton(
-//           icon: const Icon(Icons.arrow_back, color: Color(0xFF111827)),
-//           onPressed: () => Navigator.pop(context),
-//         ),
-//         title: const Text(
-//           'Salary Details',
-//           style: TextStyle(
-//             color: Color(0xFF111827),
-//             fontSize: 18,
-//             fontWeight: FontWeight.w700,
-//           ),
-//         ),
-//         centerTitle: true,
-//         actions: [
-//           // Print Slip Button
-//           OutlinedButton.icon(
-//             onPressed: () {
-//               // TODO: Implement print functionality
-//             },
-//             icon: const Icon(Icons.print, size: 14, color: _kSlate),
-//             label: const Text('Print Slip', style: TextStyle(color: _kSlate, fontSize: 13, fontWeight: FontWeight.w600)),
-//             style: OutlinedButton.styleFrom(
-//               side: const BorderSide(color: _kBorder),
-//               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-//               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-//             ),
-//           ),
-//           const SizedBox(width: 8),
-//           // Download PDF Button
-//           OutlinedButton.icon(
-//             onPressed: () {
-//               // TODO: Implement PDF download
-//             },
-//             icon: const Icon(Icons.download_rounded, size: 14, color: _kSlate),
-//             label: const Text('Download PDF', style: TextStyle(color: _kSlate, fontSize: 13, fontWeight: FontWeight.w600)),
-//             style: OutlinedButton.styleFrom(
-//               side: const BorderSide(color: _kBorder),
-//               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-//               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-//             ),
-//           ),
-//           const SizedBox(width: 8),
-//         ],
-//       ),
-//       body: LayoutBuilder(
-//         builder: (context, constraints) {
-//           final isDesktop = constraints.maxWidth >= 900;
-//           return SingleChildScrollView(
-//             padding: const EdgeInsets.all(16.0),
-//             child: Column(
-//               crossAxisAlignment: CrossAxisAlignment.start,
-//               children: [
-//                 // 1. Top Stats Row (4 Cards)
-//                 _buildStatsRow(rec),
-//                 const SizedBox(height: 24),
-//
-//                 // 2. Middle Section (Desktop: Row, Mobile: Column)
-//                 if (isDesktop)
-//                   Row(
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       Expanded(flex: 2, child: _buildSalaryBreakdown(rec, presentDays)),
-//                       const SizedBox(width: 20),
-//                       Expanded(flex: 1, child: _buildEmployeeInfo(rec)),
-//                     ],
-//                   )
-//                 else
-//                   Column(
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       _buildSalaryBreakdown(rec, presentDays),
-//                       const SizedBox(height: 20),
-//                       _buildEmployeeInfo(rec),
-//                     ],
-//                   ),
-//
-//                 const SizedBox(height: 20),
-//
-//                 // 3. Notes
-//                 if (rec.note != null && rec.note!.isNotEmpty)
-//                   _buildNotes(rec.note!),
-//               ],
-//             ),
-//           );
-//         },
-//       ),
-//     );
-//   }
-//
-//   // ─── Top Stats Row ───
-//   Widget _buildStatsRow(SalaryRecord rec) {
-//     final totalDeductions = rec.absentDeduction + rec.fine;
-//     final netPayable = rec.payableNetSalary;
-//
-//     // Use Wrap to handle small screens gracefully (2x2 grid if space gets tight)
-//     return LayoutBuilder(
-//       builder: (context, constraints) {
-//         final isMobile = constraints.maxWidth < 600;
-//         return Wrap(
-//           spacing: 12,
-//           runSpacing: 12,
-//           children: [
-//             _buildStatCard(
-//               label: 'Base Salary',
-//               value: 'Rs ${NumberFormat('#,##0').format(rec.baseSalary)}',
-//               subLabel: 'Monthly Gross Salary',
-//               icon: Icons.account_balance_wallet_outlined,
-//               color: _kPurple,
-//               width: isMobile ? (constraints.maxWidth / 2) - 6 : null,
-//             ),
-//             _buildStatCard(
-//               label: 'Total Deductions',
-//               value: 'Rs ${NumberFormat('#,##0').format(totalDeductions)}',
-//               subLabel: 'All Deductions',
-//               icon: Icons.trending_down_rounded,
-//               color: _kRed,
-//               width: isMobile ? (constraints.maxWidth / 2) - 6 : null,
-//             ),
-//             _buildStatCard(
-//               label: 'Total Bonus',
-//               value: 'Rs ${NumberFormat('#,##0').format(rec.bonus)}',
-//               subLabel: 'All Bonuses',
-//               icon: Icons.card_giftcard,
-//               color: _kGreen,
-//               width: isMobile ? (constraints.maxWidth / 2) - 6 : null,
-//             ),
-//             _buildStatCard(
-//               label: 'Net Salary',
-//               value: 'Rs ${NumberFormat('#,##0').format(netPayable)}',
-//               subLabel: 'Payable Amount',
-//               icon: Icons.account_balance_rounded,
-//               color: _kBlue,
-//               width: isMobile ? (constraints.maxWidth / 2) - 6 : null,
-//             ),
-//           ],
-//         );
-//       },
-//     );
-//   }
-//
-//   Widget _buildStatCard({
-//     required String label,
-//     required String value,
-//     required String subLabel,
-//     required IconData icon,
-//     required Color color,
-//     double? width,
-//   }) {
-//     return Container(
-//       width: width,
-//       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-//       decoration: BoxDecoration(
-//         color: Colors.white,
-//         borderRadius: BorderRadius.circular(12),
-//         border: Border.all(color: _kBorder),
-//       ),
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Row(
-//             children: [
-//               Container(
-//                 padding: const EdgeInsets.all(8),
-//                 decoration: BoxDecoration(
-//                   color: color.withOpacity(0.1),
-//                   shape: BoxShape.circle,
-//                 ),
-//                 child: Icon(icon, size: 20, color: color),
-//               ),
-//               const SizedBox(width: 10),
-//               Column(
-//                 crossAxisAlignment: CrossAxisAlignment.start,
-//                 children: [
-//                   Text(
-//                     label,
-//                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: _kInk),
-//                   ),
-//                   Text(
-//                     subLabel,
-//                     style: const TextStyle(fontSize: 11, color: _kSlateLight),
-//                   ),
-//                 ],
-//               ),
-//             ],
-//           ),
-//           const SizedBox(height: 12),
-//           Text(
-//             value,
-//             style: TextStyle(
-//               fontSize: 18,
-//               fontWeight: FontWeight.w800,
-//               color: color,
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-//
-//   // ─── Employee Info Card ───
-//   Widget _buildEmployeeInfo(SalaryRecord rec) {
-//     return _buildCard(
-//       title: 'Employee Information',
-//       icon: Icons.person_outline,
-//       children: [
-//         _detailRow('Employee Name', Text(rec.employeeName)),
-//         _detailRow('Employee ID', Text(rec.employeeId ?? 'N/A')),
-//         _detailRow('Designation', Text(rec.designation ?? 'N/A')),
-//         _detailRow('Department', Text('Computer Science')), // Hardcoded as per image, or you can use rec.department if available
-//         _detailRow('Joining Date', Text('12 Jan 2025')),    // Placeholder as per image
-//         _detailRow('Salary Month', Text(DateFormat('MMMM yyyy').format(DateTime(rec.year, rec.month)))),
-//         _detailRow('Generated Date', Text(DateFormat('dd MMM yyyy').format(rec.generatedDate))),
-//         _detailRow('Status', _statusChip(rec.status)),
-//       ],
-//     );
-//   }
-//
-//   // ─── Salary Breakdown Card ───
-//   Widget _buildSalaryBreakdown(SalaryRecord rec, int presentDays) {
-//     return _buildCard(
-//       title: 'Salary Breakdown',
-//       icon: Icons.receipt_long_outlined,
-//       children: [
-//         // Table Header
-//         Container(
-//           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-//           decoration: BoxDecoration(
-//             color: const Color(0xFFF3F4F6),
-//             borderRadius: BorderRadius.circular(6),
-//           ),
-//           child: Row(
-//             children: [
-//               Expanded(flex: 3, child: Text('Description', style: _breakdownHeaderStyle())),
-//               Expanded(flex: 3, child: Text('Details', style: _breakdownHeaderStyle())),
-//               Expanded(flex: 2, child: Text('Amount', style: _breakdownHeaderStyle(textAlign: TextAlign.right))),
-//             ],
-//           ),
-//         ),
-//         const SizedBox(height: 8),
-//
-//         // Data Rows
-//         _breakdownRow('Base Salary', 'Monthly Fixed Salary', 'Rs ${NumberFormat('#,##0').format(rec.baseSalary)}', isBold: true),
-//         _breakdownRow('Present Days', '$presentDays Days', '-'),
-//         _breakdownRow('Absent Days', '${rec.leaves} Days', '-'),
-//         _breakdownRow('Absent Deduction', '${rec.leaves} Days × Rs ${NumberFormat('#,##0').format(rec.perDayRate)}', '-Rs ${NumberFormat('#,##0').format(rec.absentDeduction)}', isRed: true),
-//
-//         if (rec.fine > 0)
-//           _breakdownRow('Fine / Deduction', 'Disciplinary Fine', 'Rs ${NumberFormat('#,##0').format(rec.fine)}', isRed: true),
-//
-//         if (rec.bonus > 0)
-//           _breakdownRow('Bonus / Addition', 'Performance Bonus', '+Rs ${NumberFormat('#,##0').format(rec.bonus)}', isGreen: true),
-//
-//         const SizedBox(height: 12),
-//
-//         // Footer Total (Highlighted Background as in Image)
-//         Container(
-//           padding: const EdgeInsets.all(12),
-//           decoration: BoxDecoration(
-//             color: _kPurpleLight,
-//             borderRadius: BorderRadius.circular(8),
-//             border: Border.all(color: _kPurpleSoft),
-//           ),
-//           child: Row(
-//             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//             children: [
-//               Text(
-//                 'Net Payable Salary',
-//                 style: TextStyle(
-//                   fontWeight: FontWeight.w700,
-//                   fontSize: 14,
-//                   color: _kBlue,
-//                 ),
-//               ),
-//               Text(
-//                 'Rs ${NumberFormat('#,##0').format(rec.payableNetSalary)}',
-//                 style: TextStyle(
-//                   fontWeight: FontWeight.w800,
-//                   fontSize: 15,
-//                   color: _kBlue,
-//                 ),
-//               ),
-//             ],
-//           ),
-//         ),
-//       ],
-//     );
-//   }
-//
-//   // ─── Notes Card ───
-//   Widget _buildNotes(String note) {
-//     final lines = note.split('\n').where((l) => l.trim().isNotEmpty).toList();
-//
-//     return Container(
-//       width: double.infinity,
-//       padding: const EdgeInsets.all(16),
-//       decoration: BoxDecoration(
-//         color: _kOrangeBg,
-//         borderRadius: BorderRadius.circular(12),
-//         border: Border.all(color: _kOrangeBorder),
-//       ),
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Row(
-//             children: [
-//               const Icon(Icons.note_outlined, size: 18, color: Color(0xFFD97706)),
-//               const SizedBox(width: 8),
-//               const Text(
-//                 'Notes',
-//                 style: TextStyle(
-//                   fontWeight: FontWeight.w700,
-//                   fontSize: 14,
-//                   color: Color(0xFF92400E),
-//                 ),
-//               ),
-//             ],
-//           ),
-//           const SizedBox(height: 12),
-//           ...lines.map((line) => Padding(
-//             padding: const EdgeInsets.only(bottom: 6),
-//             child: Row(
-//               crossAxisAlignment: CrossAxisAlignment.start,
-//               children: [
-//                 const Text('• ', style: TextStyle(color: Color(0xFF92400E), fontSize: 14)),
-//                 Expanded(
-//                   child: Text(
-//                     line,
-//                     style: const TextStyle(color: Color(0xFF78350F), fontSize: 13, height: 1.5),
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           )),
-//         ],
-//       ),
-//     );
-//   }
-//
-//   // ─── Helper Widgets ───
-//
-//   Widget _statusChip(String status) {
-//     final isPaid = status == 'Paid';
-//     final bg = isPaid ? const Color(0xFFECFDF3) : const Color(0xFFFFFBEB);
-//     final fg = isPaid ? _kGreen : const Color(0xFFD97706);
-//     final border = isPaid ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A);
-//     return Container(
-//       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-//       decoration: BoxDecoration(
-//         color: bg,
-//         borderRadius: BorderRadius.circular(20),
-//         border: Border.all(color: border),
-//       ),
-//       child: Row(
-//         mainAxisSize: MainAxisSize.min,
-//         children: [
-//           Icon(isPaid ? Icons.check_circle : Icons.schedule, size: 14, color: fg),
-//           const SizedBox(width: 4),
-//           Text(status, style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w700)),
-//         ],
-//       ),
-//     );
-//   }
-//
-//   Widget _buildCard({required String title, required IconData icon, required List<Widget> children}) {
-//     return Container(
-//       width: double.infinity,
-//       padding: const EdgeInsets.all(16),
-//       decoration: BoxDecoration(
-//         color: Colors.white,
-//         borderRadius: BorderRadius.circular(12),
-//         border: Border.all(color: _kBorder),
-//       ),
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Row(
-//             children: [
-//               Icon(icon, size: 18, color: _kPurple),
-//               const SizedBox(width: 8),
-//               Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF111827))),
-//             ],
-//           ),
-//           const Padding(
-//             padding: EdgeInsets.symmetric(vertical: 12),
-//             child: Divider(height: 1, color: _kBorder),
-//           ),
-//           ...children,
-//         ],
-//       ),
-//     );
-//   }
-//
-//   Widget _detailRow(String label, Widget value, {FontWeight fontWeight = FontWeight.w600}) {
-//     return Padding(
-//       padding: const EdgeInsets.symmetric(vertical: 8),
-//       child: Row(
-//         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Expanded(
-//             flex: 2,
-//             child: Text(label, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13)),
-//           ),
-//           Expanded(
-//             flex: 3,
-//             child: DefaultTextStyle.merge(
-//               style: TextStyle(fontWeight: fontWeight, fontSize: 13, color: const Color(0xFF111827)),
-//               textAlign: TextAlign.right,
-//               child: value,
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-//
-//   Widget _breakdownRow(String label, String details, String amount, {bool isBold = false, bool isRed = false, bool isGreen = false}) {
-//     Color textColor = const Color(0xFF111827);
-//     if (isRed) textColor = _kRed;
-//     if (isGreen) textColor = _kGreen;
-//
-//     return Padding(
-//       padding: const EdgeInsets.symmetric(vertical: 8),
-//       child: Row(
-//         children: [
-//           Expanded(flex: 3, child: Text(label, style: TextStyle(fontWeight: isBold ? FontWeight.w600 : FontWeight.w400, fontSize: 13, color: textColor))),
-//           Expanded(flex: 3, child: Text(details, style: TextStyle(fontSize: 12, color: const Color(0xFF6B7280)))),
-//           Expanded(flex: 2, child: Text(amount, textAlign: TextAlign.right, style: TextStyle(fontWeight: isBold ? FontWeight.w700 : FontWeight.w500, fontSize: 13, color: textColor))),
-//         ],
-//       ),
-//     );
-//   }
-//
-//   TextStyle _breakdownHeaderStyle({TextAlign textAlign = TextAlign.left}) {
-//     return TextStyle(
-//       fontSize: 12,
-//       fontWeight: FontWeight.w700,
-//       color: const Color(0xFF6B7280),
-//       letterSpacing: 0.3,
-//     );
-//   }
-// }
 
 class _YearPickerDialog extends StatelessWidget {
   final int initialYear, minYear, maxYear;
