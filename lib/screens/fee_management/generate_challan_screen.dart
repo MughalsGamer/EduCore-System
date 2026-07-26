@@ -1,3 +1,4 @@
+//
 // import 'package:flutter/material.dart';
 // import 'package:provider/provider.dart';
 //
@@ -5,6 +6,7 @@
 // import '../../models/fee_challan_model.dart';
 // import '../../providers/admission_provider.dart';
 // import '../../providers/fee_challan_provider.dart';
+// import 'challan_list_screen.dart';
 //
 // // ─────────────────────────────────────────────
 // //  Generate Fee Challan Screen
@@ -13,6 +15,12 @@
 // //  screen is manual-only. Generated Date / Due Date are shown
 // //  pre-filled with the 28th / next-month-10th defaults but are
 // //  fully editable before hitting Generate.
+// //
+// //  Duplicate prevention is now STUDENT-LEVEL, not family-level:
+// //  a family already fully challaned for the month is skipped, but a
+// //  family with a newly-added student (not present in that earlier
+// //  challan) is still selectable — only the new student's line gets
+// //  generated.
 // // ─────────────────────────────────────────────
 // class GenerateChallanScreen extends StatelessWidget {
 //   const GenerateChallanScreen({super.key});
@@ -151,6 +159,23 @@
 //         backgroundColor: _purple,
 //         foregroundColor: Colors.white,
 //         elevation: 0,
+//         actions: [
+//           IconButton(
+//             tooltip: 'Challan List',
+//             icon: const Icon(Icons.receipt_long),
+//             onPressed: () {
+//               Navigator.push(
+//                 context,
+//                 MaterialPageRoute(
+//                   builder: (_) => ChangeNotifierProvider.value(
+//                     value: context.read<FeeChallanProvider>(),
+//                     child: const ChallanListScreen(),
+//                   ),
+//                 ),
+//               );
+//             },
+//           ),
+//         ],
 //       ),
 //       body: Column(
 //         children: [
@@ -168,14 +193,19 @@
 //               itemCount: filtered.length,
 //               itemBuilder: (context, i) {
 //                 final family = filtered[i];
-//                 final alreadyDone = challanProvider.alreadyChallanedFamilyDocIds
-//                     .contains(family.familyDocId);
+//                 final fullyDone = challanProvider.isFamilyFullyGenerated(family);
+//                 final partiallyDone =
+//                 challanProvider.isFamilyPartiallyGenerated(family);
+//                 final eligibleCount =
+//                     challanProvider.eligibleStudentsFor(family).length;
 //                 final selected = _selectedFamilyDocIds.contains(family.familyDocId);
 //                 return _FamilySelectTile(
 //                   family: family,
 //                   selected: selected,
-//                   alreadyGenerated: alreadyDone,
-//                   onTap: alreadyDone
+//                   fullyGenerated: fullyDone,
+//                   partiallyGenerated: partiallyDone,
+//                   eligibleStudentCount: eligibleCount,
+//                   onTap: fullyDone
 //                       ? null
 //                       : () {
 //                     setState(() {
@@ -406,7 +436,7 @@
 //   // ── Search + Select All ──
 //   Widget _buildSearchAndSelectAll(List<FamilyForChallan> filtered, FeeChallanProvider p) {
 //     final selectableIds = filtered
-//         .where((f) => !p.alreadyChallanedFamilyDocIds.contains(f.familyDocId))
+//         .where((f) => !p.isFamilyFullyGenerated(f))
 //         .map((f) => f.familyDocId)
 //         .toSet();
 //     final allSelected =
@@ -580,13 +610,17 @@
 // class _FamilySelectTile extends StatelessWidget {
 //   final FamilyForChallan family;
 //   final bool selected;
-//   final bool alreadyGenerated;
+//   final bool fullyGenerated;
+//   final bool partiallyGenerated;
+//   final int eligibleStudentCount;
 //   final VoidCallback? onTap;
 //
 //   const _FamilySelectTile({
 //     required this.family,
 //     required this.selected,
-//     required this.alreadyGenerated,
+//     required this.fullyGenerated,
+//     required this.partiallyGenerated,
+//     required this.eligibleStudentCount,
 //     required this.onTap,
 //   });
 //
@@ -599,7 +633,7 @@
 //     family.students.fold<double>(0, (s, st) => s + (st.monthlyFee ?? 0));
 //
 //     return Opacity(
-//       opacity: alreadyGenerated ? 0.55 : 1,
+//       opacity: fullyGenerated ? 0.55 : 1,
 //       child: Card(
 //         margin: const EdgeInsets.only(bottom: 10),
 //         elevation: selected ? 3 : 1,
@@ -616,10 +650,10 @@
 //             child: Row(
 //               children: [
 //                 Icon(
-//                   alreadyGenerated
+//                   fullyGenerated
 //                       ? Icons.check_circle
 //                       : (selected ? Icons.check_circle : Icons.circle_outlined),
-//                   color: alreadyGenerated
+//                   color: fullyGenerated
 //                       ? Colors.green.shade400
 //                       : (selected ? _purple : Colors.grey.shade300),
 //                   size: 22,
@@ -646,6 +680,16 @@
 //                         style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
 //                         overflow: TextOverflow.ellipsis,
 //                       ),
+//                       if (partiallyGenerated) ...[
+//                         const SizedBox(height: 3),
+//                         Text(
+//                           '$eligibleStudentCount naya student — baqi ka challan pehle se hai',
+//                           style: TextStyle(
+//                               fontSize: 11,
+//                               color: Colors.orange.shade700,
+//                               fontWeight: FontWeight.w600),
+//                         ),
+//                       ],
 //                     ],
 //                   ),
 //                 ),
@@ -656,7 +700,7 @@
 //                       Text('Rs ${totalMonthly.toStringAsFixed(0)}',
 //                           style: const TextStyle(
 //                               fontWeight: FontWeight.bold, color: _purple, fontSize: 13)),
-//                     if (alreadyGenerated)
+//                     if (fullyGenerated)
 //                       Padding(
 //                         padding: const EdgeInsets.only(top: 3),
 //                         child: Container(
@@ -669,6 +713,22 @@
 //                               style: TextStyle(
 //                                   fontSize: 9,
 //                                   color: Colors.green.shade700,
+//                                   fontWeight: FontWeight.w600)),
+//                         ),
+//                       )
+//                     else if (partiallyGenerated)
+//                       Padding(
+//                         padding: const EdgeInsets.only(top: 3),
+//                         child: Container(
+//                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+//                           decoration: BoxDecoration(
+//                             color: Colors.orange.shade50,
+//                             borderRadius: BorderRadius.circular(6),
+//                           ),
+//                           child: Text('Partial',
+//                               style: TextStyle(
+//                                   fontSize: 9,
+//                                   color: Colors.orange.shade700,
 //                                   fontWeight: FontWeight.w600)),
 //                         ),
 //                       ),
@@ -858,7 +918,7 @@ import 'challan_list_screen.dart';
 //  pre-filled with the 28th / next-month-10th defaults but are
 //  fully editable before hitting Generate.
 //
-//  Duplicate prevention is now STUDENT-LEVEL, not family-level:
+//  Duplicate prevention is STUDENT-LEVEL, not family-level:
 //  a family already fully challaned for the month is skipped, but a
 //  family with a newly-added student (not present in that earlier
 //  challan) is still selectable — only the new student's line gets
@@ -1138,8 +1198,18 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
     );
   }
 
+  // Year list is generated relative to today's date every time this
+  // widget builds (currentYear - 1 .. currentYear + 4), so it always
+  // includes the current year and automatically slides forward into
+  // 2030, 2031, etc. with no manual code update ever needed. As a
+  // safety net, _billingYear is folded in too, in case it was ever
+  // set outside this range (e.g. editing an old record).
   Widget _yearDropdown() {
-    final years = List.generate(5, (i) => DateTime.now().year - 1 + i);
+    final currentYear = DateTime.now().year;
+    final years = {currentYear - 1, currentYear, currentYear + 1, currentYear + 2,
+      currentYear + 3, currentYear + 4, _billingYear}.toList()
+      ..sort();
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
@@ -1253,7 +1323,7 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
                   count > 0
                       ? '$count challan${count != 1 ? 's' : ''} generated'
                       '${skipped > 0 ? ' • $skipped skipped (already generated)' : ''}'
-                      : 'Sab selected families ka is month ka challan pehle se ban chuka hai',
+                      : 'All selected families already have a challan for this month',
                   style: TextStyle(
                       color: Colors.green.shade800,
                       fontSize: 12,
@@ -1299,7 +1369,7 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
                 controller: _searchCtrl,
                 onChanged: (v) => setState(() => _searchQuery = v.trim()),
                 decoration: InputDecoration(
-                  hintText: 'Family search karein...',
+                  hintText: 'Search family...',
                   hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
                   prefixIcon: const Icon(Icons.search, color: _purple, size: 20),
                   border: InputBorder.none,
@@ -1348,13 +1418,13 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
           Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade300),
           const SizedBox(height: 16),
           Text(
-            _searchQuery.isEmpty ? 'Koi eligible family nahi mili' : 'Search result nahi mila',
+            _searchQuery.isEmpty ? 'No eligible family found' : 'No search results found',
             style:
             TextStyle(color: Colors.grey.shade500, fontSize: 16, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 6),
           Text(
-            'Sirf Regular admission wale students eligible hain',
+            'Only students with Regular admission are eligible',
             style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
           ),
         ],
@@ -1414,10 +1484,10 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Challan Generate Karein?'),
+        title: const Text('Generate Challans?'),
         content: Text(
-            '${selected.length} family ke liye ${FeeChallanModel.monthNames[_billingMonth]} '
-                '$_billingYear ka challan generate hoga.\n\n'
+            'Challans will be generated for ${selected.length} famil${selected.length != 1 ? 'ies' : 'y'} '
+                'for ${FeeChallanModel.monthNames[_billingMonth]} $_billingYear.\n\n'
                 'Generated Date: ${_fmt(_generatedDate)}\nDue Date: ${_fmt(_dueDate)}'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -1525,7 +1595,7 @@ class _FamilySelectTile extends StatelessWidget {
                       if (partiallyGenerated) ...[
                         const SizedBox(height: 3),
                         Text(
-                          '$eligibleStudentCount naya student — baqi ka challan pehle se hai',
+                          '$eligibleStudentCount new student(s) — the rest already have a challan',
                           style: TextStyle(
                               fontSize: 11,
                               color: Colors.orange.shade700,
