@@ -1,0 +1,1304 @@
+// import 'package:flutter/material.dart';
+// import 'package:provider/provider.dart';
+//
+// import '../../models/fee_challan_model.dart';
+// import '../../providers/fee_challan_provider.dart';
+//
+// // ─────────────────────────────────────────────
+// //  Challan List Screen
+// //  Shows every generated challan, filterable by month/year and
+// //  searchable by family/challan number. Supports delete with
+// //  confirmation. Responsive: desktop table, mobile cards.
+// // ─────────────────────────────────────────────
+// class ChallanListScreen extends StatefulWidget {
+//   const ChallanListScreen({super.key});
+//
+//   @override
+//   State<ChallanListScreen> createState() => _ChallanListScreenState();
+// }
+//
+// class _ChallanListScreenState extends State<ChallanListScreen> {
+//   static const _purple = Color(0xFF534AB7);
+//   static const _lightPurple = Color(0xFFEEECFA);
+//
+//   int? _filterMonth; // null = All
+//   int? _filterYear;  // null = All
+//
+//   final _searchCtrl = TextEditingController();
+//   String _searchQuery = '';
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     WidgetsBinding.instance.addPostFrameCallback((_) {
+//       if (!mounted) return;
+//       context.read<FeeChallanProvider>().loadAllChallans();
+//     });
+//   }
+//
+//   @override
+//   void dispose() {
+//     _searchCtrl.dispose();
+//     super.dispose();
+//   }
+//
+//   void _reload() {
+//     context
+//         .read<FeeChallanProvider>()
+//         .loadAllChallans(month: _filterMonth, year: _filterYear);
+//   }
+//
+//   String _fmtDate(DateTime d) =>
+//       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+//
+//   List<FeeChallanModel> _applySearch(List<FeeChallanModel> list) {
+//     final q = _searchQuery.toLowerCase();
+//     if (q.isEmpty) return list;
+//     return list.where((c) {
+//       return c.familyName.toLowerCase().contains(q) ||
+//           c.fatherName.toLowerCase().contains(q) ||
+//           c.familyId.toLowerCase().contains(q) ||
+//           c.challanNumber.toLowerCase().contains(q);
+//     }).toList();
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     final provider = context.watch<FeeChallanProvider>();
+//     final challans = _applySearch(provider.allChallans);
+//
+//     return Scaffold(
+//       backgroundColor: const Color(0xFFF5F5FA),
+//       appBar: AppBar(
+//         title: const Text('Fee Challans'),
+//         centerTitle: true,
+//         backgroundColor: _purple,
+//         foregroundColor: Colors.white,
+//         elevation: 0,
+//         actions: [
+//           IconButton(
+//             icon: const Icon(Icons.refresh),
+//             onPressed: provider.isLoadingList ? null : _reload,
+//           ),
+//         ],
+//       ),
+//       body: Column(
+//         children: [
+//           _buildFilters(),
+//           if (provider.listError != null) _buildErrorBanner(provider),
+//           Expanded(
+//             child: provider.isLoadingList
+//                 ? const Center(child: CircularProgressIndicator(color: _purple))
+//                 : challans.isEmpty
+//                 ? _buildEmpty()
+//                 : LayoutBuilder(
+//               builder: (context, constraints) {
+//                 final isDesktop = constraints.maxWidth >= 800;
+//                 return isDesktop
+//                     ? _buildDesktopTable(challans, provider)
+//                     : _buildMobileList(challans, provider);
+//               },
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   // ── Filters: month, year, search ──
+//   Widget _buildFilters() {
+//     final years = List.generate(6, (i) => DateTime.now().year - 2 + i);
+//     return Container(
+//       color: Colors.white,
+//       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.stretch,
+//         children: [
+//           Row(
+//             children: [
+//               Expanded(
+//                 flex: 3,
+//                 child: _dropdownShell(
+//                   child: DropdownButtonHideUnderline(
+//                     child: DropdownButton<int?>(
+//                       value: _filterMonth,
+//                       isExpanded: true,
+//                       hint: const Text('Sab Months',
+//                           style: TextStyle(fontSize: 13, color: Colors.black87)),
+//                       icon: const Icon(Icons.keyboard_arrow_down, color: _purple),
+//                       items: [
+//                         const DropdownMenuItem<int?>(
+//                           value: null,
+//                           child: Text('Sab Months', style: TextStyle(fontSize: 13)),
+//                         ),
+//                         ...List.generate(12, (i) => i + 1).map(
+//                               (m) => DropdownMenuItem<int?>(
+//                             value: m,
+//                             child: Text(FeeChallanModel.monthNames[m],
+//                                 style: const TextStyle(fontSize: 13)),
+//                           ),
+//                         ),
+//                       ],
+//                       onChanged: (v) {
+//                         setState(() => _filterMonth = v);
+//                         _reload();
+//                       },
+//                     ),
+//                   ),
+//                 ),
+//               ),
+//               const SizedBox(width: 10),
+//               Expanded(
+//                 flex: 2,
+//                 child: _dropdownShell(
+//                   child: DropdownButtonHideUnderline(
+//                     child: DropdownButton<int?>(
+//                       value: _filterYear,
+//                       isExpanded: true,
+//                       hint: const Text('Sab Years',
+//                           style: TextStyle(fontSize: 13, color: Colors.black87)),
+//                       icon: const Icon(Icons.keyboard_arrow_down, color: _purple),
+//                       items: [
+//                         const DropdownMenuItem<int?>(
+//                           value: null,
+//                           child: Text('Sab Years', style: TextStyle(fontSize: 13)),
+//                         ),
+//                         ...years.map(
+//                               (y) => DropdownMenuItem<int?>(
+//                             value: y,
+//                             child: Text('$y', style: const TextStyle(fontSize: 13)),
+//                           ),
+//                         ),
+//                       ],
+//                       onChanged: (v) {
+//                         setState(() => _filterYear = v);
+//                         _reload();
+//                       },
+//                     ),
+//                   ),
+//                 ),
+//               ),
+//             ],
+//           ),
+//           const SizedBox(height: 10),
+//           Container(
+//             decoration: BoxDecoration(
+//               color: const Color(0xFFF5F5FA),
+//               borderRadius: BorderRadius.circular(12),
+//               border: Border.all(color: Colors.grey.shade200),
+//             ),
+//             child: TextField(
+//               controller: _searchCtrl,
+//               onChanged: (v) => setState(() => _searchQuery = v.trim()),
+//               decoration: InputDecoration(
+//                 hintText: 'Family, father ya challan number search karein...',
+//                 hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+//                 prefixIcon: const Icon(Icons.search, color: _purple, size: 20),
+//                 border: InputBorder.none,
+//                 contentPadding: const EdgeInsets.symmetric(vertical: 10),
+//               ),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _dropdownShell({required Widget child}) {
+//     return Container(
+//       padding: const EdgeInsets.symmetric(horizontal: 12),
+//       height: 46,
+//       decoration: BoxDecoration(
+//         color: _lightPurple,
+//         borderRadius: BorderRadius.circular(10),
+//       ),
+//       alignment: Alignment.center,
+//       child: child,
+//     );
+//   }
+//
+//   Widget _buildErrorBanner(FeeChallanProvider p) {
+//     return Container(
+//       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+//       padding: const EdgeInsets.all(12),
+//       decoration: BoxDecoration(
+//         color: Colors.red.shade50,
+//         borderRadius: BorderRadius.circular(10),
+//         border: Border.all(color: Colors.red.shade200),
+//       ),
+//       child: Row(
+//         children: [
+//           Icon(Icons.error_outline, color: Colors.red.shade600, size: 18),
+//           const SizedBox(width: 8),
+//           Expanded(
+//             child: Text(p.listError!,
+//                 style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _buildEmpty() {
+//     return Center(
+//       child: Column(
+//         mainAxisSize: MainAxisSize.min,
+//         children: [
+//           Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade300),
+//           const SizedBox(height: 16),
+//           Text(
+//             _searchQuery.isEmpty ? 'Koi challan nahi mila' : 'Search result nahi mila',
+//             style: TextStyle(
+//                 color: Colors.grey.shade500, fontSize: 16, fontWeight: FontWeight.w500),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   // ── Mobile: card list ──
+//   Widget _buildMobileList(List<FeeChallanModel> challans, FeeChallanProvider provider) {
+//     return ListView.builder(
+//       padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+//       itemCount: challans.length,
+//       itemBuilder: (context, i) {
+//         final c = challans[i];
+//         return _ChallanCard(
+//           challan: c,
+//           onDelete: () => _confirmDelete(c, provider),
+//         );
+//       },
+//     );
+//   }
+//
+//   // ── Desktop: table ──
+//   Widget _buildDesktopTable(List<FeeChallanModel> challans, FeeChallanProvider provider) {
+//     return Padding(
+//       padding: const EdgeInsets.all(16),
+//       child: Container(
+//         decoration: BoxDecoration(
+//           color: Colors.white,
+//           borderRadius: BorderRadius.circular(14),
+//           border: Border.all(color: Colors.grey.shade200),
+//         ),
+//         child: Column(
+//           children: [
+//             Container(
+//               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+//               decoration: BoxDecoration(
+//                 color: _lightPurple,
+//                 borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+//               ),
+//               child: const Row(
+//                 children: [
+//                   Expanded(flex: 2, child: _HeaderCell('Challan #')),
+//                   Expanded(flex: 3, child: _HeaderCell('Family')),
+//                   Expanded(flex: 2, child: _HeaderCell('Month')),
+//                   Expanded(flex: 1, child: _HeaderCell('Students')),
+//                   Expanded(flex: 2, child: _HeaderCell('Grand Total')),
+//                   Expanded(flex: 2, child: _HeaderCell('Status')),
+//                   Expanded(flex: 2, child: _HeaderCell('Due Date')),
+//                   SizedBox(width: 48),
+//                 ],
+//               ),
+//             ),
+//             Expanded(
+//               child: ListView.separated(
+//                 itemCount: challans.length,
+//                 separatorBuilder: (_, __) =>
+//                     Divider(height: 1, color: Colors.grey.shade100),
+//                 itemBuilder: (context, i) {
+//                   final c = challans[i];
+//                   return _ChallanRow(
+//                     challan: c,
+//                     onDelete: () => _confirmDelete(c, provider),
+//                   );
+//                 },
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+//
+//   Future<void> _confirmDelete(FeeChallanModel challan, FeeChallanProvider provider) async {
+//     final confirmed = await showDialog<bool>(
+//       context: context,
+//       builder: (ctx) => AlertDialog(
+//         title: const Text('Challan Delete Karein?'),
+//         content: Text(
+//             '${challan.challanNumber} — ${challan.familyName}\n'
+//                 '${challan.monthLabel} ${challan.year}\n\n'
+//                 'Ye action wapas nahi ho sakta.'),
+//         actions: [
+//           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+//           ElevatedButton(
+//             onPressed: () => Navigator.pop(ctx, true),
+//             style: ElevatedButton.styleFrom(
+//                 backgroundColor: Colors.red.shade600, foregroundColor: Colors.white),
+//             child: const Text('Delete'),
+//           ),
+//         ],
+//       ),
+//     );
+//
+//     if (confirmed != true) return;
+//     if (!mounted) return;
+//
+//     final ok = await provider.deleteChallan(challan);
+//     if (!mounted) return;
+//
+//     ScaffoldMessenger.of(context).showSnackBar(
+//       SnackBar(
+//         content: Text(ok
+//             ? 'Challan delete ho gaya'
+//             : (provider.listError ?? 'Delete nahi ho saka')),
+//         backgroundColor: ok ? Colors.green.shade600 : Colors.red.shade600,
+//       ),
+//     );
+//   }
+// }
+//
+// // ─────────────────────────────────────────────
+// //  Desktop table header cell
+// // ─────────────────────────────────────────────
+// class _HeaderCell extends StatelessWidget {
+//   final String text;
+//   const _HeaderCell(this.text);
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Text(text,
+//         style: TextStyle(
+//             fontSize: 12, fontWeight: FontWeight.w700, color: Colors.grey.shade700));
+//   }
+// }
+//
+// // ─────────────────────────────────────────────
+// //  Desktop table row
+// // ─────────────────────────────────────────────
+// class _ChallanRow extends StatelessWidget {
+//   final FeeChallanModel challan;
+//   final VoidCallback onDelete;
+//
+//   const _ChallanRow({required this.challan, required this.onDelete});
+//
+//   static const _purple = Color(0xFF534AB7);
+//
+//   String _fmtDate(DateTime d) =>
+//       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     final c = challan;
+//     return Padding(
+//       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+//       child: Row(
+//         children: [
+//           Expanded(
+//               flex: 2,
+//               child: Text(c.challanNumber,
+//                   style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+//           Expanded(
+//             flex: 3,
+//             child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 Text(c.familyName,
+//                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+//                 Text(c.fatherName,
+//                     style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+//               ],
+//             ),
+//           ),
+//           Expanded(
+//               flex: 2,
+//               child: Text('${c.monthLabel} ${c.year}', style: const TextStyle(fontSize: 13))),
+//           Expanded(
+//               flex: 1,
+//               child: Text('${c.students.length}', style: const TextStyle(fontSize: 13))),
+//           Expanded(
+//               flex: 2,
+//               child: Text('Rs ${c.grandTotal.toStringAsFixed(0)}',
+//                   style: const TextStyle(
+//                       fontWeight: FontWeight.bold, color: _purple, fontSize: 13))),
+//           Expanded(flex: 2, child: _StatusChip(status: c.status)),
+//           Expanded(
+//               flex: 2,
+//               child: Text(_fmtDate(c.dueDate),
+//                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600))),
+//           SizedBox(
+//             width: 48,
+//             child: IconButton(
+//               icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 20),
+//               onPressed: onDelete,
+//               tooltip: 'Delete',
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+//
+// // ─────────────────────────────────────────────
+// //  Mobile card
+// // ─────────────────────────────────────────────
+// class _ChallanCard extends StatelessWidget {
+//   final FeeChallanModel challan;
+//   final VoidCallback onDelete;
+//
+//   const _ChallanCard({required this.challan, required this.onDelete});
+//
+//   static const _purple = Color(0xFF534AB7);
+//   static const _lightPurple = Color(0xFFEEECFA);
+//
+//   String _fmtDate(DateTime d) =>
+//       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     final c = challan;
+//     return Card(
+//       margin: const EdgeInsets.only(bottom: 10),
+//       elevation: 1,
+//       shadowColor: _purple.withOpacity(0.1),
+//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+//       child: Padding(
+//         padding: const EdgeInsets.all(14),
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             Row(
+//               children: [
+//                 CircleAvatar(
+//                   radius: 20,
+//                   backgroundColor: _lightPurple,
+//                   child: Text(
+//                     c.familyName.isNotEmpty ? c.familyName[0].toUpperCase() : 'F',
+//                     style: const TextStyle(color: _purple, fontWeight: FontWeight.bold),
+//                   ),
+//                 ),
+//                 const SizedBox(width: 12),
+//                 Expanded(
+//                   child: Column(
+//                     crossAxisAlignment: CrossAxisAlignment.start,
+//                     children: [
+//                       Text(c.familyName,
+//                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+//                       const SizedBox(height: 2),
+//                       Text('${c.challanNumber} • ${c.monthLabel} ${c.year}',
+//                           style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+//                     ],
+//                   ),
+//                 ),
+//                 IconButton(
+//                   icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 20),
+//                   onPressed: onDelete,
+//                   tooltip: 'Delete',
+//                 ),
+//               ],
+//             ),
+//             const SizedBox(height: 10),
+//             Row(
+//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//               children: [
+//                 Text('${c.students.length} student${c.students.length != 1 ? 's' : ''}',
+//                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+//                 _StatusChip(status: c.status),
+//               ],
+//             ),
+//             const SizedBox(height: 8),
+//             Row(
+//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//               children: [
+//                 Text('Due: ${_fmtDate(c.dueDate)}',
+//                     style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+//                 Text('Rs ${c.grandTotal.toStringAsFixed(0)}',
+//                     style: const TextStyle(
+//                         fontWeight: FontWeight.bold, color: _purple, fontSize: 15)),
+//               ],
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+//
+// // ─────────────────────────────────────────────
+// //  Status chip — pending / partial / paid
+// // ─────────────────────────────────────────────
+// class _StatusChip extends StatelessWidget {
+//   final String status;
+//   const _StatusChip({required this.status});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     Color bg;
+//     Color fg;
+//     String label;
+//     switch (status) {
+//       case 'paid':
+//         bg = Colors.green.shade50;
+//         fg = Colors.green.shade700;
+//         label = 'Paid';
+//         break;
+//       case 'partial':
+//         bg = Colors.orange.shade50;
+//         fg = Colors.orange.shade700;
+//         label = 'Partial';
+//         break;
+//       default:
+//         bg = Colors.red.shade50;
+//         fg = Colors.red.shade700;
+//         label = 'Pending';
+//     }
+//     return Container(
+//       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+//       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+//       child: Text(label,
+//           style: TextStyle(fontSize: 10, color: fg, fontWeight: FontWeight.w700)),
+//     );
+//   }
+// }
+
+
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../models/fee_challan_model.dart';
+import '../../providers/fee_challan_provider.dart';
+
+// ─────────────────────────────────────────────
+//  Challan List Screen
+//  Shows every generated challan, filterable by month/year and
+//  searchable by family/challan number. Supports delete with
+//  confirmation. Responsive: desktop table, mobile cards.
+// ─────────────────────────────────────────────
+class ChallanListScreen extends StatefulWidget {
+  const ChallanListScreen({super.key});
+
+  @override
+  State<ChallanListScreen> createState() => _ChallanListScreenState();
+}
+
+class _ChallanListScreenState extends State<ChallanListScreen> {
+  static const _purple = Color(0xFF534AB7);
+  static const _lightPurple = Color(0xFFEEECFA);
+
+  int? _filterMonth; // null = All
+  int? _filterYear;  // null = All
+
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<FeeChallanProvider>().loadAllChallans();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _reload() {
+    context
+        .read<FeeChallanProvider>()
+        .loadAllChallans(month: _filterMonth, year: _filterYear);
+  }
+
+  String _fmtDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  List<FeeChallanModel> _applySearch(List<FeeChallanModel> list) {
+    final q = _searchQuery.toLowerCase();
+    if (q.isEmpty) return list;
+    return list.where((c) {
+      return c.familyName.toLowerCase().contains(q) ||
+          c.fatherName.toLowerCase().contains(q) ||
+          c.familyId.toLowerCase().contains(q) ||
+          c.challanNumber.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<FeeChallanProvider>();
+    final challans = _applySearch(provider.allChallans);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5FA),
+      appBar: AppBar(
+        title: const Text('Fee Challans'),
+        centerTitle: true,
+        backgroundColor: _purple,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: provider.isLoadingList ? null : _reload,
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          _buildFilters(),
+          if (provider.listError != null) _buildErrorBanner(provider),
+          Expanded(
+            child: provider.isLoadingList
+                ? const Center(child: CircularProgressIndicator(color: _purple))
+                : challans.isEmpty
+                ? _buildEmpty()
+                : LayoutBuilder(
+              builder: (context, constraints) {
+                final isDesktop = constraints.maxWidth >= 800;
+                return isDesktop
+                    ? _buildDesktopTable(challans, provider)
+                    : _buildMobileList(challans, provider);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Filters: month, year, search ──
+  Widget _buildFilters() {
+    final years = List.generate(6, (i) => DateTime.now().year - 2 + i);
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: _dropdownShell(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int?>(
+                      value: _filterMonth,
+                      isExpanded: true,
+                      hint: const Text('Sab Months',
+                          style: TextStyle(fontSize: 13, color: Colors.black87)),
+                      icon: const Icon(Icons.keyboard_arrow_down, color: _purple),
+                      items: [
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('Sab Months', style: TextStyle(fontSize: 13)),
+                        ),
+                        ...List.generate(12, (i) => i + 1).map(
+                              (m) => DropdownMenuItem<int?>(
+                            value: m,
+                            child: Text(FeeChallanModel.monthNames[m],
+                                style: const TextStyle(fontSize: 13)),
+                          ),
+                        ),
+                      ],
+                      onChanged: (v) {
+                        setState(() => _filterMonth = v);
+                        _reload();
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: _dropdownShell(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int?>(
+                      value: _filterYear,
+                      isExpanded: true,
+                      hint: const Text('Sab Years',
+                          style: TextStyle(fontSize: 13, color: Colors.black87)),
+                      icon: const Icon(Icons.keyboard_arrow_down, color: _purple),
+                      items: [
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('Sab Years', style: TextStyle(fontSize: 13)),
+                        ),
+                        ...years.map(
+                              (y) => DropdownMenuItem<int?>(
+                            value: y,
+                            child: Text('$y', style: const TextStyle(fontSize: 13)),
+                          ),
+                        ),
+                      ],
+                      onChanged: (v) {
+                        setState(() => _filterYear = v);
+                        _reload();
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F5FA),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (v) => setState(() => _searchQuery = v.trim()),
+              decoration: InputDecoration(
+                hintText: 'Family, father ya challan number search karein...',
+                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                prefixIcon: const Icon(Icons.search, color: _purple, size: 20),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dropdownShell({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      height: 46,
+      decoration: BoxDecoration(
+        color: _lightPurple,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      alignment: Alignment.center,
+      child: child,
+    );
+  }
+
+  Widget _buildErrorBanner(FeeChallanProvider p) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: Colors.red.shade600, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(p.listError!,
+                style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmpty() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(
+            _searchQuery.isEmpty ? 'Koi challan nahi mila' : 'Search result nahi mila',
+            style: TextStyle(
+                color: Colors.grey.shade500, fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Mobile: card list ──
+  Widget _buildMobileList(List<FeeChallanModel> challans, FeeChallanProvider provider) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+      itemCount: challans.length,
+      itemBuilder: (context, i) {
+        final c = challans[i];
+        return _ChallanCard(
+          challan: c,
+          onDelete: () => _confirmDelete(c, provider),
+        );
+      },
+    );
+  }
+
+  // ── Desktop: table ──
+  Widget _buildDesktopTable(List<FeeChallanModel> challans, FeeChallanProvider provider) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: _lightPurple,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+              ),
+              child: const Row(
+                children: [
+                  Expanded(flex: 2, child: _HeaderCell('Challan #')),
+                  Expanded(flex: 3, child: _HeaderCell('Family')),
+                  Expanded(flex: 2, child: _HeaderCell('Month')),
+                  Expanded(flex: 1, child: _HeaderCell('Students')),
+                  Expanded(flex: 2, child: _HeaderCell('Grand Total')),
+                  Expanded(flex: 2, child: _HeaderCell('Status')),
+                  Expanded(flex: 2, child: _HeaderCell('Due Date')),
+                  SizedBox(width: 48),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                itemCount: challans.length,
+                separatorBuilder: (_, __) =>
+                    Divider(height: 1, color: Colors.grey.shade100),
+                itemBuilder: (context, i) {
+                  final c = challans[i];
+                  return _ChallanRow(
+                    challan: c,
+                    onDelete: () => _confirmDelete(c, provider),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(FeeChallanModel challan, FeeChallanProvider provider) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Challan Delete Karein?'),
+        content: Text(
+            '${challan.challanNumber} — ${challan.familyName}\n'
+                '${challan.monthLabel} ${challan.year}\n\n'
+                'Ye action wapas nahi ho sakta.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade600, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    final ok = await provider.deleteChallan(challan);
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? 'Challan delete ho gaya'
+            : (provider.listError ?? 'Delete nahi ho saka')),
+        backgroundColor: ok ? Colors.green.shade600 : Colors.red.shade600,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Desktop table header cell
+// ─────────────────────────────────────────────
+class _HeaderCell extends StatelessWidget {
+  final String text;
+  const _HeaderCell(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(text,
+        style: TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w700, color: Colors.grey.shade700));
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Desktop table row — expandable to show full per-student
+//  breakdown, totals, and dates.
+// ─────────────────────────────────────────────
+class _ChallanRow extends StatefulWidget {
+  final FeeChallanModel challan;
+  final VoidCallback onDelete;
+
+  const _ChallanRow({required this.challan, required this.onDelete});
+
+  @override
+  State<_ChallanRow> createState() => _ChallanRowState();
+}
+
+class _ChallanRowState extends State<_ChallanRow> {
+  bool _expanded = false;
+  static const _purple = Color(0xFF534AB7);
+
+  String _fmtDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.challan;
+    return Container(
+      color: _expanded ? const Color(0xFFFAFAFF) : Colors.transparent,
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(_expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      color: Colors.grey.shade400, size: 20),
+                  const SizedBox(width: 6),
+                  Expanded(
+                      flex: 2,
+                      child: Text(c.challanNumber,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(c.familyName,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        Text(c.fatherName,
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                      flex: 2,
+                      child:
+                      Text('${c.monthLabel} ${c.year}', style: const TextStyle(fontSize: 13))),
+                  Expanded(
+                      flex: 1,
+                      child: Text('${c.students.length}', style: const TextStyle(fontSize: 13))),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Rs ${c.grandTotal.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, color: _purple, fontSize: 13))),
+                  Expanded(flex: 2, child: _StatusChip(status: c.status)),
+                  Expanded(
+                      flex: 2,
+                      child: Text(_fmtDate(c.dueDate),
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600))),
+                  SizedBox(
+                    width: 48,
+                    child: IconButton(
+                      icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 20),
+                      onPressed: widget.onDelete,
+                      tooltip: 'Delete',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(46, 0, 16, 16),
+              child: _ChallanDetailPanel(challan: c),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Mobile card — tap to expand full details
+// ─────────────────────────────────────────────
+class _ChallanCard extends StatefulWidget {
+  final FeeChallanModel challan;
+  final VoidCallback onDelete;
+
+  const _ChallanCard({required this.challan, required this.onDelete});
+
+  @override
+  State<_ChallanCard> createState() => _ChallanCardState();
+}
+
+class _ChallanCardState extends State<_ChallanCard> {
+  bool _expanded = false;
+  static const _purple = Color(0xFF534AB7);
+  static const _lightPurple = Color(0xFFEEECFA);
+
+  String _fmtDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.challan;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 1,
+      shadowColor: _purple.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => setState(() => _expanded = !_expanded),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: _lightPurple,
+                    child: Text(
+                      c.familyName.isNotEmpty ? c.familyName[0].toUpperCase() : 'F',
+                      style: const TextStyle(color: _purple, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(c.familyName,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        const SizedBox(height: 2),
+                        Text('${c.challanNumber} • ${c.monthLabel} ${c.year}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 20),
+                    onPressed: widget.onDelete,
+                    tooltip: 'Delete',
+                  ),
+                  Icon(_expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      color: Colors.grey.shade400, size: 20),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('${c.students.length} student${c.students.length != 1 ? 's' : ''}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  _StatusChip(status: c.status),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Due: ${_fmtDate(c.dueDate)}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                  Text('Rs ${c.grandTotal.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, color: _purple, fontSize: 15)),
+                ],
+              ),
+              if (_expanded) ...[
+                const SizedBox(height: 10),
+                const Divider(height: 1),
+                const SizedBox(height: 10),
+                _ChallanDetailPanel(challan: c),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Shared expanded-detail panel (used by both mobile card and
+//  desktop row). Shows per-student breakdown with Admission/
+//  Annual/Monthly split, plus current month / previous balance /
+//  grand total / generated & due dates.
+// ─────────────────────────────────────────────
+class _ChallanDetailPanel extends StatelessWidget {
+  final FeeChallanModel challan;
+  const _ChallanDetailPanel({required this.challan});
+
+  static const _purple = Color(0xFF534AB7);
+
+  String _fmtDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  @override
+  Widget build(BuildContext context) {
+    final c = challan;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Family ID: ${c.familyId}',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+        if (c.fatherPhone.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text('Phone: ${c.fatherPhone}',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+        ],
+        const SizedBox(height: 10),
+        Text('Students',
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey.shade600)),
+        const SizedBox(height: 6),
+        ...c.students.map((s) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(s.name,
+                              style: const TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        if (s.className != null && s.className!.isNotEmpty) ...[
+                          const SizedBox(width: 5),
+                          Text('(${s.className}${s.sectionName != null && s.sectionName!.isNotEmpty ? ' - ${s.sectionName}' : ''})',
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                        ],
+                        if (s.isFirstChallan) ...[
+                          const SizedBox(width: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text('1st Challan',
+                                style: TextStyle(
+                                    fontSize: 9,
+                                    color: Colors.orange.shade700,
+                                    fontWeight: FontWeight.w600)),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Text('Rs ${s.lineTotal.toStringAsFixed(0)}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 4, top: 2),
+                child: Text(
+                  s.isFirstChallan
+                      ? 'Admission: Rs ${s.registrationFee.toStringAsFixed(0)}  •  '
+                      'Annual: Rs ${s.annualFee.toStringAsFixed(0)}  •  '
+                      'Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}'
+                      : 'Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}',
+                  style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                ),
+              ),
+            ],
+          ),
+        )),
+        const SizedBox(height: 4),
+        const Divider(height: 12),
+        _totalRow('Current Month', c.currentMonthTotal),
+        if (c.previousBalance > 0) _totalRow('Previous Balance', c.previousBalance),
+        if (c.previousBalance < 0) _totalRow('Advance Carried Forward', c.previousBalance),
+        _totalRow('Grand Total', c.grandTotal, bold: true),
+        _totalRow('Amount Paid', c.amountPaid),
+        _totalRow('Remaining Balance', c.remainingBalance, bold: true),
+        const SizedBox(height: 6),
+        Text('Generated: ${_fmtDate(c.generatedDate)}   •   Due: ${_fmtDate(c.dueDate)}',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+      ],
+    );
+  }
+
+  Widget _totalRow(String label, double value, {bool bold = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: bold ? Colors.black87 : Colors.grey.shade600,
+                  fontWeight: bold ? FontWeight.w700 : FontWeight.normal)),
+          Text('Rs ${value.toStringAsFixed(0)}',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: bold ? _purple : Colors.black87,
+                  fontWeight: bold ? FontWeight.w700 : FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Status chip — pending / partial / paid
+// ─────────────────────────────────────────────
+class _StatusChip extends StatelessWidget {
+  final String status;
+  const _StatusChip({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    Color bg;
+    Color fg;
+    String label;
+    switch (status) {
+      case 'paid':
+        bg = Colors.green.shade50;
+        fg = Colors.green.shade700;
+        label = 'Paid';
+        break;
+      case 'partial':
+        bg = Colors.orange.shade50;
+        fg = Colors.orange.shade700;
+        label = 'Partial';
+        break;
+      default:
+        bg = Colors.red.shade50;
+        fg = Colors.red.shade700;
+        label = 'Pending';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+      child: Text(label,
+          style: TextStyle(fontSize: 10, color: fg, fontWeight: FontWeight.w700)),
+    );
+  }
+}
