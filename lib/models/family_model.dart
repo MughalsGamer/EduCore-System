@@ -120,3 +120,4 @@ class FamilyModel {
   int get regularCount =>
       students.where((s) => s.type == AdmissionType.regular).length;
 }
+

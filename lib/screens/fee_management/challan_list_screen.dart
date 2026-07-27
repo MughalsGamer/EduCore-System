@@ -3,13 +3,17 @@
 // import 'package:provider/provider.dart';
 //
 // import '../../models/fee_challan_model.dart';
+// import '../../pdf_files/fee_challan_pdf_service.dart';
 // import '../../providers/fee_challan_provider.dart';
+// import '../../providers/school_setting_prodvider.dart';
 //
 // // ─────────────────────────────────────────────
 // //  Challan List Screen
 // //  Shows every generated challan, filterable by month/year and
 // //  searchable by family/challan number. Supports delete with
-// //  confirmation. Responsive: desktop table, mobile cards.
+// //  confirmation, per-challan print/save, and bulk select-mode
+// //  print/save (2-per-page merged PDF). Responsive: desktop table,
+// //  mobile cards. Defaults to the current month/year on open.
 // // ─────────────────────────────────────────────
 // class ChallanListScreen extends StatefulWidget {
 //   const ChallanListScreen({super.key});
@@ -22,18 +26,35 @@
 //   static const _purple = Color(0xFF534AB7);
 //   static const _lightPurple = Color(0xFFEEECFA);
 //
-//   int? _filterMonth; // null = All
-//   int? _filterYear;  // null = All
+//   // Default to the CURRENT month/year, not "All" — matches the
+//   // Salary list screen's behavior and is what's needed 95% of the
+//   // time (checking this month's challans).
+//   int? _filterMonth = DateTime.now().month;
+//   int? _filterYear = DateTime.now().year;
 //
 //   final _searchCtrl = TextEditingController();
 //   String _searchQuery = '';
+//
+//   // ─── Bulk selection (mirrors SalaryListScreen) ───
+//   bool _selectMode = false;
+//   final Set<String> _selectedIds = {};
+//
+//   bool _bulkBusy = false;
 //
 //   @override
 //   void initState() {
 //     super.initState();
 //     WidgetsBinding.instance.addPostFrameCallback((_) {
 //       if (!mounted) return;
-//       context.read<FeeChallanProvider>().loadAllChallans();
+//       context
+//           .read<FeeChallanProvider>()
+//           .loadAllChallans(month: _filterMonth, year: _filterYear);
+//       // School settings are needed for the PDF header — load once,
+//       // cheap read, cached by the provider for the rest of the session.
+//       final settingsProvider = context.read<SchoolSettingsProvider>();
+//       if (settingsProvider.settings.schoolName.isEmpty && !settingsProvider.loading) {
+//         settingsProvider.loadSettings();
+//       }
 //     });
 //   }
 //
@@ -63,6 +84,107 @@
 //     }).toList();
 //   }
 //
+//   // ─── Selection helpers ───
+//   void _toggleSelectMode() {
+//     setState(() {
+//       if (_selectMode) {
+//         _selectMode = false;
+//         _selectedIds.clear();
+//       } else {
+//         _selectMode = true;
+//       }
+//     });
+//   }
+//
+//   void _selectAll(List<FeeChallanModel> challans) {
+//     setState(() {
+//       final allIds = challans.map((c) => c.id!).toSet();
+//       if (_selectedIds.length == allIds.length) {
+//         _selectedIds.clear();
+//       } else {
+//         _selectedIds
+//           ..clear()
+//           ..addAll(allIds);
+//       }
+//     });
+//   }
+//
+//   void _toggleItem(String id) {
+//     setState(() {
+//       if (_selectedIds.contains(id)) {
+//         _selectedIds.remove(id);
+//         if (_selectedIds.isEmpty) _selectMode = false;
+//       } else {
+//         _selectedIds.add(id);
+//       }
+//     });
+//   }
+//
+//   // ─── PDF: single challan ───
+//   Future<void> _printSingle(FeeChallanModel challan) async {
+//     final settings = context.read<SchoolSettingsProvider>().settings;
+//     try {
+//       await FeeChallanPdfService.printChallan(challan, settings);
+//     } catch (e) {
+//       _showSnack('Print failed: $e', isError: true);
+//     }
+//   }
+//
+//   Future<void> _saveSingle(FeeChallanModel challan) async {
+//     final settings = context.read<SchoolSettingsProvider>().settings;
+//     try {
+//       await FeeChallanPdfService.downloadAndOpen(challan, settings);
+//       _showSnack('Challan saved');
+//     } catch (e) {
+//       _showSnack('Save failed: $e', isError: true);
+//     }
+//   }
+//
+//   // ─── PDF: bulk (select-mode) ───
+//   Future<void> _bulkPrint(List<FeeChallanModel> allChallans) async {
+//     if (_selectedIds.isEmpty || _bulkBusy) return;
+//     final selected = allChallans.where((c) => _selectedIds.contains(c.id)).toList();
+//     if (selected.isEmpty) return;
+//
+//     setState(() => _bulkBusy = true);
+//     final settings = context.read<SchoolSettingsProvider>().settings;
+//     try {
+//       await FeeChallanPdfService.bulkPrint(selected, settings);
+//     } catch (e) {
+//       _showSnack('Print failed: $e', isError: true);
+//     } finally {
+//       if (mounted) setState(() => _bulkBusy = false);
+//     }
+//   }
+//
+//   Future<void> _bulkSave(List<FeeChallanModel> allChallans) async {
+//     if (_selectedIds.isEmpty || _bulkBusy) return;
+//     final selected = allChallans.where((c) => _selectedIds.contains(c.id)).toList();
+//     if (selected.isEmpty) return;
+//
+//     setState(() => _bulkBusy = true);
+//     final settings = context.read<SchoolSettingsProvider>().settings;
+//     try {
+//       await FeeChallanPdfService.bulkDownload(selected, settings);
+//       _showSnack('${selected.length} challans saved');
+//     } catch (e) {
+//       _showSnack('Save failed: $e', isError: true);
+//     } finally {
+//       if (mounted) setState(() => _bulkBusy = false);
+//     }
+//   }
+//
+//   void _showSnack(String msg, {bool isError = false}) {
+//     if (!mounted) return;
+//     ScaffoldMessenger.of(context).showSnackBar(
+//       SnackBar(
+//         content: Text(msg),
+//         backgroundColor: isError ? Colors.red.shade600 : Colors.green.shade600,
+//         behavior: SnackBarBehavior.floating,
+//       ),
+//     );
+//   }
+//
 //   @override
 //   Widget build(BuildContext context) {
 //     final provider = context.watch<FeeChallanProvider>();
@@ -71,16 +193,36 @@
 //     return Scaffold(
 //       backgroundColor: const Color(0xFFF5F5FA),
 //       appBar: AppBar(
-//         title: const Text('Fee Challans'),
+//         title: _selectMode
+//             ? Text('${_selectedIds.length} selected')
+//             : const Text('Fee Challans'),
 //         centerTitle: true,
 //         backgroundColor: _purple,
 //         foregroundColor: Colors.white,
 //         elevation: 0,
 //         actions: [
-//           IconButton(
-//             icon: const Icon(Icons.refresh),
-//             onPressed: provider.isLoadingList ? null : _reload,
-//           ),
+//           if (_selectMode) ...[
+//             IconButton(
+//               icon: const Icon(Icons.select_all),
+//               tooltip: 'Select All',
+//               onPressed: () => _selectAll(challans),
+//             ),
+//             IconButton(
+//               icon: const Icon(Icons.close),
+//               tooltip: 'Cancel',
+//               onPressed: _toggleSelectMode,
+//             ),
+//           ] else ...[
+//             IconButton(
+//               icon: const Icon(Icons.checklist_outlined),
+//               tooltip: 'Select',
+//               onPressed: challans.isEmpty ? null : _toggleSelectMode,
+//             ),
+//             IconButton(
+//               icon: const Icon(Icons.refresh),
+//               onPressed: provider.isLoadingList ? null : _reload,
+//             ),
+//           ],
 //         ],
 //       ),
 //       body: Column(
@@ -101,14 +243,87 @@
 //               },
 //             ),
 //           ),
+//           if (_selectedIds.isNotEmpty && _selectMode) _buildBulkActionBar(challans),
 //         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _buildBulkActionBar(List<FeeChallanModel> challans) {
+//     return Container(
+//       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         border: Border(top: BorderSide(color: Colors.grey.shade200)),
+//         boxShadow: [
+//           BoxShadow(
+//               color: Colors.black.withOpacity(0.05),
+//               blurRadius: 10,
+//               offset: const Offset(0, -2)),
+//         ],
+//       ),
+//       child: SafeArea(
+//         top: false,
+//         child: Row(
+//           children: [
+//             const Icon(Icons.checklist, color: _purple, size: 20),
+//             const SizedBox(width: 8),
+//             Text('${_selectedIds.length} selected',
+//                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+//             const Spacer(),
+//             OutlinedButton.icon(
+//               onPressed: _bulkBusy ? null : () => _bulkPrint(challans),
+//               icon: _bulkBusy
+//                   ? const SizedBox(
+//                   width: 14,
+//                   height: 14,
+//                   child: CircularProgressIndicator(strokeWidth: 2))
+//                   : Icon(Icons.print_outlined, size: 16, color: Colors.grey.shade700),
+//               label: Text('Print',
+//                   style: TextStyle(
+//                       color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w600)),
+//               style: OutlinedButton.styleFrom(
+//                 side: BorderSide(color: Colors.grey.shade300),
+//                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+//                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+//               ),
+//             ),
+//             const SizedBox(width: 10),
+//             ElevatedButton.icon(
+//               onPressed: _bulkBusy ? null : () => _bulkSave(challans),
+//               icon: _bulkBusy
+//                   ? const SizedBox(
+//                   width: 14,
+//                   height: 14,
+//                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+//                   : const Icon(Icons.download_rounded, size: 16, color: Colors.white),
+//               label: const Text('Save',
+//                   style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+//               style: ElevatedButton.styleFrom(
+//                 backgroundColor: _purple,
+//                 elevation: 0,
+//                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+//                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+//               ),
+//             ),
+//           ],
+//         ),
 //       ),
 //     );
 //   }
 //
 //   // ── Filters: month, year, search ──
 //   Widget _buildFilters() {
-//     final years = List.generate(6, (i) => DateTime.now().year - 2 + i);
+//     // Year list is anchored to the CURRENT year every time this widget
+//     // builds, so a challan generated in 2030, 2031 etc. is always
+//     // selectable here without ever touching this code again.
+//     final currentYear = DateTime.now().year;
+//     final years = {
+//       currentYear - 2, currentYear - 1, currentYear, currentYear + 1,
+//       currentYear + 2, currentYear + 3, if (_filterYear != null) _filterYear!,
+//     }.toList()
+//       ..sort();
+//
 //     return Container(
 //       color: Colors.white,
 //       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -124,13 +339,13 @@
 //                     child: DropdownButton<int?>(
 //                       value: _filterMonth,
 //                       isExpanded: true,
-//                       hint: const Text('Sab Months',
+//                       hint: const Text('All Months',
 //                           style: TextStyle(fontSize: 13, color: Colors.black87)),
 //                       icon: const Icon(Icons.keyboard_arrow_down, color: _purple),
 //                       items: [
 //                         const DropdownMenuItem<int?>(
 //                           value: null,
-//                           child: Text('Sab Months', style: TextStyle(fontSize: 13)),
+//                           child: Text('All Months', style: TextStyle(fontSize: 13)),
 //                         ),
 //                         ...List.generate(12, (i) => i + 1).map(
 //                               (m) => DropdownMenuItem<int?>(
@@ -156,13 +371,13 @@
 //                     child: DropdownButton<int?>(
 //                       value: _filterYear,
 //                       isExpanded: true,
-//                       hint: const Text('Sab Years',
+//                       hint: const Text('All Years',
 //                           style: TextStyle(fontSize: 13, color: Colors.black87)),
 //                       icon: const Icon(Icons.keyboard_arrow_down, color: _purple),
 //                       items: [
 //                         const DropdownMenuItem<int?>(
 //                           value: null,
-//                           child: Text('Sab Years', style: TextStyle(fontSize: 13)),
+//                           child: Text('All Years', style: TextStyle(fontSize: 13)),
 //                         ),
 //                         ...years.map(
 //                               (y) => DropdownMenuItem<int?>(
@@ -192,7 +407,7 @@
 //               controller: _searchCtrl,
 //               onChanged: (v) => setState(() => _searchQuery = v.trim()),
 //               decoration: InputDecoration(
-//                 hintText: 'Family, father ya challan number search karein...',
+//                 hintText: 'Search by family, father or challan number...',
 //                 hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
 //                 prefixIcon: const Icon(Icons.search, color: _purple, size: 20),
 //                 border: InputBorder.none,
@@ -248,7 +463,7 @@
 //           Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade300),
 //           const SizedBox(height: 16),
 //           Text(
-//             _searchQuery.isEmpty ? 'Koi challan nahi mila' : 'Search result nahi mila',
+//             _searchQuery.isEmpty ? 'No challans found' : 'No search results found',
 //             style: TextStyle(
 //                 color: Colors.grey.shade500, fontSize: 16, fontWeight: FontWeight.w500),
 //           ),
@@ -264,9 +479,15 @@
 //       itemCount: challans.length,
 //       itemBuilder: (context, i) {
 //         final c = challans[i];
+//         final isSelected = _selectedIds.contains(c.id);
 //         return _ChallanCard(
 //           challan: c,
+//           selectMode: _selectMode,
+//           selected: isSelected,
+//           onTap: _selectMode ? () => _toggleItem(c.id!) : null,
 //           onDelete: () => _confirmDelete(c, provider),
+//           onPrint: () => _printSingle(c),
+//           onSave: () => _saveSingle(c),
 //         );
 //       },
 //     );
@@ -290,16 +511,17 @@
 //                 color: _lightPurple,
 //                 borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
 //               ),
-//               child: const Row(
+//               child: Row(
 //                 children: [
-//                   Expanded(flex: 2, child: _HeaderCell('Challan #')),
-//                   Expanded(flex: 3, child: _HeaderCell('Family')),
-//                   Expanded(flex: 2, child: _HeaderCell('Month')),
-//                   Expanded(flex: 1, child: _HeaderCell('Students')),
-//                   Expanded(flex: 2, child: _HeaderCell('Grand Total')),
-//                   Expanded(flex: 2, child: _HeaderCell('Status')),
-//                   Expanded(flex: 2, child: _HeaderCell('Due Date')),
-//                   SizedBox(width: 48),
+//                   if (_selectMode) const SizedBox(width: 40),
+//                   const Expanded(flex: 2, child: _HeaderCell('Challan #')),
+//                   const Expanded(flex: 3, child: _HeaderCell('Family')),
+//                   const Expanded(flex: 2, child: _HeaderCell('Month')),
+//                   const Expanded(flex: 1, child: _HeaderCell('Students')),
+//                   const Expanded(flex: 2, child: _HeaderCell('Grand Total')),
+//                   const Expanded(flex: 2, child: _HeaderCell('Status')),
+//                   const Expanded(flex: 2, child: _HeaderCell('Due Date')),
+//                   const SizedBox(width: 96),
 //                 ],
 //               ),
 //             ),
@@ -312,7 +534,12 @@
 //                   final c = challans[i];
 //                   return _ChallanRow(
 //                     challan: c,
+//                     selectMode: _selectMode,
+//                     selected: _selectedIds.contains(c.id),
+//                     onToggleSelect: () => _toggleItem(c.id!),
 //                     onDelete: () => _confirmDelete(c, provider),
+//                     onPrint: () => _printSingle(c),
+//                     onSave: () => _saveSingle(c),
 //                   );
 //                 },
 //               ),
@@ -327,11 +554,11 @@
 //     final confirmed = await showDialog<bool>(
 //       context: context,
 //       builder: (ctx) => AlertDialog(
-//         title: const Text('Challan Delete Karein?'),
+//         title: const Text('Delete this challan?'),
 //         content: Text(
 //             '${challan.challanNumber} — ${challan.familyName}\n'
 //                 '${challan.monthLabel} ${challan.year}\n\n'
-//                 'Ye action wapas nahi ho sakta.'),
+//                 'This action cannot be undone.'),
 //         actions: [
 //           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
 //           ElevatedButton(
@@ -350,13 +577,9 @@
 //     final ok = await provider.deleteChallan(challan);
 //     if (!mounted) return;
 //
-//     ScaffoldMessenger.of(context).showSnackBar(
-//       SnackBar(
-//         content: Text(ok
-//             ? 'Challan delete ho gaya'
-//             : (provider.listError ?? 'Delete nahi ho saka')),
-//         backgroundColor: ok ? Colors.green.shade600 : Colors.red.shade600,
-//       ),
+//     _showSnack(
+//       ok ? 'Challan deleted' : (provider.listError ?? 'Delete failed'),
+//       isError: !ok,
 //     );
 //   }
 // }
@@ -378,13 +601,26 @@
 //
 // // ─────────────────────────────────────────────
 // //  Desktop table row — expandable to show full per-student
-// //  breakdown, totals, and dates.
+// //  breakdown, totals, and dates. Includes per-row Print/Save.
 // // ─────────────────────────────────────────────
 // class _ChallanRow extends StatefulWidget {
 //   final FeeChallanModel challan;
+//   final bool selectMode;
+//   final bool selected;
+//   final VoidCallback onToggleSelect;
 //   final VoidCallback onDelete;
+//   final VoidCallback onPrint;
+//   final VoidCallback onSave;
 //
-//   const _ChallanRow({required this.challan, required this.onDelete});
+//   const _ChallanRow({
+//     required this.challan,
+//     required this.selectMode,
+//     required this.selected,
+//     required this.onToggleSelect,
+//     required this.onDelete,
+//     required this.onPrint,
+//     required this.onSave,
+//   });
 //
 //   @override
 //   State<_ChallanRow> createState() => _ChallanRowState();
@@ -405,14 +641,29 @@
 //       child: Column(
 //         children: [
 //           InkWell(
-//             onTap: () => setState(() => _expanded = !_expanded),
+//             onTap: widget.selectMode
+//                 ? widget.onToggleSelect
+//                 : () => setState(() => _expanded = !_expanded),
 //             child: Padding(
 //               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
 //               child: Row(
 //                 children: [
-//                   Icon(_expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-//                       color: Colors.grey.shade400, size: 20),
-//                   const SizedBox(width: 6),
+//                   if (widget.selectMode)
+//                     SizedBox(
+//                       width: 40,
+//                       child: Checkbox(
+//                         value: widget.selected,
+//                         onChanged: (_) => widget.onToggleSelect(),
+//                         activeColor: _purple,
+//                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+//                         visualDensity: VisualDensity.compact,
+//                       ),
+//                     )
+//                   else ...[
+//                     Icon(_expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+//                         color: Colors.grey.shade400, size: 20),
+//                     const SizedBox(width: 6),
+//                   ],
 //                   Expanded(
 //                       flex: 2,
 //                       child: Text(c.challanNumber,
@@ -447,18 +698,38 @@
 //                       child: Text(_fmtDate(c.dueDate),
 //                           style: TextStyle(fontSize: 12, color: Colors.grey.shade600))),
 //                   SizedBox(
-//                     width: 48,
-//                     child: IconButton(
-//                       icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 20),
-//                       onPressed: widget.onDelete,
-//                       tooltip: 'Delete',
+//                     width: 96,
+//                     child: widget.selectMode
+//                         ? const SizedBox.shrink()
+//                         : Row(
+//                       mainAxisSize: MainAxisSize.min,
+//                       children: [
+//                         IconButton(
+//                           icon: Icon(Icons.print_outlined, color: Colors.grey.shade600, size: 18),
+//                           onPressed: widget.onPrint,
+//                           tooltip: 'Print',
+//                           visualDensity: VisualDensity.compact,
+//                         ),
+//                         IconButton(
+//                           icon: const Icon(Icons.download_rounded, color: _purple, size: 18),
+//                           onPressed: widget.onSave,
+//                           tooltip: 'Save',
+//                           visualDensity: VisualDensity.compact,
+//                         ),
+//                         IconButton(
+//                           icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 18),
+//                           onPressed: widget.onDelete,
+//                           tooltip: 'Delete',
+//                           visualDensity: VisualDensity.compact,
+//                         ),
+//                       ],
 //                     ),
 //                   ),
 //                 ],
 //               ),
 //             ),
 //           ),
-//           if (_expanded)
+//           if (_expanded && !widget.selectMode)
 //             Padding(
 //               padding: const EdgeInsets.fromLTRB(46, 0, 16, 16),
 //               child: _ChallanDetailPanel(challan: c),
@@ -470,13 +741,27 @@
 // }
 //
 // // ─────────────────────────────────────────────
-// //  Mobile card — tap to expand full details
+// //  Mobile card — tap to expand full details. Includes per-card
+// //  Print/Save actions and select-mode checkbox.
 // // ─────────────────────────────────────────────
 // class _ChallanCard extends StatefulWidget {
 //   final FeeChallanModel challan;
+//   final bool selectMode;
+//   final bool selected;
+//   final VoidCallback? onTap;
 //   final VoidCallback onDelete;
+//   final VoidCallback onPrint;
+//   final VoidCallback onSave;
 //
-//   const _ChallanCard({required this.challan, required this.onDelete});
+//   const _ChallanCard({
+//     required this.challan,
+//     required this.selectMode,
+//     required this.selected,
+//     required this.onTap,
+//     required this.onDelete,
+//     required this.onPrint,
+//     required this.onSave,
+//   });
 //
 //   @override
 //   State<_ChallanCard> createState() => _ChallanCardState();
@@ -495,12 +780,16 @@
 //     final c = widget.challan;
 //     return Card(
 //       margin: const EdgeInsets.only(bottom: 10),
-//       elevation: 1,
+//       elevation: widget.selected ? 3 : 1,
 //       shadowColor: _purple.withOpacity(0.1),
-//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+//       shape: RoundedRectangleBorder(
+//         borderRadius: BorderRadius.circular(14),
+//         side: BorderSide(
+//             color: widget.selected ? _purple : Colors.transparent, width: 1.5),
+//       ),
 //       child: InkWell(
 //         borderRadius: BorderRadius.circular(14),
-//         onTap: () => setState(() => _expanded = !_expanded),
+//         onTap: widget.selectMode ? widget.onTap : () => setState(() => _expanded = !_expanded),
 //         child: Padding(
 //           padding: const EdgeInsets.all(14),
 //           child: Column(
@@ -508,6 +797,14 @@
 //             children: [
 //               Row(
 //                 children: [
+//                   if (widget.selectMode) ...[
+//                     Icon(
+//                       widget.selected ? Icons.check_circle : Icons.circle_outlined,
+//                       color: widget.selected ? _purple : Colors.grey.shade300,
+//                       size: 22,
+//                     ),
+//                     const SizedBox(width: 10),
+//                   ],
 //                   CircleAvatar(
 //                     radius: 20,
 //                     backgroundColor: _lightPurple,
@@ -529,13 +826,28 @@
 //                       ],
 //                     ),
 //                   ),
-//                   IconButton(
-//                     icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 20),
-//                     onPressed: widget.onDelete,
-//                     tooltip: 'Delete',
-//                   ),
-//                   Icon(_expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-//                       color: Colors.grey.shade400, size: 20),
+//                   if (!widget.selectMode) ...[
+//                     IconButton(
+//                       icon: Icon(Icons.print_outlined, color: Colors.grey.shade600, size: 20),
+//                       onPressed: widget.onPrint,
+//                       tooltip: 'Print',
+//                       visualDensity: VisualDensity.compact,
+//                     ),
+//                     IconButton(
+//                       icon: const Icon(Icons.download_rounded, color: _purple, size: 20),
+//                       onPressed: widget.onSave,
+//                       tooltip: 'Save',
+//                       visualDensity: VisualDensity.compact,
+//                     ),
+//                     IconButton(
+//                       icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 20),
+//                       onPressed: widget.onDelete,
+//                       tooltip: 'Delete',
+//                       visualDensity: VisualDensity.compact,
+//                     ),
+//                     Icon(_expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+//                         color: Colors.grey.shade400, size: 20),
+//                   ],
 //                 ],
 //               ),
 //               const SizedBox(height: 10),
@@ -558,7 +870,7 @@
 //                           fontWeight: FontWeight.bold, color: _purple, fontSize: 15)),
 //                 ],
 //               ),
-//               if (_expanded) ...[
+//               if (_expanded && !widget.selectMode) ...[
 //                 const SizedBox(height: 10),
 //                 const Divider(height: 1),
 //                 const SizedBox(height: 10),
@@ -737,7 +1049,7 @@
 //   }
 // }
 
-
+//running code
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -746,14 +1058,6 @@ import '../../pdf_files/fee_challan_pdf_service.dart';
 import '../../providers/fee_challan_provider.dart';
 import '../../providers/school_setting_prodvider.dart';
 
-// ─────────────────────────────────────────────
-//  Challan List Screen
-//  Shows every generated challan, filterable by month/year and
-//  searchable by family/challan number. Supports delete with
-//  confirmation, per-challan print/save, and bulk select-mode
-//  print/save (2-per-page merged PDF). Responsive: desktop table,
-//  mobile cards. Defaults to the current month/year on open.
-// ─────────────────────────────────────────────
 class ChallanListScreen extends StatefulWidget {
   const ChallanListScreen({super.key});
 
@@ -765,19 +1069,14 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
   static const _purple = Color(0xFF534AB7);
   static const _lightPurple = Color(0xFFEEECFA);
 
-  // Default to the CURRENT month/year, not "All" — matches the
-  // Salary list screen's behavior and is what's needed 95% of the
-  // time (checking this month's challans).
   int? _filterMonth = DateTime.now().month;
   int? _filterYear = DateTime.now().year;
 
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
 
-  // ─── Bulk selection (mirrors SalaryListScreen) ───
   bool _selectMode = false;
   final Set<String> _selectedIds = {};
-
   bool _bulkBusy = false;
 
   @override
@@ -788,8 +1087,6 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
       context
           .read<FeeChallanProvider>()
           .loadAllChallans(month: _filterMonth, year: _filterYear);
-      // School settings are needed for the PDF header — load once,
-      // cheap read, cached by the provider for the rest of the session.
       final settingsProvider = context.read<SchoolSettingsProvider>();
       if (settingsProvider.settings.schoolName.isEmpty && !settingsProvider.loading) {
         settingsProvider.loadSettings();
@@ -823,7 +1120,6 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
     }).toList();
   }
 
-  // ─── Selection helpers ───
   void _toggleSelectMode() {
     setState(() {
       if (_selectMode) {
@@ -859,7 +1155,7 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
     });
   }
 
-  // ─── PDF: single challan ───
+  // ─── Single challan PDF actions ───
   Future<void> _printSingle(FeeChallanModel challan) async {
     final settings = context.read<SchoolSettingsProvider>().settings;
     try {
@@ -879,7 +1175,7 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
     }
   }
 
-  // ─── PDF: bulk (select-mode) ───
+  // ─── Bulk PDF actions ───
   Future<void> _bulkPrint(List<FeeChallanModel> allChallans) async {
     if (_selectedIds.isEmpty || _bulkBusy) return;
     final selected = allChallans.where((c) => _selectedIds.contains(c.id)).toList();
@@ -924,6 +1220,7 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
     );
   }
 
+  // ─── Build methods ───
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<FeeChallanProvider>();
@@ -1051,11 +1348,7 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
     );
   }
 
-  // ── Filters: month, year, search ──
   Widget _buildFilters() {
-    // Year list is anchored to the CURRENT year every time this widget
-    // builds, so a challan generated in 2030, 2031 etc. is always
-    // selectable here without ever touching this code again.
     final currentYear = DateTime.now().year;
     final years = {
       currentYear - 2, currentYear - 1, currentYear, currentYear + 1,
@@ -1211,7 +1504,6 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
     );
   }
 
-  // ── Mobile: card list ──
   Widget _buildMobileList(List<FeeChallanModel> challans, FeeChallanProvider provider) {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
@@ -1232,7 +1524,6 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
     );
   }
 
-  // ── Desktop: table ──
   Widget _buildDesktopTable(List<FeeChallanModel> challans, FeeChallanProvider provider) {
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -1323,9 +1614,7 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
   }
 }
 
-// ─────────────────────────────────────────────
-//  Desktop table header cell
-// ─────────────────────────────────────────────
+// ─── Desktop table header cell ───
 class _HeaderCell extends StatelessWidget {
   final String text;
   const _HeaderCell(this.text);
@@ -1338,10 +1627,7 @@ class _HeaderCell extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-//  Desktop table row — expandable to show full per-student
-//  breakdown, totals, and dates. Includes per-row Print/Save.
-// ─────────────────────────────────────────────
+// ─── Desktop table row ───
 class _ChallanRow extends StatefulWidget {
   final FeeChallanModel challan;
   final bool selectMode;
@@ -1479,10 +1765,7 @@ class _ChallanRowState extends State<_ChallanRow> {
   }
 }
 
-// ─────────────────────────────────────────────
-//  Mobile card — tap to expand full details. Includes per-card
-//  Print/Save actions and select-mode checkbox.
-// ─────────────────────────────────────────────
+// ─── Mobile card ───
 class _ChallanCard extends StatefulWidget {
   final FeeChallanModel challan;
   final bool selectMode;
@@ -1623,12 +1906,7 @@ class _ChallanCardState extends State<_ChallanCard> {
   }
 }
 
-// ─────────────────────────────────────────────
-//  Shared expanded-detail panel (used by both mobile card and
-//  desktop row). Shows per-student breakdown with Admission/
-//  Annual/Monthly split, plus current month / previous balance /
-//  grand total / generated & due dates.
-// ─────────────────────────────────────────────
+// ─── Shared expanded detail panel ───
 class _ChallanDetailPanel extends StatelessWidget {
   final FeeChallanModel challan;
   const _ChallanDetailPanel({required this.challan});
@@ -1751,9 +2029,7 @@ class _ChallanDetailPanel extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-//  Status chip — pending / partial / paid
-// ─────────────────────────────────────────────
+// ─── Status chip ───
 class _StatusChip extends StatelessWidget {
   final String status;
   const _StatusChip({required this.status});
@@ -1787,3 +2063,5 @@ class _StatusChip extends StatelessWidget {
     );
   }
 }
+
+

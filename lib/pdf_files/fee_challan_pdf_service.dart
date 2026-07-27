@@ -1,6 +1,1508 @@
-import 'dart:convert';
-import 'dart:typed_data';
+//
+// import 'dart:typed_data';
+// import 'package:pdf/pdf.dart';
+// import 'package:pdf/widgets.dart' as pw;
+// import 'package:printing/printing.dart';
+//
+// import '../models/fee_challan_model.dart';
+// import '../models/school_setting_model.dart';
+//
+// class FeeChallanPdfService {
+//   static const PdfColor _purple = PdfColor.fromInt(0xFF534AB7);
+//   static const PdfColor _lightPurple = PdfColor.fromInt(0xFFEEECFA);
+//   static const PdfColor _grey = PdfColor.fromInt(0xFF6B7280);
+//   static const PdfColor _lightGrey = PdfColor.fromInt(0xFFF3F4F6);
+//   static const PdfColor _borderGrey = PdfColor.fromInt(0xFFE5E7EB);
+//   static const PdfColor _red = PdfColor.fromInt(0xFFDC2626);
+//   static const PdfColor _green = PdfColor.fromInt(0xFF16A34A);
+//
+//   // ─── STATIC SCHOOL DATA (change these to your details) ───
+//   static const String schoolName = 'Your School Name';
+//   static const String schoolPhone = '123-4567890';
+//   static const String schoolAddress = '123 Main Street, City, State';
+//   static const String schoolCity = 'City';
+//
+//   // ── Public API ──
+//
+//   static Future<Uint8List> buildSinglePdf(
+//       FeeChallanModel challan,
+//       SchoolSettings settings,
+//       ) async {
+//     final doc = pw.Document();
+//     doc.addPage(
+//       pw.Page(
+//         pageFormat: PdfPageFormat.a4,
+//         margin: const pw.EdgeInsets.all(24),
+//         build: (context) => pw.Column(
+//           crossAxisAlignment: pw.CrossAxisAlignment.start,
+//           children: [
+//             _challanBlock(challan, settings, compact: false),
+//           ],
+//         ),
+//       ),
+//     );
+//     return doc.save();
+//   }
+//
+//   static Future<Uint8List> buildMergedPdf(
+//       List<FeeChallanModel> challans,
+//       SchoolSettings settings,
+//       ) async {
+//     final doc = pw.Document();
+//
+//     for (var i = 0; i < challans.length; i += 2) {
+//       final first = challans[i];
+//       final second = (i + 1 < challans.length) ? challans[i + 1] : null;
+//
+//       doc.addPage(
+//         pw.Page(
+//           pageFormat: PdfPageFormat.a4,
+//           margin: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+//           build: (context) => pw.Column(
+//             children: [
+//               _challanBlock(first, settings, compact: true),
+//               pw.SizedBox(height: 10),
+//               pw.Container(
+//                 height: 0,
+//                 decoration: const pw.BoxDecoration(
+//                   border: pw.Border(
+//                     top: pw.BorderSide(
+//                         color: _borderGrey, width: 1, style: pw.BorderStyle.dashed),
+//                   ),
+//                 ),
+//               ),
+//               pw.SizedBox(height: 10),
+//               if (second != null)
+//                 _challanBlock(second, settings, compact: true)
+//               else
+//                 pw.Expanded(child: pw.Container()),
+//             ],
+//           ),
+//         ),
+//       );
+//     }
+//
+//     return doc.save();
+//   }
+//
+//   static Future<void> downloadAndOpen(
+//       FeeChallanModel challan,
+//       SchoolSettings settings,
+//       ) async {
+//     final bytes = await buildSinglePdf(challan, settings);
+//     await Printing.sharePdf(
+//       bytes: bytes,
+//       filename: 'Challan_${challan.challanNumber}.pdf',
+//     );
+//   }
+//
+//   static Future<void> printChallan(
+//       FeeChallanModel challan,
+//       SchoolSettings settings,
+//       ) async {
+//     final bytes = await buildSinglePdf(challan, settings);
+//     await Printing.layoutPdf(
+//       onLayout: (format) async => bytes,
+//       name: 'Challan_${challan.challanNumber}.pdf',
+//     );
+//   }
+//
+//   static Future<void> bulkDownload(
+//       List<FeeChallanModel> challans,
+//       SchoolSettings settings,
+//       ) async {
+//     final bytes = await buildMergedPdf(challans, settings);
+//     await Printing.sharePdf(
+//       bytes: bytes,
+//       filename: 'Fee_Challans_Bulk.pdf',
+//     );
+//   }
+//
+//   static Future<void> bulkPrint(
+//       List<FeeChallanModel> challans,
+//       SchoolSettings settings,
+//       ) async {
+//     final bytes = await buildMergedPdf(challans, settings);
+//     await Printing.layoutPdf(
+//       onLayout: (format) async => bytes,
+//       name: 'Fee_Challans_Bulk.pdf',
+//     );
+//   }
+//
+//   // ── Layout builders ──
+//
+//   static pw.Widget _challanBlock(
+//       FeeChallanModel c,
+//       SchoolSettings settings, {
+//         required bool compact,
+//       }) {
+//     return pw.Container(
+//       decoration: pw.BoxDecoration(
+//         border: pw.Border.all(color: _borderGrey, width: 1),
+//         borderRadius: pw.BorderRadius.circular(6),
+//       ),
+//       padding: const pw.EdgeInsets.all(12),
+//       child: pw.Column(
+//         crossAxisAlignment: pw.CrossAxisAlignment.start,
+//         children: [
+//           _schoolHeader(),
+//           pw.SizedBox(height: 8),
+//           pw.Container(height: 1, color: _borderGrey),
+//           pw.SizedBox(height: 8),
+//           _challanMetaRow(c),
+//           pw.SizedBox(height: 8),
+//           _studentTable(c),   // dynamic columns
+//           pw.SizedBox(height: 8),
+//           _totalsBlock(c),
+//           if (!compact) ...[
+//             pw.SizedBox(height: 10),
+//             pw.Text(
+//               'Please pay before the due date to avoid late fee. This is a system-generated challan.',
+//               style: pw.TextStyle(fontSize: 8, color: _grey),
+//             ),
+//           ],
+//         ],
+//       ),
+//     );
+//   }
+//
+//   static pw.Widget _schoolHeader() {
+//     return pw.Row(
+//       crossAxisAlignment: pw.CrossAxisAlignment.center,
+//       children: [
+//         pw.Expanded(
+//           child: pw.Column(
+//             crossAxisAlignment: pw.CrossAxisAlignment.start,
+//             children: [
+//               pw.Text(
+//                 schoolName,
+//                 style: pw.TextStyle(
+//                     fontSize: 14, fontWeight: pw.FontWeight.bold, color: _purple),
+//               ),
+//               pw.SizedBox(height: 2),
+//               if (schoolAddress.isNotEmpty)
+//                 pw.Text(schoolAddress,
+//                     style: pw.TextStyle(fontSize: 8, color: _grey)),
+//               pw.Text(
+//                 'Ph: $schoolPhone  •  $schoolCity',
+//                 style: pw.TextStyle(fontSize: 8, color: _grey),
+//               ),
+//             ],
+//           ),
+//         ),
+//         pw.Column(
+//           crossAxisAlignment: pw.CrossAxisAlignment.end,
+//           children: [
+//             pw.Text('FEE CHALLAN',
+//                 style: pw.TextStyle(
+//                     fontSize: 11, fontWeight: pw.FontWeight.bold, color: _purple)),
+//           ],
+//         ),
+//       ],
+//     );
+//   }
+//
+//   static pw.Widget _challanMetaRow(FeeChallanModel c) {
+//     return pw.Row(
+//       crossAxisAlignment: pw.CrossAxisAlignment.start,
+//       children: [
+//         pw.Expanded(
+//           flex: 3,
+//           child: pw.Column(
+//             crossAxisAlignment: pw.CrossAxisAlignment.start,
+//             children: [
+//               _metaLine('Family', c.familyName),
+//               _metaLine('Father', c.fatherName),
+//               if (c.fatherPhone.isNotEmpty) _metaLine('Phone', c.fatherPhone),
+//             ],
+//           ),
+//         ),
+//         pw.Expanded(
+//           flex: 2,
+//           child: pw.Column(
+//             crossAxisAlignment: pw.CrossAxisAlignment.start,
+//             children: [
+//               _metaLine('Challan #', c.challanNumber),
+//               _metaLine('Month', '${c.monthLabel} ${c.year}'),
+//               _metaLine('Family ID', c.familyId),
+//             ],
+//           ),
+//         ),
+//         pw.Expanded(
+//           flex: 2,
+//           child: pw.Column(
+//             crossAxisAlignment: pw.CrossAxisAlignment.start,
+//             children: [
+//               _metaLine('Generated', _fmt(c.generatedDate)),
+//               pw.Container(
+//                 margin: const pw.EdgeInsets.only(top: 2),
+//                 padding:
+//                 const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+//                 decoration: pw.BoxDecoration(
+//                   color: const PdfColor.fromInt(0xFFFEF2F2),
+//                   borderRadius: pw.BorderRadius.circular(4),
+//                 ),
+//                 child: pw.Text('Due: ${_fmt(c.dueDate)}',
+//                     style: pw.TextStyle(
+//                         fontSize: 8,
+//                         color: _red,
+//                         fontWeight: pw.FontWeight.bold)),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+//
+//   static pw.Widget _metaLine(String label, String value) {
+//     return pw.Padding(
+//       padding: const pw.EdgeInsets.only(bottom: 2),
+//       child: pw.RichText(
+//         text: pw.TextSpan(
+//           children: [
+//             pw.TextSpan(
+//                 text: '$label: ',
+//                 style: pw.TextStyle(fontSize: 8, color: _grey)),
+//             pw.TextSpan(
+//                 text: value.isNotEmpty ? value : '—',
+//                 style: pw.TextStyle(
+//                     fontSize: 8.5,
+//                     color: PdfColors.black,
+//                     fontWeight: pw.FontWeight.bold)),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+//
+//   // ─── DYNAMIC STUDENT TABLE ──────────────────────────────────────────
+//   static pw.Widget _studentTable(FeeChallanModel c) {
+//     // Determine which columns to show
+//     bool showAdmission = c.students.any((s) => s.registrationFee > 0);
+//     bool showAnnual = c.students.any((s) => s.annualFee > 0);
+//
+//     // Build header row dynamically
+//     List<pw.Widget> headerCells = [];
+//     headerCells.add(_tableHeaderCell('Student', flex: 2));
+//     headerCells.add(_tableHeaderCell('Class', flex: 1.5));
+//     if (showAdmission) headerCells.add(_tableHeaderCell('Admission', flex: 1.2, align: pw.TextAlign.right));
+//     if (showAnnual) headerCells.add(_tableHeaderCell('Annual', flex: 1.2, align: pw.TextAlign.right));
+//     headerCells.add(_tableHeaderCell('Monthly', flex: 1.2, align: pw.TextAlign.right));
+//     headerCells.add(_tableHeaderCell('Total', flex: 1.2, align: pw.TextAlign.right));
+//
+//     // Build data rows
+//     List<pw.TableRow> rows = [];
+//     for (var s in c.students) {
+//       List<pw.Widget> cells = [];
+//       cells.add(_tableCell(s.name, bold: true));
+//       cells.add(_tableCell([
+//         if (s.className != null && s.className!.isNotEmpty) s.className!,
+//         if (s.sectionName != null && s.sectionName!.isNotEmpty) s.sectionName!,
+//       ].join(' - ')));
+//       if (showAdmission) {
+//         cells.add(_tableCell(
+//             s.registrationFee > 0 ? s.registrationFee.toStringAsFixed(0) : '—',
+//             align: pw.TextAlign.right));
+//       }
+//       if (showAnnual) {
+//         cells.add(_tableCell(
+//             s.annualFee > 0 ? s.annualFee.toStringAsFixed(0) : '—',
+//             align: pw.TextAlign.right));
+//       }
+//       cells.add(_tableCell(s.monthlyFee.toStringAsFixed(0), align: pw.TextAlign.right));
+//       cells.add(_tableCell(s.lineTotal.toStringAsFixed(0), align: pw.TextAlign.right, bold: true));
+//       rows.add(pw.TableRow(children: cells));
+//     }
+//
+//     // Build column widths: total flex sum = sum of all flex values
+//     // We'll assign flex values in the header builder and reuse.
+//     // We need to compute total flex for columnWidths.
+//     // Simpler: use FlexColumnWidth with same ratios.
+//     // We'll collect flex values from header creation.
+//     // Let's define a function to get column widths.
+//     List<double> flexValues = [];
+//     flexValues.add(2.0); // Student
+//     flexValues.add(1.5); // Class
+//     if (showAdmission) flexValues.add(1.2);
+//     if (showAnnual) flexValues.add(1.2);
+//     flexValues.add(1.2); // Monthly
+//     flexValues.add(1.2); // Total
+//
+//     Map<int, pw.FlexColumnWidth> columnWidths = {};
+//     for (int i = 0; i < flexValues.length; i++) {
+//       columnWidths[i] = pw.FlexColumnWidth(flexValues[i]);
+//     }
+//
+//     return pw.Table(
+//       border: pw.TableBorder.all(color: _borderGrey, width: 0.5),
+//       columnWidths: columnWidths,
+//       children: [
+//         // Header row
+//         pw.TableRow(
+//           decoration: const pw.BoxDecoration(color: _lightGrey),
+//           children: headerCells,
+//         ),
+//         // Data rows
+//         ...rows,
+//       ],
+//     );
+//   }
+//
+//   // Helper to build header cell with flex and alignment
+//   static pw.Widget _tableHeaderCell(String text,
+//       {double flex = 1.0, pw.TextAlign align = pw.TextAlign.left}) {
+//     return pw.Padding(
+//       padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+//       child: pw.Text(
+//         text,
+//         textAlign: align,
+//         style: pw.TextStyle(
+//             fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _purple),
+//       ),
+//     );
+//   }
+//
+//   static pw.Widget _tableCell(String text,
+//       {pw.TextAlign align = pw.TextAlign.left, bool bold = false}) {
+//     return pw.Padding(
+//       padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+//       child: pw.Text(
+//         text,
+//         textAlign: align,
+//         style: pw.TextStyle(
+//             fontSize: 8,
+//             fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal),
+//       ),
+//     );
+//   }
+//
+//   // ─── Totals block (unchanged) ──────────────────────────────────────
+//   static pw.Widget _totalsBlock(FeeChallanModel c) {
+//     return pw.Align(
+//       alignment: pw.Alignment.centerRight,
+//       child: pw.Container(
+//         width: 220,
+//         padding: const pw.EdgeInsets.all(8),
+//         decoration: pw.BoxDecoration(
+//           color: _lightPurple,
+//           borderRadius: pw.BorderRadius.circular(6),
+//         ),
+//         child: pw.Column(
+//           children: [
+//             _totalRow('Current Month', c.currentMonthTotal),
+//             if (c.previousBalance > 0)
+//               _totalRow('Previous Balance', c.previousBalance),
+//             if (c.previousBalance < 0)
+//               _totalRow('Advance Carried Forward', c.previousBalance,
+//                   color: _green),
+//             pw.Container(
+//                 margin: const pw.EdgeInsets.symmetric(vertical: 3),
+//                 height: 0.5,
+//                 color: _borderGrey),
+//             _totalRow('Grand Total', c.grandTotal, bold: true),
+//             if (c.amountPaid > 0) _totalRow('Amount Paid', c.amountPaid),
+//             if (c.amountPaid > 0)
+//               _totalRow('Remaining Balance', c.remainingBalance, bold: true),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+//
+//   static pw.Widget _totalRow(String label, double value,
+//       {bool bold = false, PdfColor? color}) {
+//     return pw.Padding(
+//       padding: const pw.EdgeInsets.symmetric(vertical: 1.5),
+//       child: pw.Row(
+//         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+//         children: [
+//           pw.Text(label,
+//               style: pw.TextStyle(
+//                   fontSize: 8,
+//                   fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+//                   color: color ?? (bold ? PdfColors.black : _grey))),
+//           pw.Text('Rs ${value.toStringAsFixed(0)}',
+//               style: pw.TextStyle(
+//                   fontSize: bold ? 10 : 8.5,
+//                   fontWeight: pw.FontWeight.bold,
+//                   color: color ?? (bold ? _purple : PdfColors.black))),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   static String _fmt(DateTime d) =>
+//       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+// }
 
+//2nd code
+// import 'dart:typed_data';
+// import 'package:pdf/pdf.dart';
+// import 'package:pdf/widgets.dart' as pw;
+// import 'package:printing/printing.dart';
+//
+// import '../models/fee_challan_model.dart';
+// import '../models/school_setting_model.dart';
+//
+// class FeeChallanPdfService {
+//   // ─── UPDATED COLORS TO MATCH IMAGE ──────────────────────────────────────────
+//   static const PdfColor _purple = PdfColor.fromInt(0xFF534AB7);    // Main primary
+//   static const PdfColor _darkPurple = PdfColor.fromInt(0xFF3B3586); // Header & Table
+//   static const PdfColor _lightPurple = PdfColor.fromInt(0xFFEEECFA); // Background boxes
+//   static const PdfColor _grey = PdfColor.fromInt(0xFF6B7280);
+//   static const PdfColor _borderGrey = PdfColor.fromInt(0xFFE5E7EB);
+//   static const PdfColor _lightRedBg = PdfColor.fromInt(0xFFFEF2F2);
+//   static const PdfColor _red = PdfColor.fromInt(0xFFDC2626);
+//   static const PdfColor _green = PdfColor.fromInt(0xFF16A34A);
+//
+//   // ─── STATIC SCHOOL DATA ──────────────────────────────────────────────────────
+//   static const String schoolName = 'Your School Name';
+//   static const String schoolPhone = '123-4567890';
+//   static const String schoolAddress = '123 Main Street, City, State';
+//   static const String schoolCity = 'City';
+//
+//   // ── Public API ──
+//
+//   static Future<Uint8List> buildSinglePdf(
+//       FeeChallanModel challan,
+//       SchoolSettings settings,
+//       ) async {
+//     final doc = pw.Document();
+//     doc.addPage(
+//       pw.Page(
+//         pageFormat: PdfPageFormat.a4,
+//         margin: const pw.EdgeInsets.all(24),
+//         build: (context) => pw.Column(
+//           crossAxisAlignment: pw.CrossAxisAlignment.start,
+//           children: [
+//             _challanBlock(challan, settings, compact: false),
+//           ],
+//         ),
+//       ),
+//     );
+//     return doc.save();
+//   }
+//
+//   static Future<Uint8List> buildMergedPdf(
+//       List<FeeChallanModel> challans,
+//       SchoolSettings settings,
+//       ) async {
+//     final doc = pw.Document();
+//
+//     for (var i = 0; i < challans.length; i += 2) {
+//       final first = challans[i];
+//       final second = (i + 1 < challans.length) ? challans[i + 1] : null;
+//
+//       doc.addPage(
+//         pw.Page(
+//           pageFormat: PdfPageFormat.a4,
+//           margin: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+//           build: (context) => pw.Column(
+//             children: [
+//               _challanBlock(first, settings, compact: true),
+//               pw.SizedBox(height: 10),
+//               pw.Container(
+//                 height: 0,
+//                 decoration: const pw.BoxDecoration(
+//                   border: pw.Border(
+//                     top: pw.BorderSide(
+//                         color: _borderGrey, width: 1, style: pw.BorderStyle.dashed),
+//                   ),
+//                 ),
+//               ),
+//               pw.SizedBox(height: 10),
+//               if (second != null)
+//                 _challanBlock(second, settings, compact: true)
+//               else
+//                 pw.Expanded(child: pw.Container()),
+//             ],
+//           ),
+//         ),
+//       );
+//     }
+//
+//     return doc.save();
+//   }
+//
+//   static Future<void> downloadAndOpen(
+//       FeeChallanModel challan,
+//       SchoolSettings settings,
+//       ) async {
+//     final bytes = await buildSinglePdf(challan, settings);
+//     await Printing.sharePdf(
+//       bytes: bytes,
+//       filename: 'Challan_${challan.challanNumber}.pdf',
+//     );
+//   }
+//
+//   static Future<void> printChallan(
+//       FeeChallanModel challan,
+//       SchoolSettings settings,
+//       ) async {
+//     final bytes = await buildSinglePdf(challan, settings);
+//     await Printing.layoutPdf(
+//       onLayout: (format) async => bytes,
+//       name: 'Challan_${challan.challanNumber}.pdf',
+//     );
+//   }
+//
+//   static Future<void> bulkDownload(
+//       List<FeeChallanModel> challans,
+//       SchoolSettings settings,
+//       ) async {
+//     final bytes = await buildMergedPdf(challans, settings);
+//     await Printing.sharePdf(
+//       bytes: bytes,
+//       filename: 'Fee_Challans_Bulk.pdf',
+//     );
+//   }
+//
+//   static Future<void> bulkPrint(
+//       List<FeeChallanModel> challans,
+//       SchoolSettings settings,
+//       ) async {
+//     final bytes = await buildMergedPdf(challans, settings);
+//     await Printing.layoutPdf(
+//       onLayout: (format) async => bytes,
+//       name: 'Fee_Challans_Bulk.pdf',
+//     );
+//   }
+//
+//   // ── Layout Builders ──
+//
+//   static pw.Widget _challanBlock(
+//       FeeChallanModel c,
+//       SchoolSettings settings, {
+//         required bool compact,
+//       }) {
+//     return pw.Container(
+//       decoration: pw.BoxDecoration(
+//         border: pw.Border.all(color: _borderGrey, width: 1),
+//         borderRadius: pw.BorderRadius.circular(6),
+//       ),
+//       padding: const pw.EdgeInsets.all(12),
+//       child: pw.Column(
+//         crossAxisAlignment: pw.CrossAxisAlignment.start,
+//         children: [
+//           _schoolHeader(),
+//           pw.SizedBox(height: 8),
+//           pw.Container(height: 1, color: _borderGrey),
+//           pw.SizedBox(height: 8),
+//           _challanMetaRow(c),
+//           pw.SizedBox(height: 12),
+//           _studentTable(c),
+//           pw.SizedBox(height: 12),
+//           _bottomBlocks(c),
+//           if (!compact) ...[
+//             pw.SizedBox(height: 12),
+//             pw.Container(
+//               width: double.infinity,
+//               decoration: const pw.BoxDecoration(
+//                 border: pw.Border(
+//                   top: pw.BorderSide(
+//                       color: _borderGrey, width: 1, style: pw.BorderStyle.dotted),
+//                 ),
+//               ),
+//               padding: const pw.EdgeInsets.only(top: 8),
+//               child: pw.Row(
+//                 mainAxisAlignment: pw.MainAxisAlignment.center,
+//                 children: [
+//                   pw.SizedBox(width: 6),
+//                   pw.Text(
+//                     'Thank you for your timely payment!',
+//                     style: pw.TextStyle(fontSize: 8, color: _grey),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//           ],
+//         ],
+//       ),
+//     );
+//   }
+//
+//   // ─── HEADER (Logo + School Name + Right Purple Block) ──────────────────────
+//   static pw.Widget _schoolHeader() {
+//     return pw.Row(
+//       crossAxisAlignment: pw.CrossAxisAlignment.center,
+//       children: [
+//         pw.Expanded(
+//           flex: 2,
+//           child: pw.Column(
+//             crossAxisAlignment: pw.CrossAxisAlignment.start,
+//             children: [
+//               pw.Row(
+//                 children: [
+//                   pw.SizedBox(width: 8),
+//                   pw.Text(
+//                     schoolName,
+//                     style: pw.TextStyle(
+//                         fontSize: 18,
+//                         fontWeight: pw.FontWeight.bold,
+//                         color: _darkPurple),
+//                   ),
+//                 ],
+//               ),
+//               pw.SizedBox(height: 4),
+//               pw.Text('📍 $schoolAddress',
+//                   style: pw.TextStyle(fontSize: 8, color: _grey)),
+//               pw.Text('📞 Ph: $schoolPhone  |  $schoolCity',
+//                   style: pw.TextStyle(fontSize: 8, color: _grey)),
+//             ],
+//           ),
+//         ),
+//         pw.Container(
+//           width: 140,
+//           height: 60,
+//           padding: const pw.EdgeInsets.symmetric(horizontal: 10),
+//           decoration: const pw.BoxDecoration(
+//             color: _darkPurple,
+//             borderRadius: pw.BorderRadius.only(
+//               bottomLeft: pw.Radius.circular(15),
+//               topLeft: pw.Radius.circular(15),
+//             ),
+//           ),
+//           alignment: pw.Alignment.center,
+//           child: pw.Text(
+//             'FEE CHALLAN',
+//             style: pw.TextStyle(
+//                 fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+//
+//   // ─── META INFO ROW (Light Purple box, with icons) ──────────────────────────
+//   static pw.Widget _challanMetaRow(FeeChallanModel c) {
+//     return pw.Container(
+//       padding: const pw.EdgeInsets.all(12),
+//       decoration: pw.BoxDecoration(
+//         color: _lightPurple,
+//         borderRadius: pw.BorderRadius.circular(8),
+//         border: pw.Border.all(color: _borderGrey, width: 0.5),
+//       ),
+//       child: pw.Row(
+//         crossAxisAlignment: pw.CrossAxisAlignment.start,
+//         children: [
+//
+//
+//           pw.Expanded(
+//             flex: 2,
+//             child: pw.Column(
+//               crossAxisAlignment: pw.CrossAxisAlignment.start,
+//               children: [
+//                 pw.SizedBox(height: 4),
+//                 pw.Container(
+//                   padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+//                   decoration: pw.BoxDecoration(
+//                     color: _lightRedBg,
+//                     borderRadius: pw.BorderRadius.circular(4),
+//                   ),
+//                   child: pw.Row(
+//                     children: [
+//                       pw.SizedBox(width: 4),
+//                       pw.Text('Due: ${_fmt(c.dueDate)}',
+//                           style: pw.TextStyle(
+//                               fontSize: 8, color: _red, fontWeight: pw.FontWeight.bold)),
+//                     ],
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   static pw.Widget _metaRowIcon(pw.IconData icon, String label, String value) {
+//     return pw.Padding(
+//       padding: const pw.EdgeInsets.only(bottom: 4),
+//       child: pw.Row(
+//         children: [
+//           pw.Icon(icon, size: 12, color: _purple),
+//           pw.SizedBox(width: 6),
+//           pw.Text('$label: ', style: pw.TextStyle(fontSize: 8, color: _grey)),
+//           pw.Text(value.isNotEmpty ? value : '—',
+//               style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold)),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   // ─── DYNAMIC STUDENT TABLE ───────────────────────────────────────────────────
+//   static pw.Widget _studentTable(FeeChallanModel c) {
+//     bool showAdmission = c.students.any((s) => s.registrationFee > 0);
+//     bool showAnnual = c.students.any((s) => s.annualFee > 0);
+//
+//     List<double> flexValues = [];
+//     flexValues.add(0.5); // #
+//     flexValues.add(2.0); // Student
+//     flexValues.add(1.5); // Class
+//     if (showAdmission) flexValues.add(1.2);
+//     if (showAnnual) flexValues.add(1.2);
+//     flexValues.add(1.2); // Monthly
+//     flexValues.add(1.2); // Total
+//
+//     List<pw.Widget> headerChildren = [
+//       _tableHeaderCell('#', flex: 0.5, align: pw.TextAlign.center),
+//       _tableHeaderCell('Student', flex: 2.0),
+//       _tableHeaderCell('Class', flex: 1.5),
+//       if (showAdmission) _tableHeaderCell('Admission', flex: 1.2, align: pw.TextAlign.right),
+//       if (showAnnual) _tableHeaderCell('Annual', flex: 1.2, align: pw.TextAlign.right),
+//       _tableHeaderCell('Monthly Fee', flex: 1.2, align: pw.TextAlign.right),
+//       _tableHeaderCell('Total', flex: 1.2, align: pw.TextAlign.right),
+//     ];
+//
+//     List<pw.TableRow> rows = [];
+//     for (int i = 0; i < c.students.length; i++) {
+//       final student = c.students[i];
+//       List<pw.Widget> cells = [];
+//
+//       // # Column with light purple box
+//       cells.add(pw.Container(
+//         padding: const pw.EdgeInsets.symmetric(vertical: 5),
+//         alignment: pw.Alignment.center,
+//         child: pw.Container(
+//           padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+//           decoration: pw.BoxDecoration(
+//             color: _lightPurple,
+//             borderRadius: pw.BorderRadius.circular(4),
+//           ),
+//           child: pw.Text('${i + 1}',
+//               style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+//         ),
+//       ));
+//
+//       cells.add(_tableCell(student.name, bold: true));
+//       cells.add(_tableCell([student.className, student.sectionName]
+//           .whereType<String>()
+//           .join(' - ')));
+//
+//       if (showAdmission) {
+//         cells.add(_tableCell(
+//             student.registrationFee > 0
+//                 ? student.registrationFee.toStringAsFixed(0)
+//                 : '—',
+//             align: pw.TextAlign.right));
+//       }
+//       if (showAnnual) {
+//         cells.add(_tableCell(
+//             student.annualFee > 0 ? student.annualFee.toStringAsFixed(0) : '—',
+//             align: pw.TextAlign.right));
+//       }
+//       cells.add(_tableCell(student.monthlyFee.toStringAsFixed(0), align: pw.TextAlign.right));
+//       cells.add(_tableCell(student.lineTotal.toStringAsFixed(0), align: pw.TextAlign.right, bold: true));
+//
+//       rows.add(pw.TableRow(children: cells));
+//     }
+//
+//     Map<int, pw.FlexColumnWidth> columnWidths = {};
+//     for (int i = 0; i < flexValues.length; i++) {
+//       columnWidths[i] = pw.FlexColumnWidth(flexValues[i]);
+//     }
+//
+//     return pw.Table(
+//       border: pw.TableBorder.all(color: _borderGrey, width: 0.5),
+//       columnWidths: columnWidths,
+//       children: [
+//         pw.TableRow(
+//           decoration: const pw.BoxDecoration(color: _darkPurple),
+//           children: headerChildren,
+//         ),
+//         ...rows,
+//       ],
+//     );
+//   }
+//
+//   static pw.Widget _tableHeaderCell(String text,
+//       {double flex = 1.0, pw.TextAlign align = pw.TextAlign.left}) {
+//     return pw.Padding(
+//       padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+//       child: pw.Text(
+//         text,
+//         textAlign: align,
+//         style: pw.TextStyle(
+//             fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+//       ),
+//     );
+//   }
+//
+//   static pw.Widget _tableCell(String text,
+//       {pw.TextAlign align = pw.TextAlign.left, bool bold = false}) {
+//     return pw.Padding(
+//       padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+//       child: pw.Text(
+//         text,
+//         textAlign: align,
+//         style: pw.TextStyle(
+//             fontSize: 8,
+//             fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal),
+//       ),
+//     );
+//   }
+//
+//   // ─── BOTTOM BLOCKS (Left: NOTE | Right: Grand Total) ──────────────────────
+//   static pw.Widget _bottomBlocks(FeeChallanModel c) {
+//     return pw.Row(
+//       crossAxisAlignment: pw.CrossAxisAlignment.start,
+//       children: [
+//         pw.Expanded(
+//           flex: 1,
+//           child: pw.Container(
+//             padding: const pw.EdgeInsets.all(10),
+//             decoration: pw.BoxDecoration(
+//               color: _lightPurple,
+//               borderRadius: pw.BorderRadius.circular(6),
+//             ),
+//             child: pw.Column(
+//               crossAxisAlignment: pw.CrossAxisAlignment.start,
+//               children: [
+//                 pw.Row(
+//                   children: [
+//                     pw.Container(
+//                       width: 18,
+//                       height: 18,
+//                       decoration: const pw.BoxDecoration(
+//                           color: _purple, shape: pw.BoxShape.circle),
+//                       alignment: pw.Alignment.center,
+//                       child: pw.Text('i',
+//                           style: pw.TextStyle(
+//                               color: PdfColors.white,
+//                               fontSize: 10,
+//                               fontWeight: pw.FontWeight.bold)),
+//                     ),
+//                     pw.SizedBox(width: 6),
+//                     pw.Text('NOTE',
+//                         style: pw.TextStyle(
+//                             fontSize: 8, fontWeight: pw.FontWeight.bold)),
+//                   ],
+//                 ),
+//                 pw.SizedBox(height: 4),
+//                 pw.Text(
+//                   'Please pay before the due date to avoid late fee.\nThis is a system-generated challan.',
+//                   style: pw.TextStyle(fontSize: 7, color: _grey),
+//                 ),
+//               ],
+//             ),
+//           ),
+//         ),
+//         pw.SizedBox(width: 12),
+//         pw.Expanded(
+//           flex: 1,
+//           child: pw.Container(
+//             padding: const pw.EdgeInsets.all(10),
+//             decoration: pw.BoxDecoration(
+//               color: _lightPurple,
+//               borderRadius: pw.BorderRadius.circular(6),
+//             ),
+//             child: pw.Column(
+//               children: [
+//                 _totalRow('Current Month', c.currentMonthTotal),
+//                 if (c.previousBalance > 0)
+//                   _totalRow('Previous Balance', c.previousBalance),
+//                 if (c.previousBalance < 0)
+//                   _totalRow('Advance Carried Forward', c.previousBalance,
+//                       color: _green),
+//                 pw.Container(
+//                     margin: const pw.EdgeInsets.symmetric(vertical: 3),
+//                     height: 0.5,
+//                     color: _borderGrey),
+//                 _totalRow('Grand Total', c.grandTotal, bold: true),
+//                 if (c.amountPaid > 0) _totalRow('Amount Paid', c.amountPaid),
+//                 if (c.amountPaid > 0)
+//                   _totalRow('Remaining Balance', c.remainingBalance, bold: true),
+//               ],
+//             ),
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+//
+//   static pw.Widget _totalRow(String label, double value,
+//       {bool bold = false, PdfColor? color}) {
+//     return pw.Padding(
+//       padding: const pw.EdgeInsets.symmetric(vertical: 1.5),
+//       child: pw.Row(
+//         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+//         children: [
+//           pw.Text(label,
+//               style: pw.TextStyle(
+//                   fontSize: 8,
+//                   fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+//                   color: color ?? (bold ? PdfColors.black : _grey))),
+//           pw.Text('Rs ${value.toStringAsFixed(0)}',
+//               style: pw.TextStyle(
+//                   fontSize: bold ? 10 : 8.5,
+//                   fontWeight: pw.FontWeight.bold,
+//                   color: color ?? (bold ? _purple : PdfColors.black))),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   static String _fmt(DateTime d) =>
+//       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+// }
+
+
+
+//3rd code
+// import 'dart:typed_data';
+// import 'package:pdf/pdf.dart';
+// import 'package:pdf/widgets.dart' as pw;
+// import 'package:printing/printing.dart';
+//
+// import '../models/fee_challan_model.dart';
+// import '../models/school_setting_model.dart';
+//
+// class FeeChallanPdfService {
+//   // ─── UPDATED COLORS TO MATCH IMAGE ──────────────────────────────────────────
+//   static const PdfColor _purple = PdfColor.fromInt(0xFF534AB7);    // Main primary
+//   static const PdfColor _darkPurple = PdfColor.fromInt(0xFF3B3586); // Header & Table
+//   static const PdfColor _lightPurple = PdfColor.fromInt(0xFFEEECFA); // Background boxes
+//   static const PdfColor _grey = PdfColor.fromInt(0xFF6B7280);
+//   static const PdfColor _borderGrey = PdfColor.fromInt(0xFFE5E7EB);
+//   static const PdfColor _lightRedBg = PdfColor.fromInt(0xFFFEF2F2);
+//   static const PdfColor _red = PdfColor.fromInt(0xFFDC2626);
+//   static const PdfColor _green = PdfColor.fromInt(0xFF16A34A);
+//
+//   // ─── STATIC SCHOOL DATA ──────────────────────────────────────────────────────
+//   static const String schoolName = 'Your School Name';
+//   static const String schoolPhone = '123-4567890';
+//   static const String schoolAddress = '123 Main Street, City, State';
+//   static const String schoolCity = 'City';
+//
+//   // ── Public API ──
+//
+//   static Future<Uint8List> buildSinglePdf(
+//       FeeChallanModel challan,
+//       SchoolSettings settings,
+//       ) async {
+//     final doc = pw.Document();
+//     doc.addPage(
+//       pw.Page(
+//         pageFormat: PdfPageFormat.a4,
+//         margin: const pw.EdgeInsets.all(24),
+//         build: (context) => pw.Column(
+//           crossAxisAlignment: pw.CrossAxisAlignment.start,
+//           children: [
+//             _challanBlock(challan, settings, compact: false),
+//           ],
+//         ),
+//       ),
+//     );
+//     return doc.save();
+//   }
+//
+//   static Future<Uint8List> buildMergedPdf(
+//       List<FeeChallanModel> challans,
+//       SchoolSettings settings,
+//       ) async {
+//     final doc = pw.Document();
+//
+//     for (var i = 0; i < challans.length; i += 2) {
+//       final first = challans[i];
+//       final second = (i + 1 < challans.length) ? challans[i + 1] : null;
+//
+//       doc.addPage(
+//         pw.Page(
+//           pageFormat: PdfPageFormat.a4,
+//           margin: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+//           build: (context) => pw.Column(
+//             children: [
+//               _challanBlock(first, settings, compact: true),
+//               pw.SizedBox(height: 10),
+//               pw.Container(
+//                 height: 0,
+//                 decoration: const pw.BoxDecoration(
+//                   border: pw.Border(
+//                     top: pw.BorderSide(
+//                         color: _borderGrey, width: 1, style: pw.BorderStyle.dashed),
+//                   ),
+//                 ),
+//               ),
+//               pw.SizedBox(height: 10),
+//               if (second != null)
+//                 _challanBlock(second, settings, compact: true)
+//               else
+//                 pw.Expanded(child: pw.Container()),
+//             ],
+//           ),
+//         ),
+//       );
+//     }
+//
+//     return doc.save();
+//   }
+//
+//   static Future<void> downloadAndOpen(
+//       FeeChallanModel challan,
+//       SchoolSettings settings,
+//       ) async {
+//     final bytes = await buildSinglePdf(challan, settings);
+//     await Printing.sharePdf(
+//       bytes: bytes,
+//       filename: 'Challan_${challan.challanNumber}.pdf',
+//     );
+//   }
+//
+//   static Future<void> printChallan(
+//       FeeChallanModel challan,
+//       SchoolSettings settings,
+//       ) async {
+//     final bytes = await buildSinglePdf(challan, settings);
+//     await Printing.layoutPdf(
+//       onLayout: (format) async => bytes,
+//       name: 'Challan_${challan.challanNumber}.pdf',
+//     );
+//   }
+//
+//   static Future<void> bulkDownload(
+//       List<FeeChallanModel> challans,
+//       SchoolSettings settings,
+//       ) async {
+//     final bytes = await buildMergedPdf(challans, settings);
+//     await Printing.sharePdf(
+//       bytes: bytes,
+//       filename: 'Fee_Challans_Bulk.pdf',
+//     );
+//   }
+//
+//   static Future<void> bulkPrint(
+//       List<FeeChallanModel> challans,
+//       SchoolSettings settings,
+//       ) async {
+//     final bytes = await buildMergedPdf(challans, settings);
+//     await Printing.layoutPdf(
+//       onLayout: (format) async => bytes,
+//       name: 'Fee_Challans_Bulk.pdf',
+//     );
+//   }
+//
+//   // ── Layout Builders ──
+//
+//   static pw.Widget _challanBlock(
+//       FeeChallanModel c,
+//       SchoolSettings settings, {
+//         required bool compact,
+//       }) {
+//     return pw.Container(
+//       decoration: pw.BoxDecoration(
+//         border: pw.Border.all(color: _borderGrey, width: 1),
+//         borderRadius: pw.BorderRadius.circular(6),
+//       ),
+//       padding: const pw.EdgeInsets.all(12),
+//       child: pw.Column(
+//         crossAxisAlignment: pw.CrossAxisAlignment.start,
+//         children: [
+//           _schoolHeader(),
+//           pw.SizedBox(height: 8),
+//           pw.Container(height: 1, color: _borderGrey),
+//           pw.SizedBox(height: 8),
+//           _challanMetaRow(c),
+//           pw.SizedBox(height: 12),
+//           _studentTable(c),
+//           pw.SizedBox(height: 12),
+//           _bottomBlocks(c),
+//           if (!compact) ...[
+//             pw.SizedBox(height: 12),
+//             pw.Container(
+//               width: double.infinity,
+//               decoration: const pw.BoxDecoration(
+//                 border: pw.Border(
+//                   top: pw.BorderSide(
+//                       color: _borderGrey, width: 1, style: pw.BorderStyle.dotted),
+//                 ),
+//               ),
+//               padding: const pw.EdgeInsets.only(top: 8),
+//               child: pw.Row(
+//                 mainAxisAlignment: pw.MainAxisAlignment.center,
+//                 children: [
+//                   pw.Text('💜', style: pw.TextStyle(fontSize: 12, color: _purple)),
+//                   pw.SizedBox(width: 6),
+//                   pw.Text(
+//                     'Thank you for your timely payment!',
+//                     style: pw.TextStyle(fontSize: 8, color: _grey),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//           ],
+//         ],
+//       ),
+//     );
+//   }
+//
+//   // ─── HEADER (Logo + School Name + Right Purple Block) ──────────────────────
+//   static pw.Widget _schoolHeader() {
+//     return pw.Row(
+//       crossAxisAlignment: pw.CrossAxisAlignment.center,
+//       children: [
+//         pw.Expanded(
+//           flex: 2,
+//           child: pw.Column(
+//             crossAxisAlignment: pw.CrossAxisAlignment.start,
+//             children: [
+//               pw.Row(
+//                 children: [
+//                   // Default flutter / school logo (Using emoji to prevent errors)
+//                   pw.Container(
+//                     width: 34,
+//                     height: 34,
+//                     alignment: pw.Alignment.center,
+//                     decoration: pw.BoxDecoration(
+//                       color: _lightPurple,
+//                       shape: pw.BoxShape.circle,
+//                     ),
+//                     child: pw.Text('🏫', style: pw.TextStyle(fontSize: 20)),
+//                   ),
+//                   pw.SizedBox(width: 10),
+//                   pw.Text(
+//                     schoolName,
+//                     style: pw.TextStyle(
+//                         fontSize: 16,
+//                         fontWeight: pw.FontWeight.bold,
+//                         color: _darkPurple),
+//                   ),
+//                 ],
+//               ),
+//               pw.SizedBox(height: 4),
+//               pw.Text('📍 $schoolAddress',
+//                   style: pw.TextStyle(fontSize: 8, color: _grey)),
+//               pw.Text('📞 Ph: $schoolPhone  |  $schoolCity',
+//                   style: pw.TextStyle(fontSize: 8, color: _grey)),
+//             ],
+//           ),
+//         ),
+//         pw.Container(
+//           width: 140,
+//           height: 60,
+//           padding: const pw.EdgeInsets.symmetric(horizontal: 10),
+//           decoration: const pw.BoxDecoration(
+//             color: _darkPurple,
+//             borderRadius: pw.BorderRadius.only(
+//               bottomLeft: pw.Radius.circular(15),
+//               topLeft: pw.Radius.circular(15),
+//             ),
+//           ),
+//           alignment: pw.Alignment.center,
+//           child: pw.Text(
+//             'FEE CHALLAN',
+//             style: pw.TextStyle(
+//                 fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+//
+//   // ─── META INFO ROW (Light Purple box, with emojis & 3 Columns) ──────────────
+//   static pw.Widget _challanMetaRow(FeeChallanModel c) {
+//     return pw.Container(
+//       padding: const pw.EdgeInsets.all(12),
+//       decoration: pw.BoxDecoration(
+//         color: _lightPurple,
+//         borderRadius: pw.BorderRadius.circular(8),
+//         border: pw.Border.all(color: _borderGrey, width: 0.5),
+//       ),
+//       child: pw.Row(
+//         crossAxisAlignment: pw.CrossAxisAlignment.start,
+//         children: [
+//           // Column 1: Family, Father, Phone
+//           pw.Expanded(
+//             flex: 3,
+//             child: pw.Column(
+//               crossAxisAlignment: pw.CrossAxisAlignment.start,
+//               children: [
+//                 _metaRowEmoji('👪', 'Family', c.familyName),
+//                 _metaRowEmoji('👤', 'Father', c.fatherName),
+//                 if (c.fatherPhone.isNotEmpty)
+//                   _metaRowEmoji('📞', 'Phone', c.fatherPhone),
+//               ],
+//             ),
+//           ),
+//           // Column 2: Challan #, Month, Family ID
+//           pw.Expanded(
+//             flex: 2,
+//             child: pw.Column(
+//               crossAxisAlignment: pw.CrossAxisAlignment.start,
+//               children: [
+//                 _metaRowEmoji('📄', 'Challan #', c.challanNumber),
+//                 _metaRowEmoji('📅', 'Month', '${c.monthLabel} ${c.year}'),
+//                 _metaRowEmoji('🏷️', 'Family ID', c.familyId),
+//               ],
+//             ),
+//           ),
+//           // Column 3: Generated, Due (with red background)
+//           pw.Expanded(
+//             flex: 2,
+//             child: pw.Column(
+//               crossAxisAlignment: pw.CrossAxisAlignment.start,
+//               children: [
+//                 _metaRowEmoji('📅', 'Generated', _fmt(c.generatedDate)),
+//                 pw.SizedBox(height: 4),
+//                 pw.Container(
+//                   padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+//                   decoration: pw.BoxDecoration(
+//                     color: _lightRedBg,
+//                     borderRadius: pw.BorderRadius.circular(4),
+//                   ),
+//                   child: pw.Row(
+//                     children: [
+//                       pw.Text('📅', style: pw.TextStyle(fontSize: 10, color: _red)),
+//                       pw.SizedBox(width: 4),
+//                       pw.Text('Due: ${_fmt(c.dueDate)}',
+//                           style: pw.TextStyle(
+//                               fontSize: 8, color: _red, fontWeight: pw.FontWeight.bold)),
+//                     ],
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   // Modified to use emojis instead of PdfIcons
+//   static pw.Widget _metaRowEmoji(String emoji, String label, String value) {
+//     return pw.Padding(
+//       padding: const pw.EdgeInsets.only(bottom: 4),
+//       child: pw.Row(
+//         children: [
+//           pw.Text(emoji, style: pw.TextStyle(fontSize: 12, color: _purple)),
+//           pw.SizedBox(width: 6),
+//           pw.Text('$label: ', style: pw.TextStyle(fontSize: 8, color: _grey)),
+//           pw.Text(value.isNotEmpty ? value : '—',
+//               style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold)),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   // ─── DYNAMIC STUDENT TABLE ───────────────────────────────────────────────────
+//   static pw.Widget _studentTable(FeeChallanModel c) {
+//     bool showAdmission = c.students.any((s) => s.registrationFee > 0);
+//     bool showAnnual = c.students.any((s) => s.annualFee > 0);
+//
+//     List<double> flexValues = [];
+//     flexValues.add(0.5); // #
+//     flexValues.add(2.0); // Student
+//     flexValues.add(1.5); // Class
+//     if (showAdmission) flexValues.add(1.2);
+//     if (showAnnual) flexValues.add(1.2);
+//     flexValues.add(1.2); // Monthly
+//     flexValues.add(1.2); // Total
+//
+//     List<pw.Widget> headerChildren = [
+//       _tableHeaderCell('#', flex: 0.5, align: pw.TextAlign.center),
+//       _tableHeaderCell('Student', flex: 2.0),
+//       _tableHeaderCell('Class', flex: 1.5),
+//       if (showAdmission) _tableHeaderCell('Admission', flex: 1.2, align: pw.TextAlign.right),
+//       if (showAnnual) _tableHeaderCell('Annual', flex: 1.2, align: pw.TextAlign.right),
+//       _tableHeaderCell('Monthly Fee', flex: 1.2, align: pw.TextAlign.right),
+//       _tableHeaderCell('Total', flex: 1.2, align: pw.TextAlign.right),
+//     ];
+//
+//     List<pw.TableRow> rows = [];
+//     for (int i = 0; i < c.students.length; i++) {
+//       final student = c.students[i];
+//       List<pw.Widget> cells = [];
+//
+//       // # Column with light purple box
+//       cells.add(pw.Container(
+//         padding: const pw.EdgeInsets.symmetric(vertical: 5),
+//         alignment: pw.Alignment.center,
+//         child: pw.Container(
+//           padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+//           decoration: pw.BoxDecoration(
+//             color: _lightPurple,
+//             borderRadius: pw.BorderRadius.circular(4),
+//           ),
+//           child: pw.Text('${i + 1}',
+//               style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+//         ),
+//       ));
+//
+//       cells.add(_tableCell(student.name, bold: true));
+//       cells.add(_tableCell([student.className, student.sectionName]
+//           .whereType<String>()
+//           .join(' - ')));
+//
+//       if (showAdmission) {
+//         cells.add(_tableCell(
+//             student.registrationFee > 0
+//                 ? student.registrationFee.toStringAsFixed(0)
+//                 : '—',
+//             align: pw.TextAlign.right));
+//       }
+//       if (showAnnual) {
+//         cells.add(_tableCell(
+//             student.annualFee > 0 ? student.annualFee.toStringAsFixed(0) : '—',
+//             align: pw.TextAlign.right));
+//       }
+//       cells.add(_tableCell(student.monthlyFee.toStringAsFixed(0), align: pw.TextAlign.right));
+//       cells.add(_tableCell(student.lineTotal.toStringAsFixed(0), align: pw.TextAlign.right, bold: true));
+//
+//       rows.add(pw.TableRow(children: cells));
+//     }
+//
+//     Map<int, pw.FlexColumnWidth> columnWidths = {};
+//     for (int i = 0; i < flexValues.length; i++) {
+//       columnWidths[i] = pw.FlexColumnWidth(flexValues[i]);
+//     }
+//
+//     return pw.Table(
+//       border: pw.TableBorder.all(color: _borderGrey, width: 0.5),
+//       columnWidths: columnWidths,
+//       children: [
+//         pw.TableRow(
+//           decoration: const pw.BoxDecoration(color: _darkPurple),
+//           children: headerChildren,
+//         ),
+//         ...rows,
+//       ],
+//     );
+//   }
+//
+//   static pw.Widget _tableHeaderCell(String text,
+//       {double flex = 1.0, pw.TextAlign align = pw.TextAlign.left}) {
+//     return pw.Padding(
+//       padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+//       child: pw.Text(
+//         text,
+//         textAlign: align,
+//         style: pw.TextStyle(
+//             fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+//       ),
+//     );
+//   }
+//
+//   static pw.Widget _tableCell(String text,
+//       {pw.TextAlign align = pw.TextAlign.left, bool bold = false}) {
+//     return pw.Padding(
+//       padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+//       child: pw.Text(
+//         text,
+//         textAlign: align,
+//         style: pw.TextStyle(
+//             fontSize: 8,
+//             fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal),
+//       ),
+//     );
+//   }
+//
+//   // ─── BOTTOM BLOCKS (Left: NOTE | Right: Grand Total) ──────────────────────
+//   static pw.Widget _bottomBlocks(FeeChallanModel c) {
+//     return pw.Row(
+//       crossAxisAlignment: pw.CrossAxisAlignment.start,
+//       children: [
+//         pw.Expanded(
+//           flex: 1,
+//           child: pw.Container(
+//             padding: const pw.EdgeInsets.all(10),
+//             decoration: pw.BoxDecoration(
+//               color: _lightPurple,
+//               borderRadius: pw.BorderRadius.circular(6),
+//             ),
+//             child: pw.Column(
+//               crossAxisAlignment: pw.CrossAxisAlignment.start,
+//               children: [
+//                 pw.Row(
+//                   children: [
+//                     pw.Container(
+//                       width: 18,
+//                       height: 18,
+//                       decoration: const pw.BoxDecoration(
+//                           color: _purple, shape: pw.BoxShape.circle),
+//                       alignment: pw.Alignment.center,
+//                       child: pw.Text('i',
+//                           style: pw.TextStyle(
+//                               color: PdfColors.white,
+//                               fontSize: 10,
+//                               fontWeight: pw.FontWeight.bold)),
+//                     ),
+//                     pw.SizedBox(width: 6),
+//                     pw.Text('NOTE',
+//                         style: pw.TextStyle(
+//                             fontSize: 8, fontWeight: pw.FontWeight.bold)),
+//                   ],
+//                 ),
+//                 pw.SizedBox(height: 4),
+//                 pw.Text(
+//                   'Please pay before the due date to avoid late fee.\nThis is a system-generated challan.',
+//                   style: pw.TextStyle(fontSize: 7, color: _grey),
+//                 ),
+//               ],
+//             ),
+//           ),
+//         ),
+//         pw.SizedBox(width: 12),
+//         pw.Expanded(
+//           flex: 1,
+//           child: pw.Container(
+//             padding: const pw.EdgeInsets.all(10),
+//             decoration: pw.BoxDecoration(
+//               color: _lightPurple,
+//               borderRadius: pw.BorderRadius.circular(6),
+//             ),
+//             child: pw.Column(
+//               children: [
+//                 _totalRow('Current Month', c.currentMonthTotal),
+//                 if (c.previousBalance > 0)
+//                   _totalRow('Previous Balance', c.previousBalance),
+//                 if (c.previousBalance < 0)
+//                   _totalRow('Advance Carried Forward', c.previousBalance,
+//                       color: _green),
+//                 pw.Container(
+//                     margin: const pw.EdgeInsets.symmetric(vertical: 3),
+//                     height: 0.5,
+//                     color: _borderGrey),
+//                 _totalRow('Grand Total', c.grandTotal, bold: true),
+//                 if (c.amountPaid > 0) _totalRow('Amount Paid', c.amountPaid),
+//                 if (c.amountPaid > 0)
+//                   _totalRow('Remaining Balance', c.remainingBalance, bold: true),
+//               ],
+//             ),
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+//
+//   static pw.Widget _totalRow(String label, double value,
+//       {bool bold = false, PdfColor? color}) {
+//     return pw.Padding(
+//       padding: const pw.EdgeInsets.symmetric(vertical: 1.5),
+//       child: pw.Row(
+//         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+//         children: [
+//           pw.Text(label,
+//               style: pw.TextStyle(
+//                   fontSize: 8,
+//                   fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+//                   color: color ?? (bold ? PdfColors.black : _grey))),
+//           pw.Text('Rs ${value.toStringAsFixed(0)}',
+//               style: pw.TextStyle(
+//                   fontSize: bold ? 10 : 8.5,
+//                   fontWeight: pw.FontWeight.bold,
+//                   color: color ?? (bold ? _purple : PdfColors.black))),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   static String _fmt(DateTime d) =>
+//       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+// }
+
+
+import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -8,33 +1510,29 @@ import 'package:printing/printing.dart';
 import '../models/fee_challan_model.dart';
 import '../models/school_setting_model.dart';
 
-// ─────────────────────────────────────────────
-//  Fee Challan PDF Service
-//  A4 page, 2 challans printed per page (top/bottom half — the
-//  standard "school copy" + "parent copy" tear-off layout).
-//  School header (name, logo, phone, address) is pulled from
-//  SchoolSettings and passed in by the caller — this service does
-//  not touch Firestore/Provider directly, keeping it a pure,
-//  fast, synchronous-build PDF layer (same pattern as
-//  SalaryPdfService).
-// ─────────────────────────────────────────────
 class FeeChallanPdfService {
-  static const PdfColor _purple = PdfColor.fromInt(0xFF534AB7);
-  static const PdfColor _lightPurple = PdfColor.fromInt(0xFFEEECFA);
+  // ─── UPDATED COLORS TO MATCH IMAGE ──────────────────────────────────────────
+  static const PdfColor _purple = PdfColor.fromInt(0xFF534AB7);    // Main primary
+  static const PdfColor _darkPurple = PdfColor.fromInt(0xFF3B3586); // Header & Table
+  static const PdfColor _lightPurple = PdfColor.fromInt(0xFFEEECFA); // Background boxes
   static const PdfColor _grey = PdfColor.fromInt(0xFF6B7280);
-  static const PdfColor _lightGrey = PdfColor.fromInt(0xFFF3F4F6);
   static const PdfColor _borderGrey = PdfColor.fromInt(0xFFE5E7EB);
+  static const PdfColor _lightRedBg = PdfColor.fromInt(0xFFFEF2F2);
   static const PdfColor _red = PdfColor.fromInt(0xFFDC2626);
   static const PdfColor _green = PdfColor.fromInt(0xFF16A34A);
 
-  // ── Public API (mirrors SalaryPdfService) ──
+  // ─── STATIC SCHOOL DATA ──────────────────────────────────────────────────────
+  static const String schoolName = 'Your School Name';
+  static const String schoolPhone = '123-4567890';
+  static const String schoolAddress = '123 Main Street, City, State';
+  static const String schoolCity = 'City';
 
-  /// Build a single-challan PDF (used for one-off print/download from
-  /// an expanded card, if ever needed) — still lays out 2-per-page
-  /// with the same challan repeated is wasteful, so single mode uses
-  /// a full-page single copy instead.
+  // ── Public API ──
+
   static Future<Uint8List> buildSinglePdf(
-      FeeChallanModel challan, SchoolSettings settings) async {
+      FeeChallanModel challan,
+      SchoolSettings settings,
+      ) async {
     final doc = pw.Document();
     doc.addPage(
       pw.Page(
@@ -51,14 +1549,12 @@ class FeeChallanPdfService {
     return doc.save();
   }
 
-  /// Build a merged PDF: every challan gets its own half-page slot,
-  /// two challans per A4 sheet, minimizing page count for bulk
-  /// printing/downloading (mirrors SalaryPdfService.buildMergedPdf).
   static Future<Uint8List> buildMergedPdf(
-      List<FeeChallanModel> challans, SchoolSettings settings) async {
+      List<FeeChallanModel> challans,
+      SchoolSettings settings,
+      ) async {
     final doc = pw.Document();
 
-    // Chunk into pairs so every page holds exactly 2 challans.
     for (var i = 0; i < challans.length; i += 2) {
       final first = challans[i];
       final second = (i + 1 < challans.length) ? challans[i + 1] : null;
@@ -95,7 +1591,9 @@ class FeeChallanPdfService {
   }
 
   static Future<void> downloadAndOpen(
-      FeeChallanModel challan, SchoolSettings settings) async {
+      FeeChallanModel challan,
+      SchoolSettings settings,
+      ) async {
     final bytes = await buildSinglePdf(challan, settings);
     await Printing.sharePdf(
       bytes: bytes,
@@ -104,7 +1602,9 @@ class FeeChallanPdfService {
   }
 
   static Future<void> printChallan(
-      FeeChallanModel challan, SchoolSettings settings) async {
+      FeeChallanModel challan,
+      SchoolSettings settings,
+      ) async {
     final bytes = await buildSinglePdf(challan, settings);
     await Printing.layoutPdf(
       onLayout: (format) async => bytes,
@@ -113,7 +1613,9 @@ class FeeChallanPdfService {
   }
 
   static Future<void> bulkDownload(
-      List<FeeChallanModel> challans, SchoolSettings settings) async {
+      List<FeeChallanModel> challans,
+      SchoolSettings settings,
+      ) async {
     final bytes = await buildMergedPdf(challans, settings);
     await Printing.sharePdf(
       bytes: bytes,
@@ -122,7 +1624,9 @@ class FeeChallanPdfService {
   }
 
   static Future<void> bulkPrint(
-      List<FeeChallanModel> challans, SchoolSettings settings) async {
+      List<FeeChallanModel> challans,
+      SchoolSettings settings,
+      ) async {
     final bytes = await buildMergedPdf(challans, settings);
     await Printing.layoutPdf(
       onLayout: (format) async => bytes,
@@ -130,11 +1634,13 @@ class FeeChallanPdfService {
     );
   }
 
-  // ── Layout builders ──
+  // ── Layout Builders ──
 
   static pw.Widget _challanBlock(
-      FeeChallanModel c, SchoolSettings settings,
-      {required bool compact}) {
+      FeeChallanModel c,
+      SchoolSettings settings, {
+        required bool compact,
+      }) {
     return pw.Container(
       decoration: pw.BoxDecoration(
         border: pw.Border.all(color: _borderGrey, width: 1),
@@ -144,20 +1650,37 @@ class FeeChallanPdfService {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          _schoolHeader(settings),
+          _schoolHeader(),
           pw.SizedBox(height: 8),
           pw.Container(height: 1, color: _borderGrey),
           pw.SizedBox(height: 8),
           _challanMetaRow(c),
-          pw.SizedBox(height: 8),
+          pw.SizedBox(height: 12),
           _studentTable(c),
-          pw.SizedBox(height: 8),
-          _totalsBlock(c),
+          pw.SizedBox(height: 12),
+          _bottomBlocks(c),
           if (!compact) ...[
-            pw.SizedBox(height: 10),
-            pw.Text(
-              'Please pay before the due date to avoid late fee. This is a system-generated challan.',
-              style: pw.TextStyle(fontSize: 8, color: _grey),
+            pw.SizedBox(height: 12),
+            pw.Container(
+              width: double.infinity,
+              decoration: const pw.BoxDecoration(
+                border: pw.Border(
+                  top: pw.BorderSide(
+                      color: _borderGrey, width: 1, style: pw.BorderStyle.dotted),
+                ),
+              ),
+              padding: const pw.EdgeInsets.only(top: 8),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: [
+                  pw.Text('♥', style: pw.TextStyle(fontSize: 12, color: _purple)),
+                  pw.SizedBox(width: 6),
+                  pw.Text(
+                    'Thank you for your timely payment!',
+                    style: pw.TextStyle(fontSize: 8, color: _grey),
+                  ),
+                ],
+              ),
             ),
           ],
         ],
@@ -165,249 +1688,364 @@ class FeeChallanPdfService {
     );
   }
 
-  static pw.Widget _schoolHeader(SchoolSettings settings) {
-    final hasLogo = settings.logoBase64 != null && settings.logoBase64!.isNotEmpty;
+  // ─── HEADER (Logo + School Name + Right Purple Block) ──────────────────────
+  static pw.Widget _schoolHeader() {
     return pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
-        if (hasLogo) ...[
-          pw.Container(
-            width: 40,
-            height: 40,
-            decoration: pw.BoxDecoration(
-              shape: pw.BoxShape.circle,
-              image: pw.DecorationImage(
-                image: pw.MemoryImage(
-                  base64Decode(settings.logoBase64!),
-                ),
-                fit: pw.BoxFit.cover,
-              ),
-            ),
-          ),
-          pw.SizedBox(width: 10),
-        ] else ...[
-          pw.Container(
-            width: 40,
-            height: 40,
-            decoration: const pw.BoxDecoration(
-              shape: pw.BoxShape.circle,
-              color: _lightPurple,
-            ),
-            alignment: pw.Alignment.center,
-            child: pw.Text(
-              settings.schoolName.isNotEmpty
-                  ? settings.schoolName[0].toUpperCase()
-                  : 'S',
-              style: pw.TextStyle(
-                  color: _purple, fontWeight: pw.FontWeight.bold, fontSize: 18),
-            ),
-          ),
-          pw.SizedBox(width: 10),
-        ],
-        pw.Expanded(
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(
-                settings.schoolName.isNotEmpty ? settings.schoolName : 'School Name',
-                style: pw.TextStyle(
-                    fontSize: 14, fontWeight: pw.FontWeight.bold, color: _purple),
-              ),
-              pw.SizedBox(height: 2),
-              if (settings.address.isNotEmpty)
-                pw.Text(settings.address,
-                    style: pw.TextStyle(fontSize: 8, color: _grey)),
-              pw.Text(
-                [
-                  if (settings.phone.isNotEmpty) 'Ph: ${settings.phone}',
-                  if (settings.city.isNotEmpty) settings.city,
-                ].join('  •  '),
-                style: pw.TextStyle(fontSize: 8, color: _grey),
-              ),
-            ],
-          ),
-        ),
-        pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.end,
-          children: [
-            pw.Text('FEE CHALLAN',
-                style: pw.TextStyle(
-                    fontSize: 11, fontWeight: pw.FontWeight.bold, color: _purple)),
-          ],
-        ),
-      ],
-    );
-  }
-
-  static pw.Widget _challanMetaRow(FeeChallanModel c) {
-    return pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Expanded(
-          flex: 3,
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              _metaLine('Family', c.familyName),
-              _metaLine('Father', c.fatherName),
-              if (c.fatherPhone.isNotEmpty) _metaLine('Phone', c.fatherPhone),
-            ],
-          ),
-        ),
         pw.Expanded(
           flex: 2,
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              _metaLine('Challan #', c.challanNumber),
-              _metaLine('Month', '${c.monthLabel} ${c.year}'),
-              _metaLine('Family ID', c.familyId),
-            ],
-          ),
-        ),
-        pw.Expanded(
-          flex: 2,
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              _metaLine('Generated', _fmt(c.generatedDate)),
-              pw.Container(
-                margin: const pw.EdgeInsets.only(top: 2),
-                padding:
-                const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: pw.BoxDecoration(
-                  color: const PdfColor.fromInt(0xFFFEF2F2),
-                  borderRadius: pw.BorderRadius.circular(4),
-                ),
-                child: pw.Text('Due: ${_fmt(c.dueDate)}',
+              pw.Row(
+                children: [
+                  // Logo
+                  pw.Container(
+                    width: 34,
+                    height: 34,
+                    alignment: pw.Alignment.center,
+                    decoration: pw.BoxDecoration(
+                      color: _lightPurple,
+                      shape: pw.BoxShape.circle,
+                    ),
+                    child: pw.Text('S', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: _darkPurple)),
+                  ),
+                  pw.SizedBox(width: 10),
+                  pw.Text(
+                    schoolName,
                     style: pw.TextStyle(
-                        fontSize: 8,
-                        color: _red,
-                        fontWeight: pw.FontWeight.bold)),
+                        fontSize: 16,
+                        fontWeight: pw.FontWeight.bold,
+                        color: _darkPurple),
+                  ),
+                ],
               ),
+              pw.SizedBox(height: 4),
+              pw.Text('📍 $schoolAddress',
+                  style: pw.TextStyle(fontSize: 8, color: _grey)),
+              pw.Text('📞 Ph: $schoolPhone  |  $schoolCity',
+                  style: pw.TextStyle(fontSize: 8, color: _grey)),
             ],
+          ),
+        ),
+        pw.Container(
+          width: 140,
+          height: 60,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 10),
+          decoration: const pw.BoxDecoration(
+            color: _darkPurple,
+            borderRadius: pw.BorderRadius.only(
+              bottomLeft: pw.Radius.circular(15),
+              topLeft: pw.Radius.circular(15),
+            ),
+          ),
+          alignment: pw.Alignment.center,
+          child: pw.Text(
+            'FEE CHALLAN',
+            style: pw.TextStyle(
+                fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
           ),
         ),
       ],
     );
   }
 
-  static pw.Widget _metaLine(String label, String value) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 2),
-      child: pw.RichText(
-        text: pw.TextSpan(
-          children: [
-            pw.TextSpan(
-                text: '$label: ',
-                style: pw.TextStyle(fontSize: 8, color: _grey)),
-            pw.TextSpan(
-                text: value.isNotEmpty ? value : '—',
-                style: pw.TextStyle(
-                    fontSize: 8.5,
-                    color: PdfColors.black,
-                    fontWeight: pw.FontWeight.bold)),
-          ],
-        ),
+  // ─── META INFO ROW (Light Purple box, with Foolproof Shapes) ──────────────
+  static pw.Widget _challanMetaRow(FeeChallanModel c) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(12),
+      decoration: pw.BoxDecoration(
+        color: _lightPurple,
+        borderRadius: pw.BorderRadius.circular(8),
+        border: pw.Border.all(color: _borderGrey, width: 0.5),
+      ),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          // Column 1: Family, Father, Phone
+          pw.Expanded(
+            flex: 3,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // ⭐ CHANGED HERE: Family ID show kiya Family Name ke aaghy
+                _metaRowCircleIcon('F', 'Family ID', c.familyName.isNotEmpty ? ' (${c.familyId})' : ''),
+                _metaRowCircleIcon('P', 'Father', c.fatherName),
+                if (c.fatherPhone.isNotEmpty)
+                  _metaRowCircleIcon('T', 'Phone', c.fatherPhone),
+              ],
+            ),
+          ),
+          // Column 2: Challan #, Month, Family ID (Agar chahein toh Family ID yahan se hata bhi sakte hain)
+          pw.Expanded(
+            flex: 2,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                _metaRowCircleIcon('D', 'Challan #', c.challanNumber),
+                _metaRowCircleIcon('C', 'Month', '${c.monthLabel} ${c.year}'),
+                // Aap chahein toh yahan wali Family ID ko hata kar " " (empty) kar sakte hain, abhi filhal rakha hai
+                // _metaRowCircleIcon('I', 'Family ID', c.familyId),
+              ],
+            ),
+          ),
+          // Column 3: Generated, Due (with red background)
+          pw.Expanded(
+            flex: 2,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                _metaRowCircleIcon('G', 'Generated', _fmt(c.generatedDate)),
+                pw.SizedBox(height: 4),
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: pw.BoxDecoration(
+                    color: _lightRedBg,
+                    borderRadius: pw.BorderRadius.circular(4),
+                  ),
+                  child: pw.Row(
+                    children: [
+                      pw.Container(
+                          width: 14, height: 14,
+                          decoration: const pw.BoxDecoration(color: _red, shape: pw.BoxShape.circle),
+                          alignment: pw.Alignment.center,
+                          child: pw.Text('!', style: pw.TextStyle(color: PdfColors.white, fontSize: 8, fontWeight: pw.FontWeight.bold))
+                      ),
+                      pw.SizedBox(width: 4),
+                      pw.Text('Due: ${_fmt(c.dueDate)}',
+                          style: pw.TextStyle(
+                              fontSize: 8, color: _red, fontWeight: pw.FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
+  // Foolproof Icon System (Replaces emojis and PdfIcons)
+  static pw.Widget _metaRowCircleIcon(String iconLetter, String label, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 4),
+      child: pw.Row(
+        children: [
+          pw.Container(
+            width: 14,
+            height: 14,
+            decoration: const pw.BoxDecoration(
+                color: _purple,
+                shape: pw.BoxShape.circle
+            ),
+            alignment: pw.Alignment.center,
+            child: pw.Text(
+              iconLetter,
+              style: pw.TextStyle(
+                  color: PdfColors.white,
+                  fontSize: 7,
+                  fontWeight: pw.FontWeight.bold
+              ),
+            ),
+          ),
+          pw.SizedBox(width: 6),
+          pw.Text('$label: ', style: pw.TextStyle(fontSize: 8, color: _grey)),
+          pw.Text(value.isNotEmpty ? value : '—',
+              style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  // ─── DYNAMIC STUDENT TABLE ───────────────────────────────────────────────────
   static pw.Widget _studentTable(FeeChallanModel c) {
+    bool showAdmission = c.students.any((s) => s.registrationFee > 0);
+    bool showAnnual = c.students.any((s) => s.annualFee > 0);
+
+    List<double> flexValues = [];
+    flexValues.add(0.5); // #
+    flexValues.add(2.0); // Student
+    flexValues.add(1.5); // Class
+    if (showAdmission) flexValues.add(1.2);
+    if (showAnnual) flexValues.add(1.2);
+    flexValues.add(1.2); // Monthly
+    flexValues.add(1.2); // Total
+
+    List<pw.Widget> headerChildren = [
+      _tableHeaderCell('#', flex: 0.5, align: pw.TextAlign.center),
+      _tableHeaderCell('Student', flex: 2.0),
+      _tableHeaderCell('Class', flex: 1.5),
+      if (showAdmission) _tableHeaderCell('Admission', flex: 1.2, align: pw.TextAlign.right),
+      if (showAnnual) _tableHeaderCell('Annual', flex: 1.2, align: pw.TextAlign.right),
+      _tableHeaderCell('Monthly Fee', flex: 1.2, align: pw.TextAlign.right),
+      _tableHeaderCell('Total', flex: 1.2, align: pw.TextAlign.right),
+    ];
+
+    List<pw.TableRow> rows = [];
+    for (int i = 0; i < c.students.length; i++) {
+      final student = c.students[i];
+      List<pw.Widget> cells = [];
+
+      // # Column with light purple box
+      cells.add(pw.Container(
+        padding: const pw.EdgeInsets.symmetric(vertical: 5),
+        alignment: pw.Alignment.center,
+        child: pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: pw.BoxDecoration(
+            color: _lightPurple,
+            borderRadius: pw.BorderRadius.circular(4),
+          ),
+          child: pw.Text('${i + 1}',
+              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+        ),
+      ));
+
+      cells.add(_tableCell(student.name, bold: true));
+      cells.add(_tableCell([student.className, student.sectionName]
+          .whereType<String>()
+          .join(' - ')));
+
+      if (showAdmission) {
+        cells.add(_tableCell(
+            student.registrationFee > 0
+                ? student.registrationFee.toStringAsFixed(0)
+                : '—',
+            align: pw.TextAlign.right));
+      }
+      if (showAnnual) {
+        cells.add(_tableCell(
+            student.annualFee > 0 ? student.annualFee.toStringAsFixed(0) : '—',
+            align: pw.TextAlign.right));
+      }
+      cells.add(_tableCell(student.monthlyFee.toStringAsFixed(0), align: pw.TextAlign.right));
+      cells.add(_tableCell(student.lineTotal.toStringAsFixed(0), align: pw.TextAlign.right, bold: true));
+
+      rows.add(pw.TableRow(children: cells));
+    }
+
+    Map<int, pw.FlexColumnWidth> columnWidths = {};
+    for (int i = 0; i < flexValues.length; i++) {
+      columnWidths[i] = pw.FlexColumnWidth(flexValues[i]);
+    }
+
     return pw.Table(
       border: pw.TableBorder.all(color: _borderGrey, width: 0.5),
-      columnWidths: {
-        0: const pw.FlexColumnWidth(3),
-        1: const pw.FlexColumnWidth(2),
-        2: const pw.FlexColumnWidth(1.5),
-        3: const pw.FlexColumnWidth(1.5),
-        4: const pw.FlexColumnWidth(1.5),
-        5: const pw.FlexColumnWidth(1.5),
-      },
+      columnWidths: columnWidths,
       children: [
         pw.TableRow(
-          decoration: const pw.BoxDecoration(color: _lightGrey),
-          children: [
-            _tableHeaderCell('Student'),
-            _tableHeaderCell('Class'),
-            _tableHeaderCell('Admission'),
-            _tableHeaderCell('Annual'),
-            _tableHeaderCell('Monthly'),
-            _tableHeaderCell('Total'),
-          ],
+          decoration: const pw.BoxDecoration(color: _darkPurple),
+          children: headerChildren,
         ),
-        ...c.students.map((s) => pw.TableRow(
-          children: [
-            _tableCell(s.name, bold: true),
-            _tableCell([
-              if (s.className != null && s.className!.isNotEmpty) s.className!,
-              if (s.sectionName != null && s.sectionName!.isNotEmpty)
-                s.sectionName!,
-            ].join(' - ')),
-            _tableCell(
-                s.registrationFee > 0 ? s.registrationFee.toStringAsFixed(0) : '—',
-                align: pw.TextAlign.right),
-            _tableCell(s.annualFee > 0 ? s.annualFee.toStringAsFixed(0) : '—',
-                align: pw.TextAlign.right),
-            _tableCell(s.monthlyFee.toStringAsFixed(0), align: pw.TextAlign.right),
-            _tableCell(s.lineTotal.toStringAsFixed(0),
-                align: pw.TextAlign.right, bold: true),
-          ],
-        )),
+        ...rows,
       ],
     );
   }
 
-  static pw.Widget _tableHeaderCell(String text) {
+  static pw.Widget _tableHeaderCell(String text,
+      {double flex = 1.0, pw.TextAlign align = pw.TextAlign.left}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
-      child: pw.Text(text,
-          style: pw.TextStyle(
-              fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _purple)),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+      child: pw.Text(
+        text,
+        textAlign: align,
+        style: pw.TextStyle(
+            fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+      ),
     );
   }
 
   static pw.Widget _tableCell(String text,
       {pw.TextAlign align = pw.TextAlign.left, bool bold = false}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
-      child: pw.Text(text,
-          textAlign: align,
-          style: pw.TextStyle(
-              fontSize: 8,
-              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+      child: pw.Text(
+        text,
+        textAlign: align,
+        style: pw.TextStyle(
+            fontSize: 8,
+            fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal),
+      ),
     );
   }
 
-  static pw.Widget _totalsBlock(FeeChallanModel c) {
-    return pw.Align(
-      alignment: pw.Alignment.centerRight,
-      child: pw.Container(
-        width: 220,
-        padding: const pw.EdgeInsets.all(8),
-        decoration: pw.BoxDecoration(
-          color: _lightPurple,
-          borderRadius: pw.BorderRadius.circular(6),
+  // ─── BOTTOM BLOCKS (Left: NOTE | Right: Grand Total) ──────────────────────
+  static pw.Widget _bottomBlocks(FeeChallanModel c) {
+    return pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Expanded(
+          flex: 1,
+          child: pw.Container(
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: _lightPurple,
+              borderRadius: pw.BorderRadius.circular(6),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Row(
+                  children: [
+                    pw.Container(
+                      width: 18,
+                      height: 18,
+                      decoration: const pw.BoxDecoration(
+                          color: _purple, shape: pw.BoxShape.circle),
+                      alignment: pw.Alignment.center,
+                      child: pw.Text('i',
+                          style: pw.TextStyle(
+                              color: PdfColors.white,
+                              fontSize: 10,
+                              fontWeight: pw.FontWeight.bold)),
+                    ),
+                    pw.SizedBox(width: 6),
+                    pw.Text('NOTE',
+                        style: pw.TextStyle(
+                            fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                  ],
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  'Please pay before the due date to avoid late fee.\nThis is a system-generated challan.',
+                  style: pw.TextStyle(fontSize: 7, color: _grey),
+                ),
+              ],
+            ),
+          ),
         ),
-        child: pw.Column(
-          children: [
-            _totalRow('Current Month', c.currentMonthTotal),
-            if (c.previousBalance > 0)
-              _totalRow('Previous Balance', c.previousBalance),
-            if (c.previousBalance < 0)
-              _totalRow('Advance Carried Forward', c.previousBalance,
-                  color: _green),
-            pw.Container(
-                margin: const pw.EdgeInsets.symmetric(vertical: 3),
-                height: 0.5,
-                color: _borderGrey),
-            _totalRow('Grand Total', c.grandTotal, bold: true),
-            if (c.amountPaid > 0) _totalRow('Amount Paid', c.amountPaid),
-            if (c.amountPaid > 0)
-              _totalRow('Remaining Balance', c.remainingBalance, bold: true),
-          ],
+        pw.SizedBox(width: 12),
+        pw.Expanded(
+          flex: 1,
+          child: pw.Container(
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: _lightPurple,
+              borderRadius: pw.BorderRadius.circular(6),
+            ),
+            child: pw.Column(
+              children: [
+                _totalRow('Current Month', c.currentMonthTotal),
+                if (c.previousBalance > 0)
+                  _totalRow('Previous Balance', c.previousBalance),
+                if (c.previousBalance < 0)
+                  _totalRow('Advance Carried Forward', c.previousBalance,
+                      color: _green),
+                pw.Container(
+                    margin: const pw.EdgeInsets.symmetric(vertical: 3),
+                    height: 0.5,
+                    color: _borderGrey),
+                _totalRow('Grand Total', c.grandTotal, bold: true),
+                if (c.amountPaid > 0) _totalRow('Amount Paid', c.amountPaid),
+                if (c.amountPaid > 0)
+                  _totalRow('Remaining Balance', c.remainingBalance, bold: true),
+              ],
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
