@@ -145,30 +145,47 @@ class FeeChallanProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // ── Fetch all family histories with WHERE IN (chunked into groups of 30) ──
+      // ── 1. Fire all history queries and the counter reservation concurrently ──
       final familyDocIds = families.map((f) => f.familyDocId).toList();
-      final Map<String, List<DocumentSnapshot>> historyByFamily = {};
 
-      // Chunk size 30 – Firestore's maximum for `whereIn`
+      // Build the list of futures – one per chunk
       const chunkSize = 30;
+      final List<Future<QuerySnapshot<Map<String, dynamic>>>> historyFutures = [];
+
       for (var i = 0; i < familyDocIds.length; i += chunkSize) {
-        final chunk = familyDocIds.sublist(i, (i + chunkSize).clamp(0, familyDocIds.length));
-        final snap = await _db
-            .collection(_collection)
-            .where('familyDocId', whereIn: chunk)
-            .get();
+        final chunk = familyDocIds.sublist(
+            i, (i + chunkSize).clamp(0, familyDocIds.length));
+        historyFutures.add(
+          _db
+              .collection(_collection)
+              .where('familyDocId', whereIn: chunk)
+              .get(),
+        );
+      }
+
+      // Start the counter reservation in parallel
+      final counterFuture = _reserveChallanNumbers(families.length);
+
+      // Wait for ALL history queries to complete
+      final List<QuerySnapshot<Map<String, dynamic>>> historySnapshots =
+      await Future.wait(historyFutures);
+
+      // Assemble the per-family history map (same as before)
+      final Map<String, List<DocumentSnapshot>> historyByFamily = {};
+      for (final snap in historySnapshots) {
         for (final doc in snap.docs) {
           final fid = doc.get('familyDocId') as String;
           historyByFamily.putIfAbsent(fid, () => []).add(doc);
         }
       }
 
+      // Now also wait for the counter (it might already be done)
+      final int nextNumberStart = await counterFuture;
+      int nextNumber = nextNumberStart;
+
+      // ── 2. Process families (unchanged logic) ──
       final List<FeeChallanModel> generated = [];
       int skipped = 0;
-
-      // Reserve contiguous challan numbers
-      int nextNumber = await _reserveChallanNumbers(families.length);
-
       final batch = _db.batch();
       final targetKey = year * 100 + month;
 
@@ -176,7 +193,7 @@ class FeeChallanProvider extends ChangeNotifier {
         final family = families[i];
         final familyDocs = historyByFamily[family.familyDocId] ?? [];
 
-        // --- Dart‑side history analysis (unchanged logic) ---
+        // --- Dart‑side history analysis ---
         final Set<String> doneThisMonth = {};
         final Set<String> everHad = {};
         final Map<String, double> priorBalance = {};
@@ -191,19 +208,20 @@ class FeeChallanProvider extends ChangeNotifier {
               .map((e) => e.toString());
 
           everHad.addAll(sids);
-
           if (docKey == targetKey) {
             doneThisMonth.addAll(sids);
           }
-
           if (docKey < targetKey) {
             final createdAtTs = data['createdAt'];
             final createdAt = createdAtTs is Timestamp
                 ? createdAtTs.toDate()
                 : DateTime.fromMillisecondsSinceEpoch(0);
-            final grandTotal = (data['currentMonthTotal'] as num?)?.toDouble() ?? 0;
-            final prevBal = (data['previousBalance'] as num?)?.toDouble() ?? 0;
-            final amountPaid = (data['amountPaid'] as num?)?.toDouble() ?? 0;
+            final grandTotal =
+                (data['currentMonthTotal'] as num?)?.toDouble() ?? 0;
+            final prevBal =
+                (data['previousBalance'] as num?)?.toDouble() ?? 0;
+            final amountPaid =
+                (data['amountPaid'] as num?)?.toDouble() ?? 0;
             final remaining = (grandTotal + prevBal) - amountPaid;
 
             for (final sid in sids) {
@@ -219,7 +237,6 @@ class FeeChallanProvider extends ChangeNotifier {
         final eligible = family.students
             .where((s) => !doneThisMonth.contains(s.studentId))
             .toList();
-
         if (eligible.isEmpty) {
           skipped++;
           continue;
@@ -246,7 +263,8 @@ class FeeChallanProvider extends ChangeNotifier {
           previousBalance += priorBalance[s.studentId] ?? 0;
         }
 
-        final challanNumber = 'CH-${nextNumber.toString().padLeft(4, '0')}';
+        final challanNumber =
+            'CH-${nextNumber.toString().padLeft(4, '0')}';
         nextNumber++;
 
         final docRef = _db.collection(_collection).doc();
@@ -272,6 +290,7 @@ class FeeChallanProvider extends ChangeNotifier {
         generated.add(model);
       }
 
+      // ── 3. Commit batch and update in‑memory state ──
       if (generated.isNotEmpty) {
         await batch.commit();
       }
@@ -279,7 +298,6 @@ class FeeChallanProvider extends ChangeNotifier {
       _lastGeneratedChallans = generated;
       _lastGenerationSkippedCount = skipped;
 
-      // Update in‑memory guard set
       for (final c in generated) {
         _alreadyGeneratedStudentIds.addAll(c.studentIds);
       }
@@ -304,22 +322,28 @@ class FeeChallanProvider extends ChangeNotifier {
   //   notifyListeners();
   //
   //   try {
-  //     // Fetch each selected family's own challan history in parallel —
-  //     // one simple `where('familyDocId', ...)` query per family, all
-  //     // fired together with Future.wait. No arrayContainsAny, no
-  //     // orderBy, no composite index ever required for this call.
-  //     final histories = await Future.wait(
-  //       families.map((f) => _db
+  //     // ── Fetch all family histories with WHERE IN (chunked into groups of 30) ──
+  //     final familyDocIds = families.map((f) => f.familyDocId).toList();
+  //     final Map<String, List<DocumentSnapshot>> historyByFamily = {};
+  //
+  //     // Chunk size 30 – Firestore's maximum for `whereIn`
+  //     const chunkSize = 30;
+  //     for (var i = 0; i < familyDocIds.length; i += chunkSize) {
+  //       final chunk = familyDocIds.sublist(i, (i + chunkSize).clamp(0, familyDocIds.length));
+  //       final snap = await _db
   //           .collection(_collection)
-  //           .where('familyDocId', isEqualTo: f.familyDocId)
-  //           .get()),
-  //     );
+  //           .where('familyDocId', whereIn: chunk)
+  //           .get();
+  //       for (final doc in snap.docs) {
+  //         final fid = doc.get('familyDocId') as String;
+  //         historyByFamily.putIfAbsent(fid, () => []).add(doc);
+  //       }
+  //     }
   //
   //     final List<FeeChallanModel> generated = [];
   //     int skipped = 0;
   //
-  //     // Reserve a contiguous block of challan numbers up front (one
-  //     // counter transaction) instead of one transaction per challan.
+  //     // Reserve contiguous challan numbers
   //     int nextNumber = await _reserveChallanNumbers(families.length);
   //
   //     final batch = _db.batch();
@@ -327,17 +351,16 @@ class FeeChallanProvider extends ChangeNotifier {
   //
   //     for (var i = 0; i < families.length; i++) {
   //       final family = families[i];
-  //       final familyDocs = histories[i].docs;
+  //       final familyDocs = historyByFamily[family.familyDocId] ?? [];
   //
-  //       // Reason about this family's history entirely in Dart —
-  //       // cheap since it's at most a few dozen documents.
+  //       // --- Dart‑side history analysis (unchanged logic) ---
   //       final Set<String> doneThisMonth = {};
   //       final Set<String> everHad = {};
   //       final Map<String, double> priorBalance = {};
   //       final Map<String, DateTime> latestPriorSeen = {};
   //
   //       for (final doc in familyDocs) {
-  //         final data = doc.data();
+  //         final data = doc.data() as Map<String, dynamic>;
   //         final docMonth = (data['month'] as num?)?.toInt() ?? 0;
   //         final docYear = (data['year'] as num?)?.toInt() ?? 0;
   //         final docKey = docYear * 100 + docMonth;
@@ -433,7 +456,7 @@ class FeeChallanProvider extends ChangeNotifier {
   //     _lastGeneratedChallans = generated;
   //     _lastGenerationSkippedCount = skipped;
   //
-  //     // Keep the in-memory guard set current without a full re-fetch.
+  //     // Update in‑memory guard set
   //     for (final c in generated) {
   //       _alreadyGeneratedStudentIds.addAll(c.studentIds);
   //     }
