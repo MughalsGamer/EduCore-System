@@ -22,6 +22,7 @@ import 'admission mangement/admission_list_screen.dart';
 // Naya Attendance Screen Import
 import 'attendance_management/attendance_screen.dart';
 import 'family_management/family management.dart';
+import 'fee_management/fee_collection_screen.dart';
 import 'fee_management/generate_challan_screen.dart';
 import 'student_management/student_list.dart';
 import 'teacher_management/teacher_list.dart';
@@ -119,6 +120,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       'Family': () => const FamilyManagementScreen(),
       'Fee Structure': () => const FeeStructureScreen(),
       'Generate Challan': () => const GenerateChallanScreen(), // ← NEW
+      'Fee Collection': () => const FeeCollectionScreen(),      // ← NEW
       'Fee Receipts': () => const FeeReceiptsScreen(),
       'Student Ledger': () => StudentLedgerScreen(studentId: 'studentId'),
       'Add Expense': () => const AddExpenseScreen(),
@@ -207,6 +209,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       _NavItem('Classes', Icons.class_rounded, go('Classes')),
       _NavItem('Admissions', Icons.how_to_reg_rounded, go('Admissions'), badge: 3),
       _NavItem('Generate Challan', Icons.receipt_long_rounded, go('Generate Challan')), // ← NEW
+      _NavItem('Fee Collection', Icons.payments_rounded, go('Fee Collection')),          // ← NEW
+
 
       _NavItem('Family', Icons.family_restroom_rounded, go('Family')),
       _NavItem('Students', Icons.people_rounded, go('Students')),
@@ -504,12 +508,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                     .map((e) => _sbTile(e, isDrawer)),
               ],
               if (items.any((n) => [
-                'Admissions','Generate Challan', 'Students', 'Family'
+                'Admissions','Generate Challan','Fee Collection', 'Students', 'Family'
               ].contains(n.label))) ...[
                 _sbLabel('Enrollment'),
                 ...items
                     .where((n) => [
-                  'Admissions','Generate Challan', 'Students', 'Family'
+                  'Admissions','Generate Challan','Fee Collection', 'Students', 'Family'
                 ].contains(n.label))
                     .map((e) => _sbTile(e, isDrawer)),
               ],
