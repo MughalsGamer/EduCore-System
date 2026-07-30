@@ -22,6 +22,7 @@ import 'admission mangement/admission_list_screen.dart';
 // Naya Attendance Screen Import
 import 'attendance_management/attendance_screen.dart';
 import 'family_management/family management.dart';
+import 'fee_management/fee_collection_history_screen.dart';
 import 'fee_management/fee_collection_screen.dart';
 import 'fee_management/generate_challan_screen.dart';
 import 'student_management/student_list.dart';
@@ -120,7 +121,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       'Family': () => const FamilyManagementScreen(),
       'Fee Structure': () => const FeeStructureScreen(),
       'Generate Challan': () => const GenerateChallanScreen(), // ← NEW
-      'Fee Collection': () => const FeeCollectionScreen(),      // ← NEW
+      'Fee Collection': () => const FeeCollectionHistoryScreen(),      // ← NEW
       'Fee Receipts': () => const FeeReceiptsScreen(),
       'Student Ledger': () => StudentLedgerScreen(studentId: 'studentId'),
       'Add Expense': () => const AddExpenseScreen(),
