@@ -1,8 +1,14 @@
+//
+//
+// import 'package:cloud_firestore/cloud_firestore.dart';
 // import 'package:flutter/material.dart';
 // import 'package:intl/intl.dart';
 // import 'package:provider/provider.dart';
 //
+// import '../../models/fee_challan_model.dart';
+// import '../../pdf_files/family_ledger_pdf_generator.dart';
 // import '../../providers/fee_collection_provider.dart';
+// import '../../services/family_ledger_pdf_service.dart';
 //
 // // ─────────────────────────────────────────────
 // //  Design tokens (matches EduCore brand + EmployeeLedgerScreen style)
@@ -46,12 +52,98 @@
 // }
 //
 // class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
+//   // Raw challans for this family — fetched directly (single equality
+//   // where on familyDocId, index-free) so the PDF can show the
+//   // student-wise fee breakdown that FamilyLedgerEntry doesn't carry.
+//   List<FeeChallanModel> _challans = [];
+//   bool _isLoadingChallans = false;
+//   bool _isPdfBusy = false;
+//
 //   @override
 //   void initState() {
 //     super.initState();
 //     WidgetsBinding.instance.addPostFrameCallback((_) {
 //       context.read<FeeCollectionProvider>().loadFamilyLedger(widget.familyDocId);
+//       _loadChallansForPdf();
 //     });
+//   }
+//
+//   Future<void> _loadChallansForPdf() async {
+//     setState(() => _isLoadingChallans = true);
+//     try {
+//       final snap = await FirebaseFirestore.instance
+//           .collection('fee_challans')
+//           .where('familyDocId', isEqualTo: widget.familyDocId)
+//           .get();
+//       final list = snap.docs.map((d) => FeeChallanModel.fromFirestore(d)).toList();
+//       list.sort((a, b) => a.generatedDate.compareTo(b.generatedDate));
+//       if (!mounted) return;
+//       setState(() => _challans = list);
+//     } catch (_) {
+//       // Silent fail is fine here — PDF button will just show 0 challans
+//       // if this errors, ledger screen itself still works.
+//     } finally {
+//       if (mounted) setState(() => _isLoadingChallans = false);
+//     }
+//   }
+//
+//   List<FamilyLedgerCreditEntry> _creditEntriesFromProvider() {
+//     final entries = context.read<FeeCollectionProvider>().ledgerEntries;
+//     return entries.where((e) => e.type == 'credit').map((e) {
+//       return FamilyLedgerCreditEntry(
+//         date: e.date,
+//         amount: e.amount,
+//         description: e.description,
+//         note: e.note,
+//       );
+//     }).toList();
+//   }
+//
+//   Future<void> _printPdf() async {
+//     if (_isPdfBusy) return;
+//     setState(() => _isPdfBusy = true);
+//     try {
+//       await FamilyLedgerPdfService.printLedger(
+//         familyName: widget.familyName,
+//         fatherName: widget.fatherName,
+//         familyId: widget.familyId,
+//         challans: _challans,
+//         credits: _creditEntriesFromProvider(),
+//       );
+//     } catch (e) {
+//       _showSnack('Print failed: $e', isError: true);
+//     } finally {
+//       if (mounted) setState(() => _isPdfBusy = false);
+//     }
+//   }
+//
+//   Future<void> _downloadPdf() async {
+//     if (_isPdfBusy) return;
+//     setState(() => _isPdfBusy = true);
+//     try {
+//       await FamilyLedgerPdfService.downloadAndOpen(
+//         familyName: widget.familyName,
+//         fatherName: widget.fatherName,
+//         familyId: widget.familyId,
+//         challans: _challans,
+//         credits: _creditEntriesFromProvider(),
+//       );
+//     } catch (e) {
+//       _showSnack('Save failed: $e', isError: true);
+//     } finally {
+//       if (mounted) setState(() => _isPdfBusy = false);
+//     }
+//   }
+//
+//   void _showSnack(String msg, {bool isError = false}) {
+//     if (!mounted) return;
+//     ScaffoldMessenger.of(context).showSnackBar(
+//       SnackBar(
+//         content: Text(msg),
+//         backgroundColor: isError ? Colors.red.shade600 : Colors.green.shade600,
+//         behavior: SnackBarBehavior.floating,
+//       ),
+//     );
 //   }
 //
 //   @override
@@ -74,11 +166,36 @@
 //         title: Text('${widget.familyName} — Ledger',
 //             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 17)),
 //         actions: [
+//           if (_isPdfBusy)
+//             const Padding(
+//               padding: EdgeInsets.symmetric(horizontal: 14),
+//               child: Center(
+//                 child: SizedBox(
+//                   width: 18,
+//                   height: 18,
+//                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+//                 ),
+//               ),
+//             )
+//           else ...[
+//             IconButton(
+//               icon: const Icon(Icons.print_outlined),
+//               tooltip: 'Print PDF',
+//               onPressed: (_isLoadingChallans) ? null : _printPdf,
+//             ),
+//             IconButton(
+//               icon: const Icon(Icons.download_rounded),
+//               tooltip: 'Download PDF',
+//               onPressed: (_isLoadingChallans) ? null : _downloadPdf,
+//             ),
+//           ],
 //           IconButton(
 //             icon: const Icon(Icons.refresh),
 //             tooltip: 'Refresh',
-//             onPressed: () =>
-//                 context.read<FeeCollectionProvider>().loadFamilyLedger(widget.familyDocId),
+//             onPressed: () {
+//               context.read<FeeCollectionProvider>().loadFamilyLedger(widget.familyDocId);
+//               _loadChallansForPdf();
+//             },
 //           ),
 //         ],
 //       ),
@@ -332,8 +449,13 @@
 //   }
 //
 //   Widget _desktopTable(List<FamilyLedgerEntry> rows) {
+//     final provider = context.read<FeeCollectionProvider>();
+//     final totalDebit = provider.ledgerTotalDebit;
+//     final totalCredit = provider.ledgerTotalCredit;
+//     final netBalance = provider.ledgerBalance;
+//
 //     return Container(
-//       constraints: const BoxConstraints(maxHeight: 520),
+//       constraints: const BoxConstraints(maxHeight: 560),
 //       child: Column(
 //         children: [
 //           Container(
@@ -361,6 +483,52 @@
 //               ),
 //             ),
 //           ),
+//           _desktopTotalsRow(totalDebit, totalCredit, netBalance),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   // ── Totals footer row (Desktop) ──
+//   Widget _desktopTotalsRow(double totalDebit, double totalCredit, double netBalance) {
+//     return Container(
+//       decoration: BoxDecoration(
+//         color: _kPurpleLight,
+//         border: Border(top: BorderSide(color: _kPurple.withOpacity(0.25), width: 1.4)),
+//       ),
+//       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+//       child: Row(
+//         children: [
+//           const Expanded(
+//             flex: 38,
+//             child: Text('TOTAL',
+//                 style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: _kPurple, letterSpacing: 0.4)),
+//           ),
+//           Expanded(
+//             flex: 14,
+//             child: Text(
+//               NumberFormat('#,##0').format(totalDebit),
+//               textAlign: TextAlign.right,
+//               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kRed),
+//             ),
+//           ),
+//           Expanded(
+//             flex: 14,
+//             child: Text(
+//               NumberFormat('#,##0').format(totalCredit),
+//               textAlign: TextAlign.right,
+//               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kGreen),
+//             ),
+//           ),
+//           Expanded(
+//             flex: 15,
+//             child: Text(
+//               '${NumberFormat('#,##0').format(netBalance.abs())} ${netBalance >= 0 ? 'Dr' : 'Cr'}',
+//               textAlign: TextAlign.right,
+//               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kInk),
+//             ),
+//           ),
+//           const Expanded(flex: 9, child: SizedBox()),
 //         ],
 //       ),
 //     );
@@ -434,17 +602,74 @@
 //   }
 //
 //   Widget _mobileCardsList(List<FamilyLedgerEntry> rows) {
+//     final provider = context.read<FeeCollectionProvider>();
 //     return Container(
-//       constraints: const BoxConstraints(maxHeight: 460),
-//       child: Scrollbar(
-//         thumbVisibility: true,
-//         child: ListView.separated(
-//           shrinkWrap: true,
-//           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-//           itemCount: rows.length,
-//           separatorBuilder: (_, __) => const SizedBox(height: 8),
-//           itemBuilder: (context, i) => _mobileRow(rows[i]),
-//         ),
+//       constraints: const BoxConstraints(maxHeight: 520),
+//       child: Column(
+//         children: [
+//           Expanded(
+//             child: Scrollbar(
+//               thumbVisibility: true,
+//               child: ListView.separated(
+//                 shrinkWrap: true,
+//                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+//                 itemCount: rows.length,
+//                 separatorBuilder: (_, __) => const SizedBox(height: 8),
+//                 itemBuilder: (context, i) => _mobileRow(rows[i]),
+//               ),
+//             ),
+//           ),
+//           _mobileTotalsCard(
+//             provider.ledgerTotalDebit,
+//             provider.ledgerTotalCredit,
+//             provider.ledgerBalance,
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   // ── Totals footer card (Mobile) ──
+//   Widget _mobileTotalsCard(double totalDebit, double totalCredit, double netBalance) {
+//     return Container(
+//       margin: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+//       padding: const EdgeInsets.all(14),
+//       decoration: BoxDecoration(
+//         color: _kPurpleLight,
+//         borderRadius: BorderRadius.circular(12),
+//         border: Border.all(color: _kPurple.withOpacity(0.2)),
+//       ),
+//       child: Column(
+//         children: [
+//           Row(
+//             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//             children: [
+//               Text('Total Debit', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+//               Text('Rs ${NumberFormat('#,##0').format(totalDebit)}',
+//                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kRed)),
+//             ],
+//           ),
+//           const SizedBox(height: 6),
+//           Row(
+//             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//             children: [
+//               Text('Total Credit', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+//               Text('Rs ${NumberFormat('#,##0').format(totalCredit)}',
+//                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kGreen)),
+//             ],
+//           ),
+//           const Divider(height: 18),
+//           Row(
+//             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//             children: [
+//               const Text('Balance', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kPurple)),
+//               Text(
+//                 '${NumberFormat('#,##0').format(netBalance.abs())} ${netBalance >= 0 ? 'Dr' : 'Cr'}',
+//                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _kInk),
+//               ),
+//             ],
+//           ),
+//         ],
 //       ),
 //     );
 //   }
@@ -562,37 +787,30 @@
 // }
 
 
-
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/fee_challan_model.dart';
+import '../../pdf_files/family_ledger_pdf_generator.dart';
 import '../../providers/fee_collection_provider.dart';
+import '../../services/family_ledger_pdf_service.dart';
 
 // ─────────────────────────────────────────────
-//  Design tokens (matches EduCore brand + EmployeeLedgerScreen style)
+//  Design tokens (unchanged)
 // ─────────────────────────────────────────────
 const _kPurple = Color(0xFF534AB7);
 const _kPurpleLight = Color(0xFFF0EFFE);
-
 const _kGreen = Color(0xFF16A34A);
 const _kGreenBg = Color(0xFFECFDF3);
 const _kRed = Color(0xFFDC2626);
 const _kRedBg = Color(0xFFFEF2F2);
-
 const _kBorder = Color(0xFFE5E7EB);
 const _kSurface = Color(0xFFF8FAFC);
 const _kInk = Color(0xFF1A1A2E);
 const _kSlate = Color(0xFF64748B);
 
-// ─────────────────────────────────────────────
-//  Family Ledger Screen
-//  Opened from the family list's "Ledger" button. Shows the merged
-//  chronological ledger for one family: fee_challans = Debit,
-//  fee_collections = Credit, with a running balance — same visual
-//  language as EmployeeLedgerScreen.
-// ─────────────────────────────────────────────
 class FamilyLedgerScreen extends StatefulWidget {
   final String familyDocId;
   final String familyName;
@@ -612,19 +830,151 @@ class FamilyLedgerScreen extends StatefulWidget {
 }
 
 class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
+  List<FeeChallanModel> _challans = [];
+  bool _isLoadingChallans = false;
+  bool _isPdfBusy = false;
+
+  // Tracks which ledger entry is currently expanded (index in the list)
+  int? _expandedEntryIndex;
+
+  // Cache of futures that fetch individual challans for each row
+  final Map<int, Future<FeeChallanModel?>> _challanFutures = {};
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<FeeCollectionProvider>().loadFamilyLedger(widget.familyDocId);
+      _loadChallansForPdf(); // still needed for PDF only
     });
   }
 
-  @override
-  void dispose() {
-    // Don't clear on dispose synchronously against a disposed context;
-    // safe no-op call guarded by mounted checks elsewhere.
-    super.dispose();
+  Future<void> _loadChallansForPdf() async {
+    setState(() => _isLoadingChallans = true);
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('fee_challans')
+          .where('familyDocId', isEqualTo: widget.familyDocId)
+          .get();
+      final list =
+      snap.docs.map((d) => FeeChallanModel.fromFirestore(d)).toList();
+      list.sort((a, b) => a.generatedDate.compareTo(b.generatedDate));
+      if (!mounted) return;
+      setState(() => _challans = list);
+    } catch (_) {
+      // Silent fail; screen still works.
+    } finally {
+      if (mounted) setState(() => _isLoadingChallans = false);
+    }
+  }
+
+  /// Extracts challan number from a description like
+  /// "Fee Challan — CH-0123 (Jan 2026)".
+  String? _extractChallanNumber(String description) {
+    final regex = RegExp(r'CH-\d+');
+    final match = regex.firstMatch(description);
+    return match?.group(0);
+  }
+
+  /// Fetch a single challan from Firestore by challan number & family doc id.
+  /// Used on‑demand when a row is expanded.
+  Future<FeeChallanModel?> _fetchSingleChallan(String challanNumber) async {
+    if (challanNumber.isEmpty) return null;
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('fee_challans')
+          .where('challanNumber', isEqualTo: challanNumber)
+          .where('familyDocId', isEqualTo: widget.familyDocId)
+          .limit(1)
+          .get();
+      if (snap.docs.isNotEmpty) {
+        return FeeChallanModel.fromFirestore(snap.docs.first);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Returns a Future that resolves to the challan for this row.
+  /// Uses cache to avoid repeated fetches.
+  Future<FeeChallanModel?> _getChallanFutureForEntry(FamilyLedgerEntry entry, int index) {
+    if (_challanFutures.containsKey(index)) {
+      return _challanFutures[index]!;
+    }
+    final challanNo = _extractChallanNumber(entry.description);
+    if (challanNo == null) {
+      _challanFutures[index] = Future.value(null);
+      return _challanFutures[index]!;
+    }
+    // Try in‑memory list first (instant)
+    FeeChallanModel? cached;
+    try {
+      cached = _challans.firstWhere((c) => c.challanNumber == challanNo);
+    } catch (_) {}
+    if (cached != null) {
+      _challanFutures[index] = Future.value(cached);
+    } else {
+      _challanFutures[index] = _fetchSingleChallan(challanNo);
+    }
+    return _challanFutures[index]!;
+  }
+
+  List<FamilyLedgerCreditEntry> _creditEntriesFromProvider() {
+    final entries = context.read<FeeCollectionProvider>().ledgerEntries;
+    return entries.where((e) => e.type == 'credit').map((e) {
+      return FamilyLedgerCreditEntry(
+        date: e.date,
+        amount: e.amount,
+        description: e.description,
+        note: e.note,
+      );
+    }).toList();
+  }
+
+  Future<void> _printPdf() async {
+    if (_isPdfBusy) return;
+    setState(() => _isPdfBusy = true);
+    try {
+      await FamilyLedgerPdfService.printLedger(
+        familyName: widget.familyName,
+        fatherName: widget.fatherName,
+        familyId: widget.familyId,
+        challans: _challans,
+        credits: _creditEntriesFromProvider(),
+      );
+    } catch (e) {
+      _showSnack('Print failed: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isPdfBusy = false);
+    }
+  }
+
+  Future<void> _downloadPdf() async {
+    if (_isPdfBusy) return;
+    setState(() => _isPdfBusy = true);
+    try {
+      await FamilyLedgerPdfService.downloadAndOpen(
+        familyName: widget.familyName,
+        fatherName: widget.fatherName,
+        familyId: widget.familyId,
+        challans: _challans,
+        credits: _creditEntriesFromProvider(),
+      );
+    } catch (e) {
+      _showSnack('Save failed: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isPdfBusy = false);
+    }
+  }
+
+  void _showSnack(String msg, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? Colors.red.shade600 : Colors.green.shade600,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -640,17 +990,48 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
         title: Text('${widget.familyName} — Ledger',
             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 17)),
         actions: [
+          if (_isPdfBusy)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                ),
+              ),
+            )
+          else ...[
+            IconButton(
+              icon: const Icon(Icons.print_outlined),
+              tooltip: 'Print PDF',
+              onPressed: (_isLoadingChallans) ? null : _printPdf,
+            ),
+            IconButton(
+              icon: const Icon(Icons.download_rounded),
+              tooltip: 'Download PDF',
+              onPressed: (_isLoadingChallans) ? null : _downloadPdf,
+            ),
+          ],
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
-            onPressed: () =>
-                context.read<FeeCollectionProvider>().loadFamilyLedger(widget.familyDocId),
+            onPressed: () {
+              context
+                  .read<FeeCollectionProvider>()
+                  .loadFamilyLedger(widget.familyDocId);
+              _loadChallansForPdf();
+              _challanFutures.clear(); // clear cache on refresh
+            },
           ),
         ],
       ),
       body: isDesktop ? _buildDesktop() : _buildMobile(),
     );
   }
+
+  // ── Layout builders ──
 
   Widget _buildDesktop() {
     return SingleChildScrollView(
@@ -688,7 +1069,7 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
     );
   }
 
-  // ── Family info header card ──
+  // ── Family info card (unchanged) ──
   Widget _familyInfoCard() {
     return _card(
       child: Row(
@@ -697,8 +1078,11 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
             radius: 24,
             backgroundColor: _kPurpleLight,
             child: Text(
-              widget.familyName.isNotEmpty ? widget.familyName[0].toUpperCase() : 'F',
-              style: const TextStyle(color: _kPurple, fontWeight: FontWeight.bold, fontSize: 18),
+              widget.familyName.isNotEmpty
+                  ? widget.familyName[0].toUpperCase()
+                  : 'F',
+              style: const TextStyle(
+                  color: _kPurple, fontWeight: FontWeight.bold, fontSize: 18),
             ),
           ),
           const SizedBox(width: 14),
@@ -707,11 +1091,15 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(widget.familyName,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _kInk)),
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _kInk)),
                 const SizedBox(height: 3),
                 Text(
                   '${widget.fatherName} • ${widget.familyId}',
-                  style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600),
+                  style:
+                  TextStyle(fontSize: 12.5, color: Colors.grey.shade600),
                 ),
               ],
             ),
@@ -721,7 +1109,7 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
     );
   }
 
-  // ── Summary cards: Total Debit / Total Credit / Net Balance / Last txn ──
+  // ── Summary cards (unchanged) ──
   Widget _summaryCardsRow({required bool isDesktop}) {
     final provider = context.watch<FeeCollectionProvider>();
     final entries = provider.ledgerEntries;
@@ -737,7 +1125,8 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
         iconColor: _kRed,
         iconBg: _kRedBg,
         label: 'Total Challans (Debit)',
-        value: 'Rs ${NumberFormat('#,##0').format(provider.ledgerTotalDebit)}',
+        value:
+        'Rs ${NumberFormat('#,##0').format(provider.ledgerTotalDebit)}',
         valueColor: _kRed,
       ),
       _summaryCard(
@@ -745,7 +1134,8 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
         iconColor: _kGreen,
         iconBg: _kGreenBg,
         label: 'Total Paid (Credit)',
-        value: 'Rs ${NumberFormat('#,##0').format(provider.ledgerTotalCredit)}',
+        value:
+        'Rs ${NumberFormat('#,##0').format(provider.ledgerTotalCredit)}',
         valueColor: _kGreen,
       ),
       _summaryCard(
@@ -763,7 +1153,9 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
         iconColor: _kPurple,
         iconBg: _kPurpleLight,
         label: 'Last Entry',
-        value: lastEntry != null ? DateFormat('dd MMM yyyy').format(lastEntry.date) : '—',
+        value: lastEntry != null
+            ? DateFormat('dd MMM yyyy').format(lastEntry.date)
+            : '—',
         valueColor: _kInk,
         sub: lastEntry != null
             ? '${lastEntry.type == 'debit' ? 'Debit' : 'Credit'} - Rs ${NumberFormat('#,##0').format(lastEntry.amount)}'
@@ -775,7 +1167,9 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
     if (isDesktop) {
       return Row(
         children: cards
-            .map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c)))
+            .map((c) => Expanded(
+            child: Padding(
+                padding: const EdgeInsets.only(right: 12), child: c)))
             .toList(),
       );
     }
@@ -815,34 +1209,46 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
           Container(
             width: 34,
             height: 34,
-            decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(9)),
+            decoration: BoxDecoration(
+                color: iconBg, borderRadius: BorderRadius.circular(9)),
             child: Icon(icon, color: iconColor, size: 18),
           ),
           const SizedBox(height: 10),
-          Text(label, style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600)),
+          Text(label,
+              style:
+              TextStyle(fontSize: 11.5, color: Colors.grey.shade600)),
           const SizedBox(height: 4),
           Text(value,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: valueColor)),
+              style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: valueColor)),
           const SizedBox(height: 4),
           if (badge != null)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: (badgeColor ?? _kSlate).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(badge,
-                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: badgeColor ?? _kSlate)),
+                  style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: badgeColor ?? _kSlate)),
             )
           else if (sub != null)
-            Text(sub, style: TextStyle(fontSize: 11, color: subColor ?? Colors.grey.shade500)),
+            Text(sub,
+                style: TextStyle(
+                    fontSize: 11, color: subColor ?? Colors.grey.shade500)),
         ],
       ),
     );
   }
 
-  // ── Ledger table/card ──
+  // ── Ledger table / card (now with expansion) ──
   Widget _ledgerTableCard() {
     final provider = context.watch<FeeCollectionProvider>();
     final isDesktop = MediaQuery.of(context).size.width >= 900;
@@ -857,16 +1263,21 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
             child: Row(
               children: [
-                const Icon(Icons.receipt_long_rounded, size: 16, color: _kPurple),
+                const Icon(Icons.receipt_long_rounded,
+                    size: 16, color: _kPurple),
                 const SizedBox(width: 8),
                 const Text('Ledger Entries',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _kInk)),
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: _kInk)),
                 const Spacer(),
                 if (provider.isLoadingLedger)
                   const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: _kPurple),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: _kPurple),
                   ),
               ],
             ),
@@ -875,7 +1286,8 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
           if (provider.isLoadingLedger)
             const Padding(
               padding: EdgeInsets.all(40),
-              child: Center(child: CircularProgressIndicator(color: _kPurple)),
+              child:
+              Center(child: CircularProgressIndicator(color: _kPurple)),
             )
           else if (entries.isEmpty)
             Padding(
@@ -883,9 +1295,12 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
               child: Center(
                 child: Column(
                   children: [
-                    Icon(Icons.receipt_long_outlined, size: 44, color: Colors.grey.shade300),
+                    Icon(Icons.receipt_long_outlined,
+                        size: 44, color: Colors.grey.shade300),
                     const SizedBox(height: 10),
-                    Text('No ledger entries yet', style: TextStyle(fontSize: 13.5, color: Colors.grey.shade500)),
+                    Text('No ledger entries yet',
+                        style: TextStyle(
+                            fontSize: 13.5, color: Colors.grey.shade500)),
                   ],
                 ),
               ),
@@ -897,6 +1312,7 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
     );
   }
 
+  // ── Desktop table with expandable rows ──
   Widget _desktopTable(List<FamilyLedgerEntry> rows) {
     final provider = context.read<FeeCollectionProvider>();
     final totalDebit = provider.ledgerTotalDebit;
@@ -909,7 +1325,8 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
         children: [
           Container(
             color: const Color(0xFFF8F9FC),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: const Row(
               children: [
                 _Th('DATE', flex: 12),
@@ -924,11 +1341,36 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
           Flexible(
             child: Scrollbar(
               thumbVisibility: true,
-              child: ListView.separated(
+              child: ListView.builder(
                 shrinkWrap: true,
                 itemCount: rows.length,
-                separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade100),
-                itemBuilder: (context, i) => _desktopRow(rows[i]),
+                itemBuilder: (context, index) {
+                  final entry = rows[index];
+                  final isExpanded = _expandedEntryIndex == index;
+                  // Start loading challan future (cached) for this row
+                  final challanFuture =
+                  entry.type == 'debit'
+                      ? _getChallanFutureForEntry(entry, index)
+                      : null;
+
+                  return Column(
+                    children: [
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            _expandedEntryIndex =
+                            isExpanded ? null : index;
+                          });
+                        },
+                        child:
+                        _desktopRow(entry, isExpanded: isExpanded),
+                      ),
+                      if (isExpanded && entry.type == 'debit')
+                        _challanBreakdownFuture(challanFuture!),
+                      Divider(height: 1, color: Colors.grey.shade100),
+                    ],
+                  );
+                },
               ),
             ),
           ),
@@ -938,74 +1380,51 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
     );
   }
 
-  // ── Totals footer row (Desktop) ──
-  Widget _desktopTotalsRow(double totalDebit, double totalCredit, double netBalance) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _kPurpleLight,
-        border: Border(top: BorderSide(color: _kPurple.withOpacity(0.25), width: 1.4)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-      child: Row(
-        children: [
-          const Expanded(
-            flex: 38,
-            child: Text('TOTAL',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: _kPurple, letterSpacing: 0.4)),
-          ),
-          Expanded(
-            flex: 14,
-            child: Text(
-              NumberFormat('#,##0').format(totalDebit),
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kRed),
-            ),
-          ),
-          Expanded(
-            flex: 14,
-            child: Text(
-              NumberFormat('#,##0').format(totalCredit),
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kGreen),
-            ),
-          ),
-          Expanded(
-            flex: 15,
-            child: Text(
-              '${NumberFormat('#,##0').format(netBalance.abs())} ${netBalance >= 0 ? 'Dr' : 'Cr'}',
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kInk),
-            ),
-          ),
-          const Expanded(flex: 9, child: SizedBox()),
-        ],
-      ),
-    );
-  }
-
-  Widget _desktopRow(FamilyLedgerEntry e) {
+  Widget _desktopRow(FamilyLedgerEntry e, {bool isExpanded = false}) {
     final isDebit = e.type == 'debit';
     final color = isDebit ? _kRed : _kGreen;
     final bal = e.runningBalance;
 
-    return Padding(
+    return Container(
+      color: isExpanded ? _kPurpleLight.withOpacity(0.3) : null,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
       child: Row(
         children: [
           Expanded(
             flex: 12,
-            child: Text(DateFormat('dd MMM yyyy').format(e.date), style: const TextStyle(fontSize: 12.5, color: _kInk)),
+            child: Text(DateFormat('dd MMM yyyy').format(e.date),
+                style: const TextStyle(fontSize: 12.5, color: _kInk)),
           ),
           Expanded(
             flex: 26,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(e.description, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: _kInk)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(e.description,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 12.5, color: _kInk)),
+                    ),
+                    if (isDebit)
+                      Icon(
+                        isExpanded
+                            ? Icons.expand_less
+                            : Icons.expand_more,
+                        size: 16,
+                        color: _kSlate,
+                      ),
+                  ],
+                ),
                 if (e.note != null && e.note!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(e.note!, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                    child: Text(e.note!,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey.shade500)),
                   ),
               ],
             ),
@@ -1015,7 +1434,10 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
             child: Text(
               isDebit ? NumberFormat('#,##0').format(e.amount) : '—',
               textAlign: TextAlign.right,
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: isDebit ? _kRed : Colors.grey.shade400),
+              style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: isDebit ? _kRed : Colors.grey.shade400),
             ),
           ),
           Expanded(
@@ -1023,7 +1445,10 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
             child: Text(
               !isDebit ? NumberFormat('#,##0').format(e.amount) : '—',
               textAlign: TextAlign.right,
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: !isDebit ? _kGreen : Colors.grey.shade400),
+              style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: !isDebit ? _kGreen : Colors.grey.shade400),
             ),
           ),
           Expanded(
@@ -1031,17 +1456,26 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
             child: Text(
               '${NumberFormat('#,##0').format(bal.abs())} ${bal >= 0 ? 'Dr' : 'Cr'}',
               textAlign: TextAlign.right,
-              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _kRed),
+              style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: _kRed),
             ),
           ),
           Expanded(
             flex: 9,
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20)),
                 child: Text(isDebit ? 'Debit' : 'Credit',
-                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
+                    style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: color)),
               ),
             ),
           ),
@@ -1050,6 +1484,205 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
     );
   }
 
+  // ── Student‑wise breakdown widget (used in both desktop & mobile) ──
+  // New: async version using FutureBuilder
+  Widget _challanBreakdownFuture(Future<FeeChallanModel?> future) {
+    return FutureBuilder<FeeChallanModel?>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _kBorder),
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2, color: _kPurple),
+              ),
+            ),
+          );
+        }
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+          return Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _kBorder),
+            ),
+            child: const Text('Could not load challan details.',
+                style: TextStyle(fontSize: 12, color: _kSlate)),
+          );
+        }
+        return _buildChallanBreakdown(snapshot.data!);
+      },
+    );
+  }
+
+  // The static breakdown UI (unchanged from your original)
+  Widget _buildChallanBreakdown(FeeChallanModel challan) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _kPurple.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+              color: _kPurple.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('STUDENT-WISE BREAKDOWN',
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: _kPurple,
+                  letterSpacing: 0.3)),
+          const SizedBox(height: 8),
+          Table(
+            border: TableBorder.all(color: _kBorder, width: 0.5),
+            columnWidths: const {
+              0: FlexColumnWidth(2.0),
+              1: FlexColumnWidth(1.5),
+              2: FlexColumnWidth(3.0),
+              3: FlexColumnWidth(1.5),
+            },
+            children: [
+              TableRow(
+                decoration: const BoxDecoration(color: _kPurpleLight),
+                children: const [
+                  _SubTh('Student'),
+                  _SubTh('Class'),
+                  _SubTh('Fee Heads'),
+                  _SubTh('Amount', align: TextAlign.right),
+                ],
+              ),
+              ...challan.students.map((s) {
+                final heads = <String>[];
+                if (s.isFirstChallan) {
+                  if (s.registrationFee > 0)
+                    heads.add(
+                        'Admission: ${NumberFormat('#,##0').format(s.registrationFee)}');
+                  if (s.annualFee > 0)
+                    heads.add(
+                        'Annual: ${NumberFormat('#,##0').format(s.annualFee)}');
+                }
+                if (s.monthlyFee > 0)
+                  heads.add(
+                      'Monthly: ${NumberFormat('#,##0').format(s.monthlyFee)}');
+
+                final classLabel = [
+                  s.className,
+                  s.sectionName,
+                ].whereType<String>().join(' - ');
+
+                return TableRow(
+                  children: [
+                    _SubData(s.name, bold: true),
+                    _SubData(classLabel),
+                    _SubData(heads.isEmpty ? '—' : heads.join('  •  ')),
+                    _SubData(
+                      'Rs ${NumberFormat('#,##0').format(s.lineTotal)}',
+                      align: TextAlign.right,
+                      bold: true,
+                      color: _kPurple,
+                    ),
+                  ],
+                );
+              }),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              'Challan Total: Rs ${NumberFormat('#,##0').format(challan.currentMonthTotal)}',
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _kRed),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Desktop totals footer (unchanged) ──
+  Widget _desktopTotalsRow(
+      double totalDebit, double totalCredit, double netBalance) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _kPurpleLight,
+        border: Border(
+            top: BorderSide(
+                color: _kPurple.withOpacity(0.25), width: 1.4)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      child: Row(
+        children: [
+          const Expanded(
+            flex: 38,
+            child: Text('TOTAL',
+                style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: _kPurple,
+                    letterSpacing: 0.4)),
+          ),
+          Expanded(
+            flex: 14,
+            child: Text(
+              NumberFormat('#,##0').format(totalDebit),
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: _kRed),
+            ),
+          ),
+          Expanded(
+            flex: 14,
+            child: Text(
+              NumberFormat('#,##0').format(totalCredit),
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: _kGreen),
+            ),
+          ),
+          Expanded(
+            flex: 15,
+            child: Text(
+              '${NumberFormat('#,##0').format(netBalance.abs())} ${netBalance >= 0 ? 'Dr' : 'Cr'}',
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: _kInk),
+            ),
+          ),
+          const Expanded(flex: 9, child: SizedBox()),
+        ],
+      ),
+    );
+  }
+
+  // ── Mobile cards list with expansion ──
   Widget _mobileCardsList(List<FamilyLedgerEntry> rows) {
     final provider = context.read<FeeCollectionProvider>();
     return Container(
@@ -1059,12 +1692,39 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
           Expanded(
             child: Scrollbar(
               thumbVisibility: true,
-              child: ListView.separated(
+              child: ListView.builder(
                 shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 itemCount: rows.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, i) => _mobileRow(rows[i]),
+                itemBuilder: (context, index) {
+                  final entry = rows[index];
+                  final isExpanded = _expandedEntryIndex == index;
+                  final challanFuture =
+                  entry.type == 'debit'
+                      ? _getChallanFutureForEntry(entry, index)
+                      : null;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Column(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _expandedEntryIndex =
+                              isExpanded ? null : index;
+                            });
+                          },
+                          child:
+                          _mobileRow(entry, isExpanded: isExpanded),
+                        ),
+                        if (isExpanded && entry.type == 'debit')
+                          _challanBreakdownFuture(challanFuture!),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -1078,8 +1738,96 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
     );
   }
 
-  // ── Totals footer card (Mobile) ──
-  Widget _mobileTotalsCard(double totalDebit, double totalCredit, double netBalance) {
+  Widget _mobileRow(FamilyLedgerEntry e, {bool isExpanded = false}) {
+    final isDebit = e.type == 'debit';
+    final color = isDebit ? _kRed : _kGreen;
+    final bal = e.runningBalance;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isExpanded ? _kPurpleLight.withOpacity(0.2) : _kSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: isExpanded ? _kPurple.withOpacity(0.4) : _kBorder),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(DateFormat('dd MMM yyyy').format(e.date),
+                    style: TextStyle(
+                        fontSize: 11, color: Colors.grey.shade500)),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(e.description,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: _kInk)),
+                    ),
+                    if (isDebit)
+                      Icon(
+                        isExpanded
+                            ? Icons.expand_less
+                            : Icons.expand_more,
+                        size: 16,
+                        color: _kSlate,
+                      ),
+                  ],
+                ),
+                if (e.note != null && e.note!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(e.note!,
+                      style: TextStyle(
+                          fontSize: 11, color: Colors.grey.shade500)),
+                ],
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${NumberFormat('#,##0').format(bal.abs())} ${bal >= 0 ? 'Dr' : 'Cr'}',
+                style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: _kRed),
+              ),
+              const SizedBox(height: 6),
+              Text('Rs ${NumberFormat('#,##0').format(e.amount)}',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: color)),
+              const SizedBox(height: 4),
+              Container(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20)),
+                child: Text(isDebit ? 'Debit' : 'Credit',
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: color)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _mobileTotalsCard(
+      double totalDebit, double totalCredit, double netBalance) {
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 4, 12, 12),
       padding: const EdgeInsets.all(14),
@@ -1093,81 +1841,45 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Total Debit', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+              Text('Total Debit',
+                  style: TextStyle(
+                      fontSize: 12, color: Colors.grey.shade700)),
               Text('Rs ${NumberFormat('#,##0').format(totalDebit)}',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kRed)),
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: _kRed)),
             ],
           ),
           const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Total Credit', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+              Text('Total Credit',
+                  style: TextStyle(
+                      fontSize: 12, color: Colors.grey.shade700)),
               Text('Rs ${NumberFormat('#,##0').format(totalCredit)}',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kGreen)),
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: _kGreen)),
             ],
           ),
           const Divider(height: 18),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Balance', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kPurple)),
+              const Text('Balance',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _kPurple)),
               Text(
                 '${NumberFormat('#,##0').format(netBalance.abs())} ${netBalance >= 0 ? 'Dr' : 'Cr'}',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _kInk),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _mobileRow(FamilyLedgerEntry e) {
-    final isDebit = e.type == 'debit';
-    final color = isDebit ? _kRed : _kGreen;
-    final bal = e.runningBalance;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _kSurface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kBorder),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(DateFormat('dd MMM yyyy').format(e.date), style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-                const SizedBox(height: 3),
-                Text(e.description, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _kInk)),
-                if (e.note != null && e.note!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(e.note!, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-                ],
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${NumberFormat('#,##0').format(bal.abs())} ${bal >= 0 ? 'Dr' : 'Cr'}',
-                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _kRed),
-              ),
-              const SizedBox(height: 6),
-              Text('Rs ${NumberFormat('#,##0').format(e.amount)}',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                child: Text(isDebit ? 'Debit' : 'Credit',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+                style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: _kInk),
               ),
             ],
           ),
@@ -1179,21 +1891,30 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
   Widget _noteCard() {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: _kPurpleLight, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+          color: _kPurpleLight,
+          borderRadius: BorderRadius.circular(12)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline_rounded, size: 18, color: _kPurple),
+          const Icon(Icons.info_outline_rounded,
+              size: 18, color: _kPurple),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
-                Text('Note', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _kPurple)),
+                Text('Note',
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: _kPurple)),
                 SizedBox(height: 4),
-                Text('•  Fee challans increase the balance (Dr)', style: TextStyle(fontSize: 12, color: _kInk)),
+                Text('•  Fee challans increase the balance (Dr)',
+                    style: TextStyle(fontSize: 12, color: _kInk)),
                 SizedBox(height: 2),
-                Text('•  Collected payments reduce the balance (Cr)', style: TextStyle(fontSize: 12, color: _kInk)),
+                Text('•  Collected payments reduce the balance (Cr)',
+                    style: TextStyle(fontSize: 12, color: _kInk)),
               ],
             ),
           ),
@@ -1216,6 +1937,7 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
   }
 }
 
+// ── Reusable table header and sub-header widgets ──
 class _Th extends StatelessWidget {
   final String label;
   final int flex;
@@ -1229,8 +1951,54 @@ class _Th extends StatelessWidget {
       child: Text(
         label,
         textAlign: align,
-        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF8B8FA8), letterSpacing: 0.4),
+        style: const TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF8B8FA8),
+            letterSpacing: 0.4),
       ),
+    );
+  }
+}
+
+class _SubTh extends StatelessWidget {
+  final String label;
+  final TextAlign align;
+  const _SubTh(this.label, {this.align = TextAlign.left});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+      child: Text(label,
+          textAlign: align,
+          style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF64748B))),
+    );
+  }
+}
+
+class _SubData extends StatelessWidget {
+  final String text;
+  final TextAlign align;
+  final bool bold;
+  final Color? color;
+  const _SubData(this.text,
+      {this.align = TextAlign.left, this.bold = false, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+      child: Text(text,
+          textAlign: align,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: bold ? FontWeight.w700 : FontWeight.normal,
+            color: color ?? const Color(0xFF1A1A2E),
+          )),
     );
   }
 }
