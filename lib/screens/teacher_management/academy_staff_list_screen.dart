@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'package:educoresystem/screens/teacher_management/staff_bulk_staff_management.dart';
 import 'package:flutter/material.dart';
@@ -7,7 +6,7 @@ import '../../models/teacher.dart';
 import '../../providers/teacher_provider.dart';
 import '../../providers/class_provider.dart';
 import '../salary_managemnet/salary_adjustment_screen.dart';
-import '../teacher_management/employee_ledger_screen.dart'; // ★ NEW – Ledger screen
+import '../teacher_management/employee_ledger_screen.dart';
 import 'Staff Profile.dart';
 import 'add_teacher.dart';
 import 'deactivate_staff_teacher_management.dart';
@@ -17,20 +16,23 @@ const _kPurpleLight = Color(0xFFF0EFFE);
 const _kGreen = Color(0xFF15803D);
 const _kGreenBg = Color(0xFFDCFCE7);
 
-class TeacherListScreen extends StatefulWidget {
+// ── Academy Staff (3rd employee type, sits alongside Teacher & School Staff) ──
+// Same design/behaviour as School Staff screen, but backed by
+// provider.academyStaff (Firestore collection: academy_staff).
+class AcademyStaffListScreen extends StatefulWidget {
   final void Function(StaffMember staff,
       {Map<String, String> classIdToName})? onItemTap;
 
-  const TeacherListScreen({
+  const AcademyStaffListScreen({
     super.key,
     this.onItemTap,
   });
 
   @override
-  State<TeacherListScreen> createState() => _TeacherListScreenState();
+  State<AcademyStaffListScreen> createState() => _AcademyStaffListScreenState();
 }
 
-class _TeacherListScreenState extends State<TeacherListScreen> {
+class _AcademyStaffListScreenState extends State<AcademyStaffListScreen> {
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
   int _currentPage = 0;
@@ -40,7 +42,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => context.read<StaffProvider>().fetchTeachers());
+    Future.microtask(() => context.read<StaffProvider>().fetchAcademyStaff());
     _searchCtrl.addListener(() {
       setState(() {
         _searchQuery = _searchCtrl.text.toLowerCase();
@@ -57,14 +59,14 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
 
   List _filtered(List all) {
     if (_searchQuery.isEmpty) return all;
-    return all.where((t) =>
-    t.name.toLowerCase().contains(_searchQuery) ||
-        t.phone.toLowerCase().contains(_searchQuery) ||
-        (t.designation ?? '').toLowerCase().contains(_searchQuery) ||
-        t.employmentType.toLowerCase().contains(_searchQuery)).toList();
+    return all.where((s) =>
+    s.name.toLowerCase().contains(_searchQuery) ||
+        s.phone.toLowerCase().contains(_searchQuery) ||
+        (s.designation ?? '').toLowerCase().contains(_searchQuery) ||
+        s.employmentType.toLowerCase().contains(_searchQuery)).toList();
   }
 
-  Future<void> _openProfile(BuildContext context, dynamic t) async {
+  Future<void> _openProfile(BuildContext context, dynamic s) async {
     final classProvider = context.read<ClassProvider>();
     final classIdToName = {
       for (final c in classProvider.classes)
@@ -72,7 +74,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
     };
 
     if (widget.onItemTap != null) {
-      widget.onItemTap!(t, classIdToName: classIdToName);
+      widget.onItemTap!(s, classIdToName: classIdToName);
       return;
     }
 
@@ -80,40 +82,40 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
       context,
       MaterialPageRoute(
           builder: (_) =>
-              StaffProfileScreen(staff: t, classIdToName: classIdToName)),
+              StaffProfileScreen(staff: s, classIdToName: classIdToName)),
     );
     if (result == 'edit' && context.mounted) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => AddEditStaffScreen(existingStaff: t)),
+        MaterialPageRoute(builder: (_) => AddEditStaffScreen(existingStaff: s)),
       );
     }
   }
 
-  Future<void> _openEdit(BuildContext context, dynamic t) async {
+  Future<void> _openEdit(BuildContext context, dynamic s) async {
     final result = await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => AddEditStaffScreen(existingStaff: t)));
+        MaterialPageRoute(builder: (_) => AddEditStaffScreen(existingStaff: s)));
     if (result == true && context.mounted) {
-      context.read<StaffProvider>().fetchTeachers();
+      context.read<StaffProvider>().fetchAcademyStaff();
     }
   }
 
-  // ★ NEW – opens the Salary Adjustment + History screen for this specific
-  // teacher. Shows only their own salary_history records (if any exist).
-  Future<void> _openSalaryHistory(BuildContext context, dynamic t) async {
+  // Opens the Salary Adjustment + History screen for this specific
+  // staff member. Shows only their own salary_history records (if any exist).
+  Future<void> _openSalaryHistory(BuildContext context, dynamic s) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => SalaryAdjustmentScreen(staff: t)),
+      MaterialPageRoute(builder: (_) => SalaryAdjustmentScreen(staff: s)),
     );
   }
 
-  // ★ NEW – opens the Employee Ledger screen for this specific
-  // teacher (Advance / Loan / Expense / Fine / Reimbursement ledger).
-  Future<void> _openLedger(BuildContext context, dynamic t) async {
+  // Opens the Employee Ledger screen for this specific
+  // staff member (Advance / Loan / Expense / Fine / Reimbursement ledger).
+  Future<void> _openLedger(BuildContext context, dynamic s) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => EmployeeLedgerScreen(employee: t)),
+      MaterialPageRoute(builder: (_) => EmployeeLedgerScreen(employee: s)),
     );
   }
 
@@ -123,7 +125,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14)),
-          title: const Text('Delete Teacher?',
+          title: const Text('Delete Staff?',
               style: TextStyle(fontWeight: FontWeight.w600)),
           content: const Text('This action cannot be undone.'),
           actions: [
@@ -146,17 +148,17 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
         ));
   }
 
-  // ★ NEW – confirmation dialog then deactivate + refresh list
-  void _confirmDeactivate(BuildContext context, dynamic t) {
+  // Confirmation dialog then deactivate + refresh list
+  void _confirmDeactivate(BuildContext context, dynamic s) {
     showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14)),
-          title: const Text('Deactivate Teacher?',
+          title: const Text('Deactivate Staff?',
               style: TextStyle(fontWeight: FontWeight.w600)),
           content: Text(
-              'This will move "${t.name}" to the Deactivated list. You can reactivate them later.'),
+              'This will move "${s.name}" to the Deactivated list. You can reactivate them later.'),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx),
@@ -169,12 +171,12 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                       borderRadius: BorderRadius.circular(8))),
               onPressed: () async {
                 Navigator.pop(ctx);
-                await context.read<StaffProvider>().deactivateStaff(t.id!);
+                await context.read<StaffProvider>().deactivateStaff(s.id!);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${t.name} has been deactivated')),
+                    SnackBar(content: Text('${s.name} has been deactivated')),
                   );
-                  setState(() {}); // refresh screen; provider list already excludes inactive
+                  setState(() {});
                 }
               },
               child: const Text('Deactivate'),
@@ -187,7 +189,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (_) => const TerminatedStaffScreen(initialTypeFilter: 'teacher')),
+          builder: (_) => const TerminatedStaffScreen(initialTypeFilter: 'academy_staff')),
     );
   }
 
@@ -197,10 +199,10 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
     return isDesktop ? _buildDesktop() : _buildMobile();
   }
 
-  // ── DESKTOP (with flexible columns) ─────────────────────────────────────
+  // ── DESKTOP (with sections column) ──────────────────────────────────────
   Widget _buildDesktop() {
     final provider = context.watch<StaffProvider>();
-    final filtered = _filtered(provider.teachers);
+    final filtered = _filtered(provider.academyStaff);
     final totalPages = (filtered.length / _pageSize).ceil().clamp(1, 9999);
     final pageItems =
     filtered.skip(_currentPage * _pageSize).take(_pageSize).toList();
@@ -215,13 +217,13 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
           // Header
           Row(children: [
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Teachers (${provider.teachers.length})',
+              Text('Academy Staff (${provider.academyStaff.length})',
                   style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1A1A2E))),
               const SizedBox(height: 2),
-              Text('Manage all teachers',
+              Text('Manage all academy staff members',
                   style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
             ]),
             const Spacer(),
@@ -263,7 +265,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                       MaterialPageRoute(builder: (_) => const BulkAddStaffScreen()));
                 } else if (value == 'bulk_edit') {
                   Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'teacher')));
+                      MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'academy_staff')));
                 } else if (value == 'deactivated_list') {
                   _openDeactivatedList(context);
                 }
@@ -273,19 +275,20 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                 const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
                 const PopupMenuItem(
                     value: 'deactivated_list',
-                    child: Text('Deactivated List')), // ★ NEW
+                    child: Text('Deactivated List')),
               ],
             ),
             const SizedBox(width: 4),
-            // Add Teacher button
+            // Add Staff button
             ElevatedButton.icon(
               onPressed: () async {
                 final result = await Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const AddEditStaffScreen(initialType: 'teacher')));
-                if (result == true && mounted) provider.fetchTeachers();
+                    MaterialPageRoute(
+                        builder: (_) => const AddEditStaffScreen(initialType: 'academy_staff')));
+                if (result == true && mounted) provider.fetchAcademyStaff();
               },
               icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add Teacher'),
+              label: const Text('Add Staff'),
               style: ElevatedButton.styleFrom(
                   backgroundColor: _kPurple,
                   foregroundColor: Colors.white,
@@ -354,21 +357,20 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: _kPurple)),
                       ])),
-                  // Table header – flex‑based columns
+                  // Table header
                   Container(
                       color: const Color(0xFFF8F9FC),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 10),
                       child: Row(children: [
-                        _th('PHOTO', flex: 6),
-                        _th('NAME', flex: 19),
-                        _th('DESIGNATION', flex: 13),
-                        _th('SUBJECTS', flex: 12),
+                        _th('PHOTO', flex: 7),
+                        _th('NAME', flex: 22),
+                        _th('DESIGNATION', flex: 15),
                         _th('SECTIONS', flex: 12),
-                        _th('PHONE', flex: 11),
-                        _th('EMPLOYMENT', flex: 10),
-                        _th('STATUS', flex: 8),
-                        _th('ACTION', flex: 15, align: TextAlign.center), // ★ widened for 5th button
+                        _th('PHONE', flex: 14),
+                        _th('EMPLOYMENT', flex: 14),
+                        _th('STATUS', flex: 10),
+                        _th('ACTION', flex: 18, align: TextAlign.center),
                       ])),
                   const Divider(height: 1, color: Color(0xFFEEEFF3)),
                   Expanded(
@@ -384,7 +386,6 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                               height: 1, color: Color(0xFFEEEFF3)),
                           itemBuilder: (ctx, i) =>
                               _desktopRow(ctx, pageItems[i]))),
-                  // Pagination footer
                   Container(
                     decoration: const BoxDecoration(
                         border: Border(
@@ -432,12 +433,11 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                 letterSpacing: 0.5)),
       );
 
-  Widget _desktopRow(BuildContext context, dynamic t) {
-    final subjects = (t.subjects as List?)?.cast<String>() ?? [];
-    final sections = (t.assignedSections as List?)?.cast<String>() ?? [];
+  Widget _desktopRow(BuildContext context, dynamic s) {
+    final sections = (s.assignedSections as List?)?.cast<String>() ?? [];
 
     return InkWell(
-      onTap: () => _openProfile(context, t),
+      onTap: () => _openProfile(context, s),
       hoverColor: const Color(0xFFF8F8FF),
       child: Padding(
           padding:
@@ -445,16 +445,16 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
           child: Row(children: [
             // PHOTO
             Expanded(
-              flex: 6,
+              flex: 7,
               child: CircleAvatar(
                   radius: 18,
                   backgroundColor: _kPurpleLight,
-                  backgroundImage: t.imageBase64 != null
-                      ? MemoryImage(base64Decode(t.imageBase64!))
+                  backgroundImage: s.imageBase64 != null
+                      ? MemoryImage(base64Decode(s.imageBase64!))
                       : null,
-                  child: t.imageBase64 == null
+                  child: s.imageBase64 == null
                       ? Text(
-                      t.name.isNotEmpty ? t.name[0].toUpperCase() : '?',
+                      s.name.isNotEmpty ? s.name[0].toUpperCase() : '?',
                       style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -463,36 +463,29 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
             ),
             // NAME
             Expanded(
-              flex: 19,
+              flex: 22,
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(t.name,
+                    Text(s.name,
                         style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF1A1A2E)),
                         overflow: TextOverflow.ellipsis),
-                    Text(t.gender,
+                    Text(s.gender,
                         style: const TextStyle(
                             fontSize: 11, color: Colors.grey)),
                   ]),
             ),
             // DESIGNATION
             Expanded(
-              flex: 13,
+              flex: 15,
               child: Text(
-                  t.designation?.isNotEmpty == true ? t.designation! : '—',
+                  s.designation?.isNotEmpty == true ? s.designation! : '—',
                   style: TextStyle(
                       fontSize: 13, color: Colors.grey.shade700),
                   overflow: TextOverflow.ellipsis),
-            ),
-            // SUBJECTS
-            Expanded(
-              flex: 12,
-              child: subjects.isEmpty
-                  ? Text('—', style: TextStyle(fontSize: 13, color: Colors.grey.shade400))
-                  : _buildChipRow(subjects, const Color(0xFFF0EFFE), _kPurple),
             ),
             // SECTIONS
             Expanded(
@@ -503,14 +496,14 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
             ),
             // PHONE
             Expanded(
-              flex: 11,
-              child: Text(t.phone,
+              flex: 14,
+              child: Text(s.phone,
                   style: const TextStyle(fontSize: 13),
                   overflow: TextOverflow.ellipsis),
             ),
             // EMPLOYMENT
             Expanded(
-              flex: 10,
+              flex: 14,
               child: Center(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -518,7 +511,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                   decoration: BoxDecoration(
                       color: const Color(0xFFF0F2F8),
                       borderRadius: BorderRadius.circular(20)),
-                  child: Text(t.employmentType,
+                  child: Text(s.employmentType,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                           fontSize: 11,
@@ -529,7 +522,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
             ),
             // STATUS
             Expanded(
-              flex: 8,
+              flex: 10,
               child: Center(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -548,35 +541,32 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
             ),
             // ACTION
             Expanded(
-              flex: 15, // ★ widened for 5th button
+              flex: 18,
               child: Center(
                 child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // ★ NEW – Ledger button
                       _actionBtn(Icons.account_balance_wallet_outlined,
                           Colors.teal.shade700,
-                              () => _openLedger(context, t),
+                              () => _openLedger(context, s),
                           tooltip: 'Ledger'),
                       const SizedBox(width: 4),
-                      // Salary History button
                       _actionBtn(Icons.payments_outlined,
                           _kPurple,
-                              () => _openSalaryHistory(context, t),
+                              () => _openSalaryHistory(context, s),
                           tooltip: 'Salary History'),
                       const SizedBox(width: 4),
-                      // Deactivate icon
                       _actionBtn(Icons.person_off_outlined,
                           Colors.orange.shade700,
-                              () => _confirmDeactivate(context, t),
+                              () => _confirmDeactivate(context, s),
                           tooltip: 'Deactivate'),
                       const SizedBox(width: 4),
                       _actionBtn(Icons.edit_outlined, _kPurple,
-                              () => _openEdit(context, t),
+                              () => _openEdit(context, s),
                           tooltip: 'Edit'),
                       const SizedBox(width: 4),
                       _actionBtn(Icons.delete_outline, Colors.red.shade600,
-                              () => _confirmDelete(context, t.id!),
+                              () => _confirmDelete(context, s.id!),
                           tooltip: 'Delete'),
                     ]),
               ),
@@ -585,7 +575,6 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
     );
   }
 
-  // Helper to build chip list with +N overflow
   Widget _buildChipRow(List<String> items, Color bgColor, Color textColor) {
     return Wrap(
       spacing: 4,
@@ -637,11 +626,11 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
 
   Widget _desktopEmpty() => Center(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.school_outlined, size: 48, color: Colors.grey.shade300),
+        Icon(Icons.people_outline, size: 48, color: Colors.grey.shade300),
         const SizedBox(height: 12),
         Text(
             _searchQuery.isEmpty
-                ? 'No teachers found.'
+                ? 'No academy staff members found.'
                 : 'No results for "$_searchQuery"',
             style: TextStyle(fontSize: 14, color: Colors.grey.shade500))
       ]));
@@ -686,10 +675,10 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                         isActive ? Colors.white : Colors.grey.shade700)))));
   }
 
-  // ── MOBILE (unchanged layout, added sections) ───────────────────────────
+  // ── MOBILE (added sections) ──────────────────────────────────────────────
   Widget _buildMobile() {
     final provider = context.watch<StaffProvider>();
-    final filtered = _filtered(provider.teachers);
+    final filtered = _filtered(provider.academyStaff);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
@@ -698,9 +687,9 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Teachers',
+          const Text('Academy Staff',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-          Text('${provider.teachers.length} teachers',
+          Text('${provider.academyStaff.length} members',
               style: const TextStyle(fontSize: 11, color: Colors.white70)),
         ]),
         actions: [
@@ -713,7 +702,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                     MaterialPageRoute(builder: (_) => const BulkAddStaffScreen()));
               } else if (value == 'bulk_edit') {
                 Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'teacher')));
+                    MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'academy_staff')));
               } else if (value == 'deactivated_list') {
                 _openDeactivatedList(context);
               }
@@ -723,18 +712,18 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
               const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
               const PopupMenuItem(
                   value: 'deactivated_list',
-                  child: Text('Deactivated List')), // ★ NEW
+                  child: Text('Deactivated List')),
             ],
           ),
           IconButton(
               icon: const Icon(Icons.add),
-              tooltip: 'Add Teacher',
+              tooltip: 'Add Staff',
               onPressed: () async {
                 final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const AddEditStaffScreen(initialType: 'teacher')));
-                if (result == true && mounted) provider.fetchTeachers();
+                        builder: (_) => const AddEditStaffScreen(initialType: 'academy_staff')));
+                if (result == true && mounted) provider.fetchAcademyStaff();
               })
         ],
       ),
@@ -746,7 +735,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                 controller: _searchCtrl,
                 style: const TextStyle(fontSize: 14),
                 decoration: InputDecoration(
-                    hintText: 'Search teachers…',
+                    hintText: 'Search staff…',
                     hintStyle:
                     const TextStyle(fontSize: 13, color: Colors.grey),
                     prefixIcon: const Icon(Icons.search,
@@ -767,12 +756,12 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.school_outlined,
+                      Icon(Icons.people_outline,
                           size: 48, color: Colors.grey.shade300),
                       const SizedBox(height: 12),
                       Text(
                           _searchQuery.isEmpty
-                              ? 'No teachers found.'
+                              ? 'No academy staff members found.'
                               : 'No results for "$_searchQuery"',
                           style: TextStyle(
                               fontSize: 14,
@@ -792,16 +781,15 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
             final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (_) => const AddEditStaffScreen(initialType: 'teacher')));
-            if (result == true && mounted) provider.fetchTeachers();
+                    builder: (_) => const AddEditStaffScreen(initialType: 'academy_staff')));
+            if (result == true && mounted) provider.fetchAcademyStaff();
           },
           child: const Icon(Icons.add)),
     );
   }
 
-  Widget _mobileCard(BuildContext context, dynamic t) {
-    final subjects = (t.subjects as List?)?.cast<String>() ?? [];
-    final sections = (t.assignedSections as List?)?.cast<String>() ?? [];
+  Widget _mobileCard(BuildContext context, dynamic s) {
+    final sections = (s.assignedSections as List?)?.cast<String>() ?? [];
 
     return Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -815,7 +803,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                   offset: const Offset(0, 2))
             ]),
         child: InkWell(
-            onTap: () => _openProfile(context, t),
+            onTap: () => _openProfile(context, s),
             borderRadius: BorderRadius.circular(14),
             child: Padding(
                 padding: const EdgeInsets.all(14),
@@ -823,14 +811,12 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                   CircleAvatar(
                       radius: 26,
                       backgroundColor: _kPurpleLight,
-                      backgroundImage: t.imageBase64 != null
-                          ? MemoryImage(base64Decode(t.imageBase64!))
+                      backgroundImage: s.imageBase64 != null
+                          ? MemoryImage(base64Decode(s.imageBase64!))
                           : null,
-                      child: t.imageBase64 == null
+                      child: s.imageBase64 == null
                           ? Text(
-                          t.name.isNotEmpty
-                              ? t.name[0].toUpperCase()
-                              : '?',
+                          s.name.isNotEmpty ? s.name[0].toUpperCase() : '?',
                           style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -841,33 +827,24 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(t.name,
+                            Text(s.name,
                                 style: const TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF1A1A2E))),
-                            if (t.designation?.isNotEmpty == true) ...[
+                            if (s.designation?.isNotEmpty == true) ...[
                               const SizedBox(height: 2),
-                              Text(t.designation!,
+                              Text(s.designation!,
                                   style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600)),
+                                      fontSize: 12, color: Colors.grey.shade600)),
                             ],
                             const SizedBox(height: 6),
                             Wrap(spacing: 6, runSpacing: 4, children: [
-                              _mobilePill(t.employmentType, _kPurple,
+                              _mobilePill(s.employmentType, _kPurple,
                                   const Color(0xFFF0EFFE)),
-                              if (subjects.isNotEmpty)
-                                _mobilePill(
-                                    subjects.first,
-                                    Colors.teal.shade700,
-                                    Colors.teal.shade50,
-                                    icon: Icons.menu_book_outlined),
-                              if (subjects.length > 1)
-                                _mobilePill(
-                                    '+${subjects.length - 1}',
-                                    Colors.grey.shade600,
-                                    Colors.grey.shade100),
+                              _mobilePill(s.phone, Colors.grey.shade700,
+                                  Colors.grey.shade100,
+                                  icon: Icons.phone_outlined),
                               if (sections.isNotEmpty)
                                 _mobilePill(
                                     sections.first,
@@ -882,38 +859,37 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
                             ]),
                           ])),
                   // Single dropdown menu (now 5 items incl. Ledger)
-                  _mobileActionMenu(context, t),
+                  _mobileActionMenu(context, s),
                 ]))));
   }
 
-  // ★ UPDATED – dropdown now contains: Ledger, Salary History, Edit,
-  // Deactivate, Delete.
-  Widget _mobileActionMenu(BuildContext context, dynamic t) {
+  // Dropdown contains: Ledger, Salary History, Edit, Deactivate, Delete.
+  Widget _mobileActionMenu(BuildContext context, dynamic s) {
     return PopupMenuButton<String>(
       icon: Icon(Icons.more_vert, color: Colors.grey.shade600, size: 20),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       onSelected: (value) {
         switch (value) {
           case 'ledger':
-            _openLedger(context, t);
+            _openLedger(context, s);
             break;
           case 'salary':
-            _openSalaryHistory(context, t);
+            _openSalaryHistory(context, s);
             break;
           case 'edit':
-            _openEdit(context, t);
+            _openEdit(context, s);
             break;
           case 'deactivate':
-            _confirmDeactivate(context, t);
+            _confirmDeactivate(context, s);
             break;
           case 'delete':
-            _confirmDelete(context, t.id!);
+            _confirmDelete(context, s.id!);
             break;
         }
       },
       itemBuilder: (context) => [
         _menuItem('ledger', Icons.account_balance_wallet_outlined, 'Ledger',
-            Colors.teal.shade700), // ★ NEW
+            Colors.teal.shade700),
         _menuItem('salary', Icons.payments_outlined, 'Salary History', _kPurple),
         _menuItem('edit', Icons.edit_outlined, 'Edit', _kPurple),
         _menuItem('deactivate', Icons.person_off_outlined, 'Deactivate',

@@ -98,16 +98,18 @@ class _EmployeeLedgerScreenState extends State<EmployeeLedgerScreen> {
       final staffProvider = context.read<StaffProvider>();
       if (staffProvider.teachers.isEmpty) staffProvider.fetchTeachers();
       if (staffProvider.staffOnly.isEmpty) staffProvider.fetchStaffOnly();
-
-      if (_selectedEmployee != null) {
-        _loadLedger();
-      }
+      if (staffProvider.academyStaff.isEmpty) staffProvider.fetchAcademyStaff(); // ← NEW
+      if (_selectedEmployee != null) _loadLedger();
     });
   }
 
   List<StaffMember> get _allEmployees {
     final staffProvider = context.watch<StaffProvider>();
-    return [...staffProvider.teachers, ...staffProvider.staffOnly];
+    return [
+      ...staffProvider.teachers,
+      ...staffProvider.staffOnly,
+      ...staffProvider.academyStaff,   // ← NEW
+    ];
   }
 
   Future<void> _loadLedger() async {

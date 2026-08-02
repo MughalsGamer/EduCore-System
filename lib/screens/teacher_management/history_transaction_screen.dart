@@ -31,7 +31,7 @@ const _kCategoryColors = <String, Color>{
   'Others': Color(0xFF5F5E5A),
 };
 
-const _kFilterTypes = <String>['All', 'Teacher', 'Staff'];
+const _kFilterTypes = <String>['All', 'Teacher', 'Staff', 'Academy'];
 const _kFilterCategories = <String>[
   'All',
   'Advance',

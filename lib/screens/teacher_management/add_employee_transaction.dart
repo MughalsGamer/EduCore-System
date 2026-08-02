@@ -147,11 +147,15 @@ class _AddStaffTransactionScreenState
 
   List<StaffMember> get _sourceList {
     final staffProvider = context.watch<StaffProvider>();
-    return _employeeType == 'teacher'
-        ? staffProvider.teachers
-        : staffProvider.staffOnly;
+    switch (_employeeType) {
+      case 'teacher':
+        return staffProvider.teachers;
+      case 'academy_staff':
+        return staffProvider.academyStaff;
+      default: // school_staff
+        return staffProvider.staffOnly;
+    }
   }
-
   List<StaffMember> get _filteredEmployees {
     final query = _searchCtrl.text.trim().toLowerCase();
     final list = _sourceList;
@@ -301,6 +305,9 @@ class _AddStaffTransactionScreenState
   //  Shared: Type toggle
   // ─────────────────────────────────────────────
   Widget _typeToggle() {
+    final types = ['teacher', 'school_staff', 'academy_staff'];   // Internal values
+    final labels = ['Teacher', 'Staff', 'Academy'];
+
     return Opacity(
       opacity: _isEditMode ? 0.55 : 1,
       child: IgnorePointer(
@@ -312,11 +319,11 @@ class _AddStaffTransactionScreenState
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
-            children: ['teacher', 'staff'].map((t) {
-              final selected = _employeeType == t;
+            children: List.generate(types.length, (i) {
+              final selected = _employeeType == types[i];
               return Expanded(
                 child: GestureDetector(
-                  onTap: () => _switchType(t),
+                  onTap: () => _switchType(types[i]),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     padding: const EdgeInsets.symmetric(vertical: 11),
@@ -329,15 +336,17 @@ class _AddStaffTransactionScreenState
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          t == 'teacher'
+                          types[i] == 'teacher'
                               ? Icons.school_rounded
+                              : types[i] == 'academy_staff'
+                              ? Icons.school_outlined
                               : Icons.badge_rounded,
                           size: 16,
                           color: selected ? Colors.white : Colors.grey.shade600,
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          t == 'teacher' ? 'Teacher' : 'Staff',
+                          labels[i],
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -349,7 +358,7 @@ class _AddStaffTransactionScreenState
                   ),
                 ),
               );
-            }).toList(),
+            }),
           ),
         ),
       ),

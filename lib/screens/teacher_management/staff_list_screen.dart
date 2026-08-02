@@ -7,6 +7,7 @@
 // import '../../providers/teacher_provider.dart';
 // import '../../providers/class_provider.dart';
 // import '../salary_managemnet/salary_adjustment_screen.dart';
+// import '../teacher_management/employee_ledger_screen.dart'; // ★ NEW – Ledger screen
 // import 'Staff Profile.dart';
 // import 'add_teacher.dart';
 // import 'deactivate_staff_teacher_management.dart';
@@ -104,6 +105,15 @@
 //     await Navigator.push(
 //       context,
 //       MaterialPageRoute(builder: (_) => SalaryAdjustmentScreen(staff: s)),
+//     );
+//   }
+//
+//   // ★ NEW – opens the Employee Ledger screen for this specific
+//   // staff member (Advance / Loan / Expense / Fine / Reimbursement ledger).
+//   Future<void> _openLedger(BuildContext context, dynamic s) async {
+//     await Navigator.push(
+//       context,
+//       MaterialPageRoute(builder: (_) => EmployeeLedgerScreen(employee: s)),
 //     );
 //   }
 //
@@ -358,7 +368,7 @@
 //                         _th('PHONE', flex: 14),
 //                         _th('EMPLOYMENT', flex: 14),
 //                         _th('STATUS', flex: 10),
-//                         _th('ACTION', flex: 15, align: TextAlign.center),
+//                         _th('ACTION', flex: 18, align: TextAlign.center), // ★ widened for 5th button
 //                       ])),
 //                   const Divider(height: 1, color: Color(0xFFEEEFF3)),
 //                   Expanded(
@@ -529,18 +539,24 @@
 //             ),
 //             // ACTION
 //             Expanded(
-//               flex: 15,
+//               flex: 18, // ★ widened for 5th button
 //               child: Center(
 //                 child: Row(
 //                     mainAxisAlignment: MainAxisAlignment.center,
 //                     children: [
-//                       // ★ NEW – Salary History button
+//                       // ★ NEW – Ledger button
+//                       _actionBtn(Icons.account_balance_wallet_outlined,
+//                           Colors.teal.shade700,
+//                               () => _openLedger(context, s),
+//                           tooltip: 'Ledger'),
+//                       const SizedBox(width: 4),
+//                       // Salary History button
 //                       _actionBtn(Icons.payments_outlined,
 //                           _kPurple,
 //                               () => _openSalaryHistory(context, s),
 //                           tooltip: 'Salary History'),
 //                       const SizedBox(width: 4),
-//                       // ★ CHANGED: View icon → Deactivate icon
+//                       // Deactivate icon
 //                       _actionBtn(Icons.person_off_outlined,
 //                           Colors.orange.shade700,
 //                               () => _confirmDeactivate(context, s),
@@ -843,19 +859,22 @@
 //                                     Colors.grey.shade100),
 //                             ]),
 //                           ])),
-//                   // ★ CHANGED: 4 separate icon buttons → single dropdown menu
+//                   // Single dropdown menu (now 5 items incl. Ledger)
 //                   _mobileActionMenu(context, s),
 //                 ]))));
 //   }
 //
-//   // ★ NEW – single 3-dot dropdown replacing the 4 stacked icon buttons.
-//   // Contains: Salary History, Edit, Deactivate, Delete.
+//   // ★ UPDATED – dropdown now contains: Ledger, Salary History, Edit,
+//   // Deactivate, Delete.
 //   Widget _mobileActionMenu(BuildContext context, dynamic s) {
 //     return PopupMenuButton<String>(
 //       icon: Icon(Icons.more_vert, color: Colors.grey.shade600, size: 20),
 //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
 //       onSelected: (value) {
 //         switch (value) {
+//           case 'ledger':
+//             _openLedger(context, s);
+//             break;
 //           case 'salary':
 //             _openSalaryHistory(context, s);
 //             break;
@@ -871,6 +890,8 @@
 //         }
 //       },
 //       itemBuilder: (context) => [
+//         _menuItem('ledger', Icons.account_balance_wallet_outlined, 'Ledger',
+//             Colors.teal.shade700), // ★ NEW
 //         _menuItem('salary', Icons.payments_outlined, 'Salary History', _kPurple),
 //         _menuItem('edit', Icons.edit_outlined, 'Edit', _kPurple),
 //         _menuItem('deactivate', Icons.person_off_outlined, 'Deactivate',
@@ -929,6 +950,7 @@
 // }
 
 
+
 import 'dart:convert';
 import 'package:educoresystem/screens/teacher_management/staff_bulk_staff_management.dart';
 import 'package:flutter/material.dart';
@@ -947,6 +969,9 @@ const _kPurpleLight = Color(0xFFF0EFFE);
 const _kGreen = Color(0xFF15803D);
 const _kGreenBg = Color(0xFFDCFCE7);
 
+// ── School Staff (was: StaffListScreen / generic "Staff") ──
+// Renamed to make the 3-type split (Teacher / School Staff / Academy Staff)
+// explicit. Uses provider.schoolStaff (Firestore collection: school_staff).
 class StaffListScreen extends StatefulWidget {
   final void Function(StaffMember staff,
       {Map<String, String> classIdToName})? onItemTap;
@@ -970,7 +995,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => context.read<StaffProvider>().fetchStaffOnly());
+    Future.microtask(() => context.read<StaffProvider>().fetchSchoolStaff());
     _searchCtrl.addListener(() {
       setState(() {
         _searchQuery = _searchCtrl.text.toLowerCase();
@@ -1025,7 +1050,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
         context,
         MaterialPageRoute(builder: (_) => AddEditStaffScreen(existingStaff: s)));
     if (result == true && context.mounted) {
-      context.read<StaffProvider>().fetchStaffOnly();
+      context.read<StaffProvider>().fetchSchoolStaff();
     }
   }
 
@@ -1117,7 +1142,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (_) => const TerminatedStaffScreen(initialTypeFilter: 'staff')),
+          builder: (_) => const TerminatedStaffScreen(initialTypeFilter: 'school_staff')),
     );
   }
 
@@ -1130,7 +1155,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
   // ── DESKTOP (with sections column) ──────────────────────────────────────
   Widget _buildDesktop() {
     final provider = context.watch<StaffProvider>();
-    final filtered = _filtered(provider.staffOnly);
+    final filtered = _filtered(provider.schoolStaff);
     final totalPages = (filtered.length / _pageSize).ceil().clamp(1, 9999);
     final pageItems =
     filtered.skip(_currentPage * _pageSize).take(_pageSize).toList();
@@ -1145,13 +1170,13 @@ class _StaffListScreenState extends State<StaffListScreen> {
           // Header
           Row(children: [
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Staff (${provider.staffOnly.length})',
+              Text('School Staff (${provider.schoolStaff.length})',
                   style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1A1A2E))),
               const SizedBox(height: 2),
-              Text('Manage all staff members',
+              Text('Manage all school staff members',
                   style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
             ]),
             const Spacer(),
@@ -1193,7 +1218,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
                       MaterialPageRoute(builder: (_) => const BulkAddStaffScreen()));
                 } else if (value == 'bulk_edit') {
                   Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'staff')));
+                      MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'school_staff')));
                 } else if (value == 'deactivated_list') {
                   _openDeactivatedList(context);
                 }
@@ -1212,8 +1237,8 @@ class _StaffListScreenState extends State<StaffListScreen> {
               onPressed: () async {
                 final result = await Navigator.push(context,
                     MaterialPageRoute(
-                        builder: (_) => const AddEditStaffScreen()));
-                if (result == true && mounted) provider.fetchStaffOnly();
+                        builder: (_) => const AddEditStaffScreen(initialType: 'school_staff')));
+                if (result == true && mounted) provider.fetchSchoolStaff();
               },
               icon: const Icon(Icons.add, size: 18),
               label: const Text('Add Staff'),
@@ -1609,7 +1634,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
   // ── MOBILE (added sections) ──────────────────────────────────────────────
   Widget _buildMobile() {
     final provider = context.watch<StaffProvider>();
-    final filtered = _filtered(provider.staffOnly);
+    final filtered = _filtered(provider.schoolStaff);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
@@ -1618,9 +1643,9 @@ class _StaffListScreenState extends State<StaffListScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Staff',
+          const Text('School Staff',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-          Text('${provider.staffOnly.length} members',
+          Text('${provider.schoolStaff.length} members',
               style: const TextStyle(fontSize: 11, color: Colors.white70)),
         ]),
         actions: [
@@ -1633,7 +1658,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
                     MaterialPageRoute(builder: (_) => const BulkAddStaffScreen()));
               } else if (value == 'bulk_edit') {
                 Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'staff')));
+                    MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'school_staff')));
               } else if (value == 'deactivated_list') {
                 _openDeactivatedList(context);
               }
@@ -1653,8 +1678,8 @@ class _StaffListScreenState extends State<StaffListScreen> {
                 final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const AddEditStaffScreen()));
-                if (result == true && mounted) provider.fetchStaffOnly();
+                        builder: (_) => const AddEditStaffScreen(initialType: 'school_staff')));
+                if (result == true && mounted) provider.fetchSchoolStaff();
               })
         ],
       ),
@@ -1712,8 +1737,8 @@ class _StaffListScreenState extends State<StaffListScreen> {
             final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (_) => const AddEditStaffScreen()));
-            if (result == true && mounted) provider.fetchStaffOnly();
+                    builder: (_) => const AddEditStaffScreen(initialType: 'school_staff')));
+            if (result == true && mounted) provider.fetchSchoolStaff();
           },
           child: const Icon(Icons.add)),
     );
