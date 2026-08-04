@@ -27,6 +27,9 @@
 //   late TabController _tabController;
 //   static const _purple = Color(0xFF534AB7);
 //
+//   final TextEditingController _searchCtrl = TextEditingController();
+//   String _searchQuery = '';
+//
 //   @override
 //   void initState() {
 //     super.initState();
@@ -47,11 +50,15 @@
 //         }
 //       }
 //     });
+//     _searchCtrl.addListener(() {
+//       setState(() => _searchQuery = _searchCtrl.text.trim());
+//     });
 //   }
 //
 //   @override
 //   void dispose() {
 //     _tabController.dispose();
+//     _searchCtrl.dispose();
 //     super.dispose();
 //   }
 //
@@ -70,9 +77,64 @@
 //     }
 //   }
 //
+//   // ── Search matching ──────────────────────────────
+//   // Normalizes CNIC-like strings by stripping everything except digits, so
+//   // "34101-0134567-8" and "3410101345678" both match the same query.
+//   String _digitsOnly(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
+//
+//   bool _matchesSearch(AdmissionModel a, String query) {
+//     if (query.isEmpty) return true;
+//     final q = query.toLowerCase();
+//     final qDigits = _digitsOnly(query);
+//     final bool queryLooksNumeric = qDigits.isNotEmpty && qDigits.length == query.replaceAll(' ', '').length;
+//
+//     bool textHit(String? v) =>
+//         v != null && v.toLowerCase().contains(q);
+//
+//     bool cnicHit(String? v) {
+//       if (v == null || v.isEmpty || qDigits.isEmpty) return false;
+//       return _digitsOnly(v).contains(qDigits);
+//     }
+//
+//     // Top-level admission / family / parent fields
+//     if (textHit(a.inquiryOrRegId)) return true;
+//     if (textHit(a.familyId)) return true;
+//     if (textHit(a.familyName)) return true;
+//     if (textHit(a.fatherName)) return true;
+//     if (textHit(a.motherName)) return true;
+//     if (textHit(a.fatherPhone)) return true;
+//     if (textHit(a.motherPhone)) return true;
+//
+//     // CNIC fields — digit-normalized so dashes don't matter either way
+//     if (cnicHit(a.fatherCnic)) return true;
+//     if (cnicHit(a.motherCnic)) return true;
+//     // Phone numbers are also sensible to match digit-only (in case the
+//     // user types with or without dashes/spaces).
+//     if (queryLooksNumeric) {
+//       if (cnicHit(a.fatherPhone)) return true;
+//       if (cnicHit(a.motherPhone)) return true;
+//     }
+//
+//     // Per-student fields
+//     for (final s in a.students) {
+//       if (textHit(s.name)) return true;
+//       if (textHit(s.studentId)) return true;
+//       if (textHit(s.className)) return true;
+//       if (cnicHit(s.bFormCnic)) return true;
+//     }
+//
+//     return false;
+//   }
+//
+//   List<AdmissionModel> _filtered(List<AdmissionModel> source) {
+//     if (_searchQuery.isEmpty) return source;
+//     return source.where((a) => _matchesSearch(a, _searchQuery)).toList();
+//   }
+//
 //   @override
 //   Widget build(BuildContext context) {
 //     return Scaffold(
+//       backgroundColor: const Color(0xFFF6F5FA),
 //       appBar: AppBar(
 //         title: const Text('Admissions'),
 //         centerTitle: true,
@@ -89,7 +151,6 @@
 //           ],
 //         ),
 //       ),
-//       // ─────────── CHANGED FAB ───────────
 //       floatingActionButton: widget.showFAB
 //           ? FloatingActionButton.extended(
 //         onPressed: () async {
@@ -106,22 +167,6 @@
 //         label: const Text('New', style: TextStyle(color: Colors.white)),
 //       )
 //           : null,
-//       // floatingActionButton: FloatingActionButton.extended(
-//       //   onPressed: () async {
-//       //     final result = await Navigator.push(
-//       //       context,
-//       //       MaterialPageRoute(builder: (_) => const AdmissionFormScreen()),
-//       //     );
-//       //     // result is either null (cancelled) or an AdmissionType (saved)
-//       //     if (result is AdmissionType && context.mounted) {
-//       //       _switchTab(result);
-//       //     }
-//       //   },
-//       //   backgroundColor: _purple,
-//       //   icon: const Icon(Icons.add, color: Colors.white),
-//       //   label: const Text('New', style: TextStyle(color: Colors.white)),
-//       // ),
-//       // ───────────────────────────────────
 //       body: Consumer<AdmissionProvider>(
 //         builder: (context, provider, _) {
 //           if (provider.isLoading && provider.admissions.isEmpty) {
@@ -141,19 +186,27 @@
 //               ),
 //             );
 //           }
-//           if (provider.admissions.isEmpty) {
-//             return _buildEmpty();
-//           }
-//           return TabBarView(
-//             controller: _tabController,
+//
+//           return Column(
 //             children: [
-//               _buildList(provider.admissions),
-//               _buildList(provider.admissions
-//                   .where((a) => a.type == AdmissionType.preAdmission)
-//                   .toList()),
-//               _buildList(provider.admissions
-//                   .where((a) => a.type == AdmissionType.regular)
-//                   .toList()),
+//               _buildSearchBar(provider),
+//               if (provider.admissions.isEmpty)
+//                 Expanded(child: _buildEmpty())
+//               else
+//                 Expanded(
+//                   child: TabBarView(
+//                     controller: _tabController,
+//                     children: [
+//                       _buildList(_filtered(provider.admissions)),
+//                       _buildList(_filtered(provider.admissions
+//                           .where((a) => a.type == AdmissionType.preAdmission)
+//                           .toList())),
+//                       _buildList(_filtered(provider.admissions
+//                           .where((a) => a.type == AdmissionType.regular)
+//                           .toList())),
+//                     ],
+//                   ),
+//                 ),
 //             ],
 //           );
 //         },
@@ -161,16 +214,114 @@
 //     );
 //   }
 //
+//   // ── Search Bar + quick stats row ──
+//   Widget _buildSearchBar(AdmissionProvider provider) {
+//     final total = provider.admissions.length;
+//     final preCount =
+//         provider.admissions.where((a) => a.type == AdmissionType.preAdmission).length;
+//     final regCount =
+//         provider.admissions.where((a) => a.type == AdmissionType.regular).length;
+//
+//     return Container(
+//       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         boxShadow: [
+//           BoxShadow(
+//             color: Colors.black.withOpacity(0.04),
+//             blurRadius: 6,
+//             offset: const Offset(0, 2),
+//           ),
+//         ],
+//       ),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           TextField(
+//             controller: _searchCtrl,
+//             decoration: InputDecoration(
+//               hintText: 'Search name, ID, CNIC, class, phone…',
+//               hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.5),
+//               prefixIcon: Icon(Icons.search, color: Colors.grey.shade500),
+//               suffixIcon: _searchQuery.isNotEmpty
+//                   ? IconButton(
+//                 icon: Icon(Icons.clear, color: Colors.grey.shade500),
+//                 onPressed: () => _searchCtrl.clear(),
+//               )
+//                   : null,
+//               filled: true,
+//               fillColor: const Color(0xFFF3F2F9),
+//               contentPadding: const EdgeInsets.symmetric(vertical: 0),
+//               border: OutlineInputBorder(
+//                 borderRadius: BorderRadius.circular(12),
+//                 borderSide: BorderSide.none,
+//               ),
+//               enabledBorder: OutlineInputBorder(
+//                 borderRadius: BorderRadius.circular(12),
+//                 borderSide: BorderSide.none,
+//               ),
+//               focusedBorder: OutlineInputBorder(
+//                 borderRadius: BorderRadius.circular(12),
+//                 borderSide: BorderSide(color: _purple, width: 1.4),
+//               ),
+//             ),
+//           ),
+//           const SizedBox(height: 10),
+//           Row(
+//             children: [
+//               _statChip('Total', total, _purple),
+//               const SizedBox(width: 8),
+//               _statChip('Pre-Admission', preCount, Colors.orange),
+//               const SizedBox(width: 8),
+//               _statChip('Regular', regCount, Colors.green),
+//             ],
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _statChip(String label, int count, Color color) {
+//     return Container(
+//       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+//       decoration: BoxDecoration(
+//         color: color.withOpacity(0.08),
+//         borderRadius: BorderRadius.circular(20),
+//         border: Border.all(color: color.withOpacity(0.25)),
+//       ),
+//       child: Row(
+//         mainAxisSize: MainAxisSize.min,
+//         children: [
+//           Text(
+//             '$count',
+//             style: TextStyle(
+//                 fontSize: 12.5, fontWeight: FontWeight.bold, color: color),
+//           ),
+//           const SizedBox(width: 4),
+//           Text(
+//             label,
+//             style: TextStyle(fontSize: 11.5, color: color.withOpacity(0.85)),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
 //   Widget _buildEmpty() {
+//     final searching = _searchQuery.isNotEmpty;
 //     return Center(
 //       child: Column(
 //         mainAxisAlignment: MainAxisAlignment.center,
 //         children: [
-//           Icon(Icons.inbox_outlined, size: 64, color: Colors.grey.shade300),
+//           Icon(
+//               searching ? Icons.search_off : Icons.inbox_outlined,
+//               size: 64,
+//               color: Colors.grey.shade300),
 //           const SizedBox(height: 16),
-//           Text('No admissions yet',
+//           Text(
+//               searching ? 'No admissions match "$_searchQuery"' : 'No admissions yet',
 //               style: TextStyle(fontSize: 16, color: Colors.grey.shade500)),
-//           if (widget.showFAB) ...[    // ← यही condition add की है
+//           if (!searching && widget.showFAB) ...[
 //             const SizedBox(height: 8),
 //             ElevatedButton.icon(
 //               onPressed: () => Navigator.push(
@@ -190,12 +341,25 @@
 //
 //   Widget _buildList(List<AdmissionModel> admissions) {
 //     if (admissions.isEmpty) {
+//       final searching = _searchQuery.isNotEmpty;
 //       return Center(
-//           child: Text('No records found',
-//               style: TextStyle(color: Colors.grey.shade500, fontSize: 14)));
+//         child: Column(
+//           mainAxisAlignment: MainAxisAlignment.center,
+//           children: [
+//             Icon(
+//                 searching ? Icons.search_off : Icons.inbox_outlined,
+//                 size: 48,
+//                 color: Colors.grey.shade300),
+//             const SizedBox(height: 10),
+//             Text(
+//                 searching ? 'No matches in this tab' : 'No records found',
+//                 style: TextStyle(color: Colors.grey.shade500, fontSize: 14)),
+//           ],
+//         ),
+//       );
 //     }
 //     return ListView.builder(
-//       padding: const EdgeInsets.all(16),
+//       padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
 //       itemCount: admissions.length,
 //       itemBuilder: (context, i) => _AdmissionCard(
 //         key: ValueKey(admissions[i].id),   // for smooth widget recycling
@@ -234,104 +398,151 @@
 //     final dateStr =
 //         '${a.admissionDate.day.toString().padLeft(2, '0')}/${a.admissionDate.month.toString().padLeft(2, '0')}/${a.admissionDate.year}';
 //
-//     return Card(
+//     return Container(
 //       margin: const EdgeInsets.only(bottom: 12),
-//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-//       elevation: 2,
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.circular(16),
+//         boxShadow: [
+//           BoxShadow(
+//             color: Colors.black.withOpacity(0.05),
+//             blurRadius: 10,
+//             offset: const Offset(0, 3),
+//           ),
+//         ],
+//       ),
 //       child: Column(
 //         children: [
 //           InkWell(
 //             onTap: () => setState(() => _expanded = !_expanded),
-//             borderRadius: BorderRadius.circular(14),
+//             borderRadius: BorderRadius.circular(16),
 //             child: Padding(
 //               padding: const EdgeInsets.all(14),
 //               child: Row(
 //                 children: [
-//                   Container(
-//                     padding:
-//                     const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-//                     decoration: BoxDecoration(
-//                       color: typeColor.withOpacity(0.1),
-//                       borderRadius: BorderRadius.circular(20),
-//                       border: Border.all(color: typeColor),
-//                     ),
-//                     child: Text(
-//                       isPre ? 'Pre' : 'Reg',
-//                       style: TextStyle(
-//                           fontSize: 11,
-//                           color: typeColor,
-//                           fontWeight: FontWeight.bold),
-//                     ),
+//                   _studentAvatar(
+//                     a.students.isNotEmpty ? a.students.first.picBase64 : null,
 //                   ),
-//                   const SizedBox(width: 10),
+//                   const SizedBox(width: 12),
 //                   Expanded(
 //                     child: Column(
 //                       crossAxisAlignment: CrossAxisAlignment.start,
 //                       children: [
-//                         Text(
-//                           a.fatherName.isNotEmpty
-//                               ? a.fatherName
-//                               : 'Family: ${a.familyName}',
-//                           style: const TextStyle(
-//                               fontWeight: FontWeight.bold, fontSize: 15),
+//                         Row(
+//                           children: [
+//                             Container(
+//                               padding: const EdgeInsets.symmetric(
+//                                   horizontal: 8, vertical: 3),
+//                               decoration: BoxDecoration(
+//                                 color: typeColor.withOpacity(0.1),
+//                                 borderRadius: BorderRadius.circular(20),
+//                                 border: Border.all(color: typeColor),
+//                               ),
+//                               child: Text(
+//                                 isPre ? 'Pre' : 'Reg',
+//                                 style: TextStyle(
+//                                     fontSize: 10.5,
+//                                     color: typeColor,
+//                                     fontWeight: FontWeight.bold),
+//                               ),
+//                             ),
+//                             const SizedBox(width: 8),
+//                             Expanded(
+//                               child: Text(
+//                                 a.fatherName.isNotEmpty
+//                                     ? a.fatherName
+//                                     : 'Family: ${a.familyName}',
+//                                 overflow: TextOverflow.ellipsis,
+//                                 style: const TextStyle(
+//                                     fontWeight: FontWeight.bold, fontSize: 15),
+//                               ),
+//                             ),
+//                           ],
 //                         ),
-//                         const SizedBox(height: 2),
+//                         const SizedBox(height: 4),
 //                         Text(
 //                           '${a.inquiryOrRegId} • $dateStr',
 //                           style: TextStyle(
 //                               fontSize: 12, color: Colors.grey.shade600),
 //                         ),
 //                         Text(
-//                           '${a.students.length} student(s)',
+//                           '${a.students.length} student(s)'
+//                               '${a.students.isNotEmpty && a.students.first.name.isNotEmpty ? " — ${a.students.map((s) => s.name).where((n) => n.isNotEmpty).join(", ")}" : ""}',
+//                           maxLines: 1,
+//                           overflow: TextOverflow.ellipsis,
 //                           style: TextStyle(
 //                               fontSize: 12, color: Colors.grey.shade500),
 //                         ),
 //                       ],
 //                     ),
 //                   ),
-//                   // ─────────── CHANGED EDIT BUTTON ───────────
-//                   IconButton(
-//                     icon: const Icon(Icons.edit_outlined, size: 20),
-//                     color: _purple,
-//                     onPressed: () async {
-//                       final result = await Navigator.push(
-//                         context,
-//                         MaterialPageRoute(
-//                           builder: (_) => AdmissionFormScreen(existing: a),
-//                         ),
-//                       );
-//                       if (result is AdmissionType && context.mounted) {
-//                         _findListScreenState()?.switchTab(result);
+//                   PopupMenuButton<String>(
+//                     icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
+//                     onSelected: (value) async {
+//                       if (value == 'edit') {
+//                         final result = await Navigator.push(
+//                           context,
+//                           MaterialPageRoute(
+//                             builder: (_) => AdmissionFormScreen(existing: a),
+//                           ),
+//                         );
+//                         if (result is AdmissionType && context.mounted) {
+//                           _findListScreenState()?.switchTab(result);
+//                         }
+//                       } else if (value == 'delete') {
+//                         _confirmDelete(context, a);
+//                       } else if (value == 'convert') {
+//                         _confirmConvert(context, a);
 //                       }
 //                     },
-//                   ),
-//                   // ────────────────────────────────────────────
-//                   IconButton(
-//                     icon: const Icon(Icons.delete_outline,
-//                         size: 20, color: Colors.red),
-//                     onPressed: () => _confirmDelete(context, a),
-//                   ),
-//                   if (isPre)
-//                     IconButton(
-//                       icon: _converting
-//                           ? const SizedBox(
-//                         width: 18,
-//                         height: 18,
-//                         child: CircularProgressIndicator(
-//                           strokeWidth: 2,
-//                           color: Colors.orange,
+//                     itemBuilder: (context) => [
+//                       const PopupMenuItem(
+//                         value: 'edit',
+//                         child: Row(
+//                           children: [
+//                             Icon(Icons.edit_outlined, size: 18, color: _purple),
+//                             SizedBox(width: 10),
+//                             Text('Edit'),
+//                           ],
 //                         ),
-//                       )
-//                           : const Icon(Icons.swap_horiz, size: 20),
-//                       color: Colors.orange,
-//                       tooltip: 'Convert to Regular Admission',
-//                       onPressed:
-//                       _converting ? null : () => _confirmConvert(context, a),
-//                     ),
+//                       ),
+//                       if (isPre)
+//                         PopupMenuItem(
+//                           value: 'convert',
+//                           enabled: !_converting,
+//                           child: Row(
+//                             children: [
+//                               _converting
+//                                   ? const SizedBox(
+//                                 width: 16,
+//                                 height: 16,
+//                                 child: CircularProgressIndicator(
+//                                     strokeWidth: 2, color: Colors.orange),
+//                               )
+//                                   : const Icon(Icons.swap_horiz,
+//                                   size: 18, color: Colors.orange),
+//                               const SizedBox(width: 10),
+//                               const Text('Convert to Regular'),
+//                             ],
+//                           ),
+//                         ),
+//                       const PopupMenuItem(
+//                         value: 'delete',
+//                         child: Row(
+//                           children: [
+//                             Icon(Icons.delete_outline,
+//                                 size: 18, color: Colors.red),
+//                             SizedBox(width: 10),
+//                             Text('Delete', style: TextStyle(color: Colors.red)),
+//                           ],
+//                         ),
+//                       ),
+//                     ],
+//                   ),
 //                   AnimatedRotation(
 //                     turns: _expanded ? 0.5 : 0,
 //                     duration: const Duration(milliseconds: 250),
-//                     child: const Icon(Icons.expand_more),
+//                     child: Icon(Icons.expand_more, color: Colors.grey.shade500),
 //                   ),
 //                 ],
 //               ),
@@ -654,278 +865,6 @@
 //       if (mounted) setState(() => _converting = false);
 //     }
 //   }
-//   // void _confirmConvert(BuildContext context, AdmissionModel a) async {
-//   //   // 1. Pick registration date
-//   //   final DateTime? pickedDate = await showDatePicker(
-//   //     context: context,
-//   //     initialDate: DateTime.now(),
-//   //     firstDate: DateTime(2020),
-//   //     lastDate: DateTime(2100),
-//   //     builder: (context, child) => Theme(
-//   //       data: Theme.of(context).copyWith(
-//   //         colorScheme: ColorScheme.fromSeed(seedColor: _purple),
-//   //       ),
-//   //       child: child!,
-//   //     ),
-//   //   );
-//   //   if (pickedDate == null || !context.mounted) return;
-//   //
-//   //   // 2. Collect required student details
-//   //   final updatedStudents = await _showStudentDetailsDialog(a);
-//   //   if (updatedStudents == null || !context.mounted) return; // user cancelled
-//   //
-//   //   // 3. Confirm the conversion
-//   //   final confirmed = await showDialog<bool>(
-//   //     context: context,
-//   //     builder: (ctx) => AlertDialog(
-//   //       title: const Text('Convert to Regular Admission'),
-//   //       content: Text(
-//   //         'This will create a new Regular Admission with date '
-//   //             '${pickedDate.day}/${pickedDate.month}/${pickedDate.year} '
-//   //             'and delete this Pre-Admission record. Continue?',
-//   //       ),
-//   //       actions: [
-//   //         TextButton(
-//   //           onPressed: () => Navigator.pop(ctx, false),
-//   //           child: const Text('Cancel'),
-//   //         ),
-//   //         TextButton(
-//   //           onPressed: () => Navigator.pop(ctx, true),
-//   //           child: const Text('Convert', style: TextStyle(color: Colors.orange)),
-//   //         ),
-//   //       ],
-//   //     ),
-//   //   );
-//   //   if (confirmed != true || !context.mounted) return;
-//   //
-//   //   // 4. Execute conversion
-//   //   setState(() => _converting = true);
-//   //   try {
-//   //     await context.read<AdmissionProvider>().convertToRegular(
-//   //       a,
-//   //       customDate: pickedDate,
-//   //       studentsOverride: updatedStudents,   // pass the collected students
-//   //     );
-//   //     if (context.mounted) {
-//   //       ScaffoldMessenger.of(context).showSnackBar(
-//   //         const SnackBar(
-//   //           content: Text('Converted to Regular Admission successfully'),
-//   //           backgroundColor: Colors.green,
-//   //         ),
-//   //       );
-//   //       _findListScreenState()?.switchTab(AdmissionType.regular);
-//   //     }
-//   //   } catch (e) {
-//   //     if (context.mounted) {
-//   //       ScaffoldMessenger.of(context).showSnackBar(
-//   //         SnackBar(
-//   //           content: Text('Conversion failed: $e'),
-//   //           backgroundColor: Colors.red,
-//   //         ),
-//   //       );
-//   //     }
-//   //   } finally {
-//   //     if (mounted) setState(() => _converting = false);
-//   //   }
-//   // }
-//
-//   Future<List<AdmissionStudent>?> _showStudentDetailsDialog(AdmissionModel a) async {
-//     final students = a.students;
-//     final formKey = GlobalKey<FormState>();
-//
-//     // Controllers and initial dates
-//     final List<TextEditingController> cnicCtrls =
-//     List.generate(students.length, (i) => TextEditingController(text: students[i].bFormCnic ?? ''));
-//     final List<DateTime?> dobList = List.generate(students.length, (i) => students[i].dob);
-//
-//     return showDialog<List<AdmissionStudent>>(
-//       context: context,
-//       barrierDismissible: false,
-//       builder: (ctx) {
-//         return StatefulBuilder(
-//           builder: (context, setDialogState) {
-//             return AlertDialog(
-//               title: const Text('Student Details Required'),
-//               content: SizedBox(
-//                 width: double.maxFinite,
-//                 child: Form(
-//                   key: formKey,
-//                   child: ListView.builder(
-//                     shrinkWrap: true,
-//                     itemCount: students.length,
-//                     itemBuilder: (context, i) {
-//                       final s = students[i];
-//                       return Card(
-//                         margin: const EdgeInsets.only(bottom: 12),
-//                         child: Padding(
-//                           padding: const EdgeInsets.all(12),
-//                           child: Column(
-//                             crossAxisAlignment: CrossAxisAlignment.start,
-//                             children: [
-//                               Text(
-//                                 'Student ${i + 1}: ${s.name}',
-//                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-//                               ),
-//                               const SizedBox(height: 12),
-//                               // B-Form / CNIC
-//                               TextFormField(
-//                                 controller: cnicCtrls[i],
-//                                 decoration: const InputDecoration(
-//                                   labelText: 'B-Form / CNIC *',
-//                                   border: OutlineInputBorder(),
-//                                   prefixIcon: Icon(Icons.credit_card_outlined),
-//                                 ),
-//                                 keyboardType: TextInputType.number,
-//                                 validator: (v) =>
-//                                 (v == null || v.trim().isEmpty) ? 'Required' : null,
-//                               ),
-//                               const SizedBox(height: 12),
-//                               // Date of Birth
-//                               InkWell(
-//                                 onTap: () async {
-//                                   final picked = await showDatePicker(
-//                                     context: ctx,
-//                                     initialDate: dobList[i] ?? DateTime(2015),
-//                                     firstDate: DateTime(2000),
-//                                     lastDate: DateTime.now(),
-//                                   );
-//                                   if (picked != null) {
-//                                     setDialogState(() => dobList[i] = picked);
-//                                   }
-//                                 },
-//                                 child: InputDecorator(
-//                                   decoration: const InputDecoration(
-//                                     labelText: 'Date of Birth *',
-//                                     border: OutlineInputBorder(),
-//                                     prefixIcon: Icon(Icons.cake_outlined),
-//                                   ),
-//                                   child: Text(
-//                                     dobList[i] != null
-//                                         ? '${dobList[i]!.day}/${dobList[i]!.month}/${dobList[i]!.year}'
-//                                         : 'Select Date',
-//                                     style: TextStyle(
-//                                       color: dobList[i] != null ? Colors.black87 : Colors.grey,
-//                                     ),
-//                                   ),
-//                                 ),
-//                               ),
-//                               // Show validation error if both fields are empty after first attempt
-//                               // (validated at dialog submit time anyway)
-//                             ],
-//                           ),
-//                         ),
-//                       );
-//                     },
-//                   ),
-//                 ),
-//               ),
-//               actions: [
-//                 TextButton(
-//                   onPressed: () {
-//                     // Dispose controllers before popping
-//                     for (var c in cnicCtrls) c.dispose();
-//                     Navigator.pop(ctx); // cancel -> null
-//                   },
-//                   child: const Text('Cancel'),
-//                 ),
-//                 ElevatedButton(
-//                   onPressed: () {
-//                     if (formKey.currentState!.validate()) {
-//                       // All B-Forms filled; check DOBs
-//                       final bool allDobFilled = dobList.every((d) => d != null);
-//                       if (!allDobFilled) {
-//                         ScaffoldMessenger.of(ctx).showSnackBar(
-//                           const SnackBar(content: Text('Please select Date of Birth for all students')),
-//                         );
-//                         return;
-//                       }
-//
-//                       // Build updated student list
-//                       final updated = List<AdmissionStudent>.generate(students.length, (i) {
-//                         return students[i].copyWith(
-//                           bFormCnic: cnicCtrls[i].text.trim(),
-//                           dob: dobList[i],
-//                         );
-//                       });
-//
-//                       // Dispose controllers before popping
-//                       for (var c in cnicCtrls) c.dispose();
-//                       Navigator.pop(ctx, updated);
-//                     }
-//                   },
-//                   child: const Text('Next'),
-//                 ),
-//               ],
-//             );
-//           },
-//         );
-//       },
-//     );
-//   }
-//   // void _confirmConvert(BuildContext context, AdmissionModel a) async {
-//   //   // 1. Pick a registration date
-//   //   final DateTime? pickedDate = await showDatePicker(
-//   //     context: context,
-//   //     initialDate: DateTime.now(),
-//   //     firstDate: DateTime(2020),
-//   //     lastDate: DateTime(2100),
-//   //     builder: (context, child) {
-//   //       return Theme(
-//   //         data: Theme.of(context).copyWith(
-//   //           colorScheme: ColorScheme.fromSeed(seedColor: _purple),
-//   //         ),
-//   //         child: child!,
-//   //       );
-//   //     },
-//   //   );
-//   //
-//   //   if (pickedDate == null || !context.mounted) return;
-//   //
-//   //   // 2. Confirmation dialog
-//   //   final confirmed = await showDialog<bool>(
-//   //     context: context,
-//   //     builder: (ctx) => AlertDialog(
-//   //       title: const Text('Convert to Regular Admission'),
-//   //       content: Text(
-//   //         'This will create a new Regular Admission with date '
-//   //             '${pickedDate.day}/${pickedDate.month}/${pickedDate.year} '
-//   //             'and delete this Pre-Admission record. Continue?',
-//   //       ),
-//   //       actions: [
-//   //         TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-//   //         TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Convert', style: TextStyle(color: Colors.orange))),
-//   //       ],
-//   //     ),
-//   //   );
-//   //
-//   //   if (confirmed != true || !context.mounted) return;
-//   //
-//   //   // ✅ Start loading
-//   //   setState(() => _converting = true);
-//   //
-//   //   try {
-//   //     await context.read<AdmissionProvider>().convertToRegular(a, customDate: pickedDate);
-//   //     if (context.mounted) {
-//   //       ScaffoldMessenger.of(context).showSnackBar(
-//   //         const SnackBar(content: Text('Converted to Regular Admission successfully'), backgroundColor: Colors.green),
-//   //
-//   //       );
-//   //       _findListScreenState()?.switchTab(AdmissionType.regular);
-//   //     }
-//   //   } catch (e) {
-//   //     if (context.mounted) {
-//   //       ScaffoldMessenger.of(context).showSnackBar(
-//   //         SnackBar(content: Text('Conversion failed: $e'), backgroundColor: Colors.red),
-//   //       );
-//   //     }
-//   //   } finally {
-//   //     // ✅ Stop loading
-//   //     if (mounted) {
-//   //       setState(() => _converting = false);
-//   //     }
-//   //   }
-//   // }
-//
 // }
 //
 // class _StudentDetailsDialog extends StatefulWidget {
@@ -1152,8 +1091,6 @@ class _AdmissionListScreenState extends State<AdmissionListScreen>
   }
 
   // ── Search matching ──────────────────────────────
-  // Normalizes CNIC-like strings by stripping everything except digits, so
-  // "34101-0134567-8" and "3410101345678" both match the same query.
   String _digitsOnly(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
 
   bool _matchesSearch(AdmissionModel a, String query) {
@@ -1179,21 +1116,20 @@ class _AdmissionListScreenState extends State<AdmissionListScreen>
     if (textHit(a.fatherPhone)) return true;
     if (textHit(a.motherPhone)) return true;
 
-    // CNIC fields — digit-normalized so dashes don't matter either way
+    // CNIC fields
     if (cnicHit(a.fatherCnic)) return true;
     if (cnicHit(a.motherCnic)) return true;
-    // Phone numbers are also sensible to match digit-only (in case the
-    // user types with or without dashes/spaces).
     if (queryLooksNumeric) {
       if (cnicHit(a.fatherPhone)) return true;
       if (cnicHit(a.motherPhone)) return true;
     }
 
-    // Per-student fields
+    // Per-student fields (includes academy name)
     for (final s in a.students) {
       if (textHit(s.name)) return true;
       if (textHit(s.studentId)) return true;
       if (textHit(s.className)) return true;
+      if (textHit(s.academyName)) return true;        // ← Academy search
       if (cnicHit(s.bFormCnic)) return true;
     }
 
@@ -1288,7 +1224,6 @@ class _AdmissionListScreenState extends State<AdmissionListScreen>
     );
   }
 
-  // ── Search Bar + quick stats row ──
   Widget _buildSearchBar(AdmissionProvider provider) {
     final total = provider.admissions.length;
     final preCount =
@@ -1436,7 +1371,7 @@ class _AdmissionListScreenState extends State<AdmissionListScreen>
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
       itemCount: admissions.length,
       itemBuilder: (context, i) => _AdmissionCard(
-        key: ValueKey(admissions[i].id),   // for smooth widget recycling
+        key: ValueKey(admissions[i].id),
         admission: admissions[i],
       ),
     );
@@ -1459,7 +1394,6 @@ class _AdmissionCardState extends State<_AdmissionCard> {
   bool _converting = false;
   static const _purple = Color(0xFF534AB7);
 
-  // Helper to find the list screen's state
   _AdmissionListScreenState? _findListScreenState() {
     return context.findAncestorStateOfType<_AdmissionListScreenState>();
   }
@@ -1634,7 +1568,6 @@ class _AdmissionCardState extends State<_AdmissionCard> {
     );
   }
 
-  // ── Details Section (unchanged) ──
   Widget _buildDetails(AdmissionModel a) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
@@ -1690,7 +1623,6 @@ class _AdmissionCardState extends State<_AdmissionCard> {
     );
   }
 
-  // ── Student Chip (unchanged) ──
   Widget _buildStudentChip(AdmissionStudent s) {
     return Card(
       elevation: 0,
@@ -1737,7 +1669,11 @@ class _AdmissionCardState extends State<_AdmissionCard> {
                       'DOB: ${s.dob!.day.toString().padLeft(2, '0')}/${s.dob!.month.toString().padLeft(2, '0')}/${s.dob!.year}',
                       Colors.pink,
                     ),
-                  if (s.monthlyFee != null || s.annualFee != null || s.registrationFee != null) ...[
+                  // ─────────── Academy Name (NEW) ───────────
+                  if (s.hasAcademy && s.academyName != null && s.academyName!.isNotEmpty)
+                    _chip(Icons.school, s.academyName!, Colors.deepPurple),
+
+                  if (s.monthlyFee != null || s.annualFee != null || s.registrationFee != null || s.academyFee != null) ...[
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 6,
@@ -1749,6 +1685,9 @@ class _AdmissionCardState extends State<_AdmissionCard> {
                           _feeBadge('Annual', s.annualFee!, Colors.orange),
                         if (s.registrationFee != null)
                           _feeBadge('Reg.', s.registrationFee!, Colors.purple),
+                        // ─────────── Academy Fee (NEW) ───────────
+                        if (s.academyFee != null)
+                          _feeBadge('Academy', s.academyFee!, Colors.deepPurple),
                       ],
                     ),
                   ],
@@ -1837,7 +1776,6 @@ class _AdmissionCardState extends State<_AdmissionCard> {
     );
   }
 
-  // ── Delete Confirm (unchanged) ──
   void _confirmDelete(BuildContext context, AdmissionModel a) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -1860,9 +1798,7 @@ class _AdmissionCardState extends State<_AdmissionCard> {
     }
   }
 
-  // ✅ Convert Confirm with loading state and date picker
   void _confirmConvert(BuildContext context, AdmissionModel a) async {
-    // 1. Pick registration date
     final DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -1877,15 +1813,13 @@ class _AdmissionCardState extends State<_AdmissionCard> {
     );
     if (pickedDate == null || !context.mounted) return;
 
-    // 2. Collect required student details
     final updatedStudents = await showDialog<List<AdmissionStudent>>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _StudentDetailsDialog(students: a.students),
     );
-    if (updatedStudents == null || !context.mounted) return; // user cancelled
+    if (updatedStudents == null || !context.mounted) return;
 
-    // 3. Confirm the conversion
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1909,7 +1843,6 @@ class _AdmissionCardState extends State<_AdmissionCard> {
     );
     if (confirmed != true || !context.mounted) return;
 
-    // 4. Execute conversion
     setState(() => _converting = true);
     try {
       await context.read<AdmissionProvider>().convertToRegular(
@@ -2022,7 +1955,6 @@ class _StudentDetailsDialogState extends State<_StudentDetailsDialog> {
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                       const SizedBox(height: 12),
-                      // B-Form / CNIC
                       TextFormField(
                         controller: _cnicCtrls[i],
                         decoration: const InputDecoration(
@@ -2034,7 +1966,6 @@ class _StudentDetailsDialogState extends State<_StudentDetailsDialog> {
                         validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                       ),
                       const SizedBox(height: 12),
-                      // Date of Birth
                       InkWell(
                         onTap: () async {
                           final picked = await showDatePicker(
@@ -2073,7 +2004,7 @@ class _StudentDetailsDialogState extends State<_StudentDetailsDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context), // cancel – returns null
+          onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
         ElevatedButton(
