@@ -1,5 +1,264 @@
+//
+// import 'package:cloud_firestore/cloud_firestore.dart';
+//
+// // ─────────────────────────────────────────────
+// //  Admission Type Enum
+// // ─────────────────────────────────────────────
+// enum AdmissionType { preAdmission, regular }
+//
+// extension AdmissionTypeExt on AdmissionType {
+//   String get label =>
+//       this == AdmissionType.preAdmission ? 'Pre-Admission' : 'Regular Admission';
+//   String get value =>
+//       this == AdmissionType.preAdmission ? 'pre_admission' : 'regular';
+//
+//   static AdmissionType fromString(String v) =>
+//       v == 'pre_admission' ? AdmissionType.preAdmission : AdmissionType.regular;
+// }
+//
+// // ─────────────────────────────────────────────
+// //  Student Entry (per student inside one admission)
+// // ─────────────────────────────────────────────
+// class AdmissionStudent {
+//   String studentId;       // Auto-generated on name entry
+//   String name;
+//   String? picBase64;
+//   String? classId;
+//   String? className;
+//   String? sectionId;
+//   String? sectionName;
+//   String? classRollNo;
+//   String? bFormCnic;      // Optional in Pre-Admission
+//   DateTime? dob;
+//   double? annualFee;
+//   double? registrationFee;
+//   double? monthlyFee;
+//
+//   AdmissionStudent({
+//     this.studentId = '',
+//     this.name = '',
+//     this.picBase64,
+//     this.classId,
+//     this.className,
+//     this.sectionId,
+//     this.sectionName,
+//     this.classRollNo,
+//     this.bFormCnic,
+//     this.dob,
+//     this.annualFee,
+//     this.registrationFee,
+//     this.monthlyFee,
+//   });
+//
+//   Map<String, dynamic> toMap() => {
+//     'studentId': studentId,
+//     'name': name,
+//     'picBase64': picBase64,
+//     'classId': classId,
+//     'className': className,
+//     'sectionId': sectionId,
+//     'sectionName': sectionName,
+//     'classRollNo': classRollNo,
+//     'bFormCnic': bFormCnic,
+//     'dob': dob?.toIso8601String(),
+//     'annualFee': annualFee,
+//     'registrationFee': registrationFee,
+//     'monthlyFee': monthlyFee,
+//   };
+//
+//   factory AdmissionStudent.fromMap(Map<String, dynamic> m) => AdmissionStudent(
+//     studentId: m['studentId'] ?? '',
+//     name: m['name'] ?? '',
+//     picBase64: m['picBase64'],
+//     classId: m['classId'],
+//     className: m['className'],
+//     sectionId: m['sectionId'],
+//     sectionName: m['sectionName'],
+//     classRollNo: m['classRollNo'],
+//     bFormCnic: m['bFormCnic'],
+//     dob: m['dob'] != null ? DateTime.tryParse(m['dob']) : null,
+//     annualFee: m['annualFee']?.toDouble(),
+//     registrationFee: m['registrationFee']?.toDouble(),
+//     monthlyFee: m['monthlyFee']?.toDouble(),
+//   );
+//
+//   AdmissionStudent copyWith({
+//     String? studentId,
+//     String? name,
+//     String? picBase64,
+//     String? classId,
+//     String? className,
+//     String? sectionId,
+//     String? sectionName,
+//     String? classRollNo,
+//     String? bFormCnic,
+//     DateTime? dob,
+//     double? annualFee,
+//     double? registrationFee,
+//     double? monthlyFee,
+//   }) =>
+//       AdmissionStudent(
+//         studentId: studentId ?? this.studentId,
+//         name: name ?? this.name,
+//         picBase64: picBase64 ?? this.picBase64,
+//         classId: classId ?? this.classId,
+//         className: className ?? this.className,
+//         sectionId: sectionId ?? this.sectionId,
+//         sectionName: sectionName ?? this.sectionName,
+//         classRollNo: classRollNo ?? this.classRollNo,
+//         bFormCnic: bFormCnic ?? this.bFormCnic,
+//         dob: dob ?? this.dob,
+//         annualFee: annualFee ?? this.annualFee,
+//         registrationFee: registrationFee ?? this.registrationFee,
+//         monthlyFee: monthlyFee ?? this.monthlyFee,
+//       );
+// }
+//
+// // ─────────────────────────────────────────────
+// //  Main Admission Model
+// // ─────────────────────────────────────────────
+// class AdmissionModel {
+//   String? id;
+//   AdmissionType type;
+//
+//   // Auto-generated IDs
+//   String inquiryOrRegId;   // Inquiry ID (Pre) / Registration ID (Regular)
+//   DateTime admissionDate;  // Inquiry date / Registration date
+//
+//   // Previous school info
+//   String? previousSchoolName;
+//   String? previousClassName;
+//   String? previousClassMarks;
+//
+//   // Family link
+//   String familyDocId;      // Firestore doc ID of the `families` collection entry (REQUIRED)
+//   String familyId;         // Human-readable family ID, e.g. KHA-0001
+//   String familyName;
+//
+//   // Parent Details (denormalized copy at time of this admission)
+//   String fatherName;
+//   String? fatherOccupation; // Optional in Pre-Admission
+//   String? fatherCnic;       // Optional in Pre-Admission
+//   String fatherPhone;
+//   String motherName;
+//   String? motherCnic;
+//   String? motherPhone;
+//   String? caste;
+//   String? address;
+//
+//   // Students list (1 or more)
+//   List<AdmissionStudent> students;
+//
+//   AdmissionModel({
+//     this.id,
+//     this.type = AdmissionType.preAdmission,
+//     this.inquiryOrRegId = '',
+//     DateTime? admissionDate,
+//     this.previousSchoolName,
+//     this.previousClassName,
+//     this.previousClassMarks,
+//     this.familyDocId = '',
+//     this.familyId = '',
+//     this.familyName = '',
+//     this.fatherName = '',
+//     this.fatherOccupation,
+//     this.fatherCnic,
+//     this.fatherPhone = '',
+//     this.motherName = '',
+//     this.motherCnic,
+//     this.motherPhone,
+//     this.caste,
+//     this.address,
+//     List<AdmissionStudent>? students,
+//   })  : admissionDate = admissionDate ?? DateTime.now(),
+//         students = students ?? [AdmissionStudent()];
+//
+//   Map<String, dynamic> toMap() => {
+//     'type': type.value,
+//     'inquiryOrRegId': inquiryOrRegId,
+//     'admissionDate': admissionDate.toIso8601String(),
+//     'previousSchoolName': previousSchoolName,
+//     'previousClassName': previousClassName,
+//     'previousClassMarks': previousClassMarks,
+//     'familyDocId': familyDocId,
+//     'familyId': familyId,
+//     'familyName': familyName,
+//     'fatherName': fatherName,
+//     'fatherOccupation': fatherOccupation,
+//     'fatherCnic': fatherCnic,
+//     'fatherPhone': fatherPhone,
+//     'motherName': motherName,
+//     'motherCnic': motherCnic,
+//     'motherPhone': motherPhone,
+//     'caste': caste,
+//     'address': address,
+//     'students': students.map((s) => s.toMap()).toList(),
+//     'createdAt': FieldValue.serverTimestamp(),
+//   };
+//
+//   factory AdmissionModel.fromFirestore(DocumentSnapshot doc) {
+//     final m = doc.data() as Map<String, dynamic>;
+//     return AdmissionModel(
+//       id: doc.id,
+//       type: AdmissionTypeExt.fromString(m['type'] ?? 'pre_admission'),
+//       inquiryOrRegId: m['inquiryOrRegId'] ?? '',
+//       admissionDate: m['admissionDate'] != null
+//           ? DateTime.tryParse(m['admissionDate']) ?? DateTime.now()
+//           : DateTime.now(),
+//       previousSchoolName: m['previousSchoolName'],
+//       previousClassName: m['previousClassName'],
+//       previousClassMarks: m['previousClassMarks'],
+//       familyDocId: m['familyDocId'] ?? '',
+//       familyId: m['familyId'] ?? '',
+//       familyName: m['familyName'] ?? '',
+//       fatherName: m['fatherName'] ?? '',
+//       fatherOccupation: m['fatherOccupation'],
+//       fatherCnic: m['fatherCnic'],
+//       fatherPhone: m['fatherPhone'] ?? '',
+//       motherName: m['motherName'] ?? '',
+//       motherCnic: m['motherCnic'],
+//       motherPhone: m['motherPhone'],
+//       caste: m['caste'],
+//       address: m['address'],
+//       students: (m['students'] as List<dynamic>?)
+//           ?.map((s) => AdmissionStudent.fromMap(s as Map<String, dynamic>))
+//           .toList() ??
+//           [AdmissionStudent()],
+//     );
+//   }
+//
+//   static List<AdmissionStudent> _parseStudents(dynamic raw) {
+//     if (raw == null) return [AdmissionStudent()];
+//     if (raw is List) {
+//       return raw
+//           .map((s) => AdmissionStudent.fromMap(Map<String, dynamic>.from(s as Map)))
+//           .toList();
+//     }
+//     if (raw is Map) {
+//       return raw.values
+//           .map((s) => AdmissionStudent.fromMap(Map<String, dynamic>.from(s as Map)))
+//           .toList();
+//     }
+//     return [AdmissionStudent()];
+//   }
+// }
+
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+// ─────────────────────────────────────────────
+//  Academy Model
+// ─────────────────────────────────────────────
+class Academy {
+  final String id;
+  final String name;
+  Academy({required this.id, required this.name});
+
+  factory Academy.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return Academy(id: doc.id, name: data['name'] ?? '');
+  }
+}
 
 // ─────────────────────────────────────────────
 //  Admission Type Enum
@@ -17,10 +276,10 @@ extension AdmissionTypeExt on AdmissionType {
 }
 
 // ─────────────────────────────────────────────
-//  Student Entry (per student inside one admission)
+//  Student Entry
 // ─────────────────────────────────────────────
 class AdmissionStudent {
-  String studentId;       // Auto-generated on name entry
+  String studentId;
   String name;
   String? picBase64;
   String? classId;
@@ -28,11 +287,20 @@ class AdmissionStudent {
   String? sectionId;
   String? sectionName;
   String? classRollNo;
-  String? bFormCnic;      // Optional in Pre-Admission
+  String? bFormCnic;
   DateTime? dob;
   double? annualFee;
   double? registrationFee;
   double? monthlyFee;
+
+  // ─── Institution selections ───
+  bool hasSchool;
+  bool hasAcademy;
+
+  // Academy
+  String? academyId;
+  String? academyName;
+  double? academyFee;
 
   AdmissionStudent({
     this.studentId = '',
@@ -48,6 +316,11 @@ class AdmissionStudent {
     this.annualFee,
     this.registrationFee,
     this.monthlyFee,
+    this.hasSchool = true,
+    this.hasAcademy = false,
+    this.academyId,
+    this.academyName,
+    this.academyFee,
   });
 
   Map<String, dynamic> toMap() => {
@@ -64,6 +337,11 @@ class AdmissionStudent {
     'annualFee': annualFee,
     'registrationFee': registrationFee,
     'monthlyFee': monthlyFee,
+    'hasSchool': hasSchool,
+    'hasAcademy': hasAcademy,
+    'academyId': academyId,
+    'academyName': academyName,
+    'academyFee': academyFee,
   };
 
   factory AdmissionStudent.fromMap(Map<String, dynamic> m) => AdmissionStudent(
@@ -80,6 +358,11 @@ class AdmissionStudent {
     annualFee: m['annualFee']?.toDouble(),
     registrationFee: m['registrationFee']?.toDouble(),
     monthlyFee: m['monthlyFee']?.toDouble(),
+    hasSchool: m['hasSchool'] ?? true,
+    hasAcademy: m['hasAcademy'] ?? false,
+    academyId: m['academyId'],
+    academyName: m['academyName'],
+    academyFee: m['academyFee']?.toDouble(),
   );
 
   AdmissionStudent copyWith({
@@ -96,6 +379,11 @@ class AdmissionStudent {
     double? annualFee,
     double? registrationFee,
     double? monthlyFee,
+    bool? hasSchool,
+    bool? hasAcademy,
+    String? academyId,
+    String? academyName,
+    double? academyFee,
   }) =>
       AdmissionStudent(
         studentId: studentId ?? this.studentId,
@@ -111,6 +399,11 @@ class AdmissionStudent {
         annualFee: annualFee ?? this.annualFee,
         registrationFee: registrationFee ?? this.registrationFee,
         monthlyFee: monthlyFee ?? this.monthlyFee,
+        hasSchool: hasSchool ?? this.hasSchool,
+        hasAcademy: hasAcademy ?? this.hasAcademy,
+        academyId: academyId ?? this.academyId,
+        academyName: academyName ?? this.academyName,
+        academyFee: academyFee ?? this.academyFee,
       );
 }
 
@@ -120,33 +413,23 @@ class AdmissionStudent {
 class AdmissionModel {
   String? id;
   AdmissionType type;
-
-  // Auto-generated IDs
-  String inquiryOrRegId;   // Inquiry ID (Pre) / Registration ID (Regular)
-  DateTime admissionDate;  // Inquiry date / Registration date
-
-  // Previous school info
+  String inquiryOrRegId;
+  DateTime admissionDate;
   String? previousSchoolName;
   String? previousClassName;
   String? previousClassMarks;
-
-  // Family link
-  String familyDocId;      // Firestore doc ID of the `families` collection entry (REQUIRED)
-  String familyId;         // Human-readable family ID, e.g. KHA-0001
+  String familyDocId;
+  String familyId;
   String familyName;
-
-  // Parent Details (denormalized copy at time of this admission)
   String fatherName;
-  String? fatherOccupation; // Optional in Pre-Admission
-  String? fatherCnic;       // Optional in Pre-Admission
+  String? fatherOccupation;
+  String? fatherCnic;
   String fatherPhone;
   String motherName;
   String? motherCnic;
   String? motherPhone;
   String? caste;
   String? address;
-
-  // Students list (1 or more)
   List<AdmissionStudent> students;
 
   AdmissionModel({
@@ -221,24 +504,10 @@ class AdmissionModel {
       caste: m['caste'],
       address: m['address'],
       students: (m['students'] as List<dynamic>?)
-          ?.map((s) => AdmissionStudent.fromMap(s as Map<String, dynamic>))
+          ?.map((s) =>
+          AdmissionStudent.fromMap(s as Map<String, dynamic>))
           .toList() ??
           [AdmissionStudent()],
     );
-  }
-
-  static List<AdmissionStudent> _parseStudents(dynamic raw) {
-    if (raw == null) return [AdmissionStudent()];
-    if (raw is List) {
-      return raw
-          .map((s) => AdmissionStudent.fromMap(Map<String, dynamic>.from(s as Map)))
-          .toList();
-    }
-    if (raw is Map) {
-      return raw.values
-          .map((s) => AdmissionStudent.fromMap(Map<String, dynamic>.from(s as Map)))
-          .toList();
-    }
-    return [AdmissionStudent()];
   }
 }
