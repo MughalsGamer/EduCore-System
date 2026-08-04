@@ -524,7 +524,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> with RouteAware {
             ),
             DropdownMenuItem(
               value: 'staff',
-              child: Text('Staff Only',
+              child: Text('School Staff Only',
+                  style: TextStyle(fontSize: 13, color: _kInk)),
+            ),
+            DropdownMenuItem(
+              value: 'academy_staff',
+              child: Text('Academy Staff Only',
                   style: TextStyle(fontSize: 13, color: _kInk)),
             ),
           ],

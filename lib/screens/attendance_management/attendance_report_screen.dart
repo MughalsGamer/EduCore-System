@@ -465,9 +465,12 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final staffProvider = context.read<StaffProvider>();
-      if (staffProvider.teachers.isEmpty && staffProvider.staffOnly.isEmpty) {
+      if (staffProvider.teachers.isEmpty &&
+          staffProvider.schoolStaff.isEmpty &&
+          staffProvider.academyStaff.isEmpty) {
         staffProvider.fetchTeachers();
-        staffProvider.fetchStaffOnly();
+        staffProvider.fetchSchoolStaff();
+        staffProvider.fetchAcademyStaff();
       }
     });
   }

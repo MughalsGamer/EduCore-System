@@ -392,6 +392,8 @@
 //           activeStaff = [..._staffProvider.teachers, ..._staffProvider.staffOnly];
 //       }
 //
+//       final now = DateTime.now();
+//       final today = DateTime(now.year, now.month, now.day);
 //       final monthStart = DateTime(year, month, 1);
 //       final monthEnd = DateTime(year, month + 1, 0);
 //       final startStr = _fmt(monthStart);
@@ -423,6 +425,7 @@
 //       while (!cursor.isAfter(monthEnd)) {
 //         final dateStr = _fmt(cursor);
 //         final isSunday = cursor.weekday == DateTime.sunday;
+//         final isFuture = cursor.isAfter(today);
 //
 //         for (final staff in activeStaff) {
 //           bool isBeforeJoin = false;
@@ -437,7 +440,23 @@
 //           if (existing != null) {
 //             result.add(existing);
 //           } else {
-//             final defaultStatus = isSunday ? 'holiday' : 'present';
+//             String defaultStatus;
+//             String defaultRemarks;
+//             bool defaultIsSaved;
+//             if (isFuture) {
+//               // Future dates are locked, cannot be changed
+//               defaultStatus = '';        // empty = unset / gray
+//               defaultRemarks = 'Future date';
+//               defaultIsSaved = true;     // treat as saved so UI knows it’s readonly
+//             } else if (isBeforeJoin) {
+//               defaultStatus = 'holiday';
+//               defaultRemarks = 'Before joining';
+//               defaultIsSaved = true;
+//             } else {
+//               defaultStatus = isSunday ? 'holiday' : 'present';
+//               defaultRemarks = '';
+//               defaultIsSaved = false;
+//             }
 //             result.add(AttendanceRecord(
 //               id: '${staff.id}_$dateStr',
 //               staffId: staff.id!,
@@ -445,10 +464,10 @@
 //               photoBase64: staff.imageBase64,
 //               type: staff.type,
 //               date: dateStr,
-//               status: isBeforeJoin ? 'holiday' : defaultStatus,
-//               remarks: isBeforeJoin ? 'Before joining' : '',
+//               status: defaultStatus,
+//               remarks: defaultRemarks,
 //               designation: staff.designation,
-//               isSaved: isBeforeJoin,
+//               isSaved: defaultIsSaved,
 //               isSaving: false,
 //             ));
 //           }
@@ -478,8 +497,7 @@
 //
 //     if (toSave.isEmpty) return;
 //
-//     // Use batch write if available, else fallback to single saves
-//     await _service.saveAttendanceBatch(toSave); // Ensure this method exists
+//     await _service.saveAttendanceBatch(toSave);
 //
 //     for (final rec in toSave) {
 //       final idx = _bulkRecords.indexWhere(
@@ -490,22 +508,20 @@
 //     notifyListeners();
 //   }
 //
-//
-//
-//
-// // Reload with the same parameters
+//   // Reload with the same parameters
 //   Future<void> reloadBulk() =>
 //       loadBulkAttendance(year: _bulkYear, month: _bulkMonth, typeFilter: _bulkFilter);
 //
-// // Update a single bulk record's status (called from UI)
+//   // Update a single bulk record's status (called from UI)
 //   void updateBulkStatus(String staffId, String date, String newStatus) {
 //     final index = _bulkRecords.indexWhere(
 //           (r) => r.staffId == staffId && r.date == date,
 //     );
 //     if (index == -1) return;
-//     // Only allow changes if the record is not read‑only (holiday before join)
+//     // Only allow changes if the record is not read‑only (future date / before joining)
 //     if (_bulkRecords[index].isSaved &&
-//         _bulkRecords[index].remarks == 'Before joining') {
+//         (_bulkRecords[index].remarks == 'Before joining' ||
+//             _bulkRecords[index].remarks == 'Future date')) {
 //       return;
 //     }
 //     _bulkRecords[index].status = newStatus;
@@ -514,21 +530,16 @@
 //     notifyListeners();
 //   }
 //
-// // Save all unsaved bulk records (including updates to existing)
+//   // Save all unsaved bulk records (including updates to existing)
 //   Future<void> saveBulkAttendance() async {
-//     // Collect all records that are not read‑only and have changes
 //     final toSave = _bulkRecords.where(
 //           (r) => !r.isSaved && r.status != 'holiday',
 //     ).toList();
 //
-//     if (toSave.isEmpty) {
-//       // Optionally show a message
-//       return;
-//     }
+//     if (toSave.isEmpty) return;
 //
 //     for (final record in toSave) {
 //       await _service.saveSingleRecord(record);
-//       // Mark as saved in the list
 //       final idx = _bulkRecords.indexWhere(
 //             (r) => r.staffId == record.staffId && r.date == record.date,
 //       );
@@ -538,7 +549,6 @@
 //     }
 //     notifyListeners();
 //   }
-//
 //
 //   Future<void> _ensureStaffLoaded() async {
 //     if (_staffLoaded) return;
@@ -553,11 +563,8 @@
 //     _staffLoaded = false;
 //     await _ensureStaffLoaded();
 //   }
-//
-//
-//
-//
 // }
+
 
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -574,14 +581,14 @@ class AttendanceProvider extends ChangeNotifier {
   List<AttendanceRecord> _records = [];
   bool _loading = false;
   String _selectedDate = DateTime.now().toIso8601String().split('T')[0];
-  String _filterType = 'all'; // 'all', 'teacher', 'staff'
+  String _filterType = 'all'; // 'all', 'teacher', 'staff', 'academy_staff'
 
   List<AttendanceRecord> get records => _records;
   bool get loading => _loading;
   String get selectedDate => _selectedDate;
   String get filterType => _filterType;
 
-  // Separate state for the "Attendance History" screen
+  // History
   List<AttendanceRecord> _historyRecords = [];
   bool _historyLoading = false;
   String? _historyError;
@@ -591,7 +598,6 @@ class AttendanceProvider extends ChangeNotifier {
   String? get historyError => _historyError;
   bool _staffLoaded = false;
 
-  // Compute summary statistics for "By Person" report
   Map<String, int> get monthSummary {
     Map<String, int> counts = {
       'total': _historyRecords.length,
@@ -612,17 +618,16 @@ class AttendanceProvider extends ChangeNotifier {
 
   AttendanceProvider(this._staffProvider);
 
-  // ★ Small date helper: 'yyyy-MM-dd' with zero-padding.
   String _fmt(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+  // Loads attendance for the current selected date, with optional type filter
   Future<void> loadData({String? typeFilter}) async {
     _loading = true;
     _filterType = typeFilter ?? _filterType;
     notifyListeners();
 
-    await _staffProvider.fetchTeachers();
-    await _staffProvider.fetchStaffOnly();
+    await _ensureStaffLoaded();
 
     final existingRecords = await _service.getAttendanceForDate(_selectedDate);
 
@@ -630,14 +635,17 @@ class AttendanceProvider extends ChangeNotifier {
     if (_filterType == 'teacher') {
       activeStaff = _staffProvider.teachers;
     } else if (_filterType == 'staff') {
-      activeStaff = _staffProvider.staffOnly;
+      activeStaff = _staffProvider.schoolStaff;
+    } else if (_filterType == 'academy_staff') {
+      activeStaff = _staffProvider.academyStaff;
     } else {
-      activeStaff = [..._staffProvider.teachers, ..._staffProvider.staffOnly];
+      activeStaff = [
+        ..._staffProvider.teachers,
+        ..._staffProvider.schoolStaff,
+        ..._staffProvider.academyStaff,
+      ];
     }
 
-    // ★ Is the currently selected day a Sunday? If so, and no explicit
-    // record already exists for a staff member, default their status to
-    // 'holiday' instead of 'present'/'absent'.
     final isSunday = DateTime.parse(_selectedDate).weekday == DateTime.sunday;
 
     _records = activeStaff.map((staff) {
@@ -661,6 +669,116 @@ class AttendanceProvider extends ChangeNotifier {
 
     _loading = false;
     notifyListeners();
+  }
+
+  // ─── NEW: Load a single staff member's attendance for a given month ──
+  Future<void> loadStaffMonthAttendance({
+    required String staffId,
+    required int year,
+    required int month,
+  }) async {
+    _bulkLoading = true;
+    _bulkError = null;
+    notifyListeners();
+
+    try {
+      await _ensureStaffLoaded();
+
+      // Find the staff member (for name, photo, etc.)
+      final allStaff = [
+        ..._staffProvider.teachers,
+        ..._staffProvider.schoolStaff,
+        ..._staffProvider.academyStaff,
+      ];
+      final staff = allStaff.firstWhere((s) => s.id == staffId);
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final monthStart = DateTime(year, month, 1);
+      final monthEnd = DateTime(year, month + 1, 0);
+      final startStr = _fmt(monthStart);
+      final endStr = _fmt(monthEnd);
+
+      // Fetch existing records for this staff in this month
+      final fetched = await _service.getAttendanceForStaffInRange(
+        staffId: staffId,
+        startDate: startStr,
+        endDate: endStr,
+      );
+
+      // Build a map for quick lookup
+      final existingByDate = <String, AttendanceRecord>{};
+      for (final rec in fetched) {
+        existingByDate[rec.date] = rec;
+      }
+
+      // Build one record per day in the month
+      final results = <AttendanceRecord>[];
+      var cursor = monthStart;
+      while (!cursor.isAfter(monthEnd)) {
+        final dateStr = _fmt(cursor);
+        final existing = existingByDate[dateStr];
+        final isSunday = cursor.weekday == DateTime.sunday;
+        final isFuture = cursor.isAfter(today);
+        bool isBeforeJoin = false;
+        if (staff.joiningDate != null && staff.joiningDate!.isNotEmpty) {
+          try {
+            final joinDate = DateTime.parse(staff.joiningDate!);
+            if (joinDate.isAfter(cursor)) isBeforeJoin = true;
+          } catch (_) {}
+        }
+
+        if (existing != null) {
+          results.add(existing);
+        } else {
+          String defaultStatus;
+          String defaultRemarks;
+          bool defaultIsSaved;
+          if (isFuture) {
+            defaultStatus = '';
+            defaultRemarks = 'Future date';
+            defaultIsSaved = true;
+          } else if (isBeforeJoin) {
+            defaultStatus = 'holiday';
+            defaultRemarks = 'Before joining';
+            defaultIsSaved = true;
+          } else {
+            defaultStatus = isSunday ? 'holiday' : 'present';
+            defaultRemarks = '';
+            defaultIsSaved = false;
+          }
+          results.add(AttendanceRecord(
+            id: '${staff.id}_$dateStr',
+            staffId: staff.id!,
+            staffName: staff.name,
+            photoBase64: staff.imageBase64,
+            type: staff.type,
+            date: dateStr,
+            status: defaultStatus,
+            remarks: defaultRemarks,
+            designation: staff.designation,
+            isSaved: defaultIsSaved,
+            isSaving: false,
+          ));
+        }
+        cursor = cursor.add(const Duration(days: 1));
+      }
+
+      // Sort by date
+      results.sort((a, b) => a.date.compareTo(b.date));
+
+      // Store in _bulkRecords (replacing any previous bulk data)
+      _bulkRecords = results;
+      _bulkYear = year;
+      _bulkMonth = month;
+      // We don't use _bulkFilter for single staff
+    } catch (e) {
+      _bulkError = 'Failed to load attendance: $e';
+      _bulkRecords = [];
+    } finally {
+      _bulkLoading = false;
+      notifyListeners();
+    }
   }
 
   void changeDate(DateTime newDate) {
@@ -709,57 +827,41 @@ class AttendanceProvider extends ChangeNotifier {
     await loadData();
   }
 
-  // ============================================================
-  // ATTENDANCE HISTORY
-  // ============================================================
-
-  // ★ FIXED: Removed improper type casting on results[0] / results[1]
-  // ★ FIXED: Sundays with no explicit Firestore record now default to
-  // 'holiday' instead of 'absent'.
+  // ─── History ──────────────────────────────────────────────
   Future<void> loadHistoryForDate(String date, {String typeFilter = 'all'}) async {
     _historyLoading = true;
     _historyError = null;
     notifyListeners();
 
     try {
-      // 1. Fetch staff & attendance in parallel properly
-      final attendanceFuture = _service.getAttendanceForDate(date);
-      final staffFetchFuture = Future.wait([
-        _staffProvider.fetchTeachers(),
-        _staffProvider.fetchStaffOnly(),
-      ]);
+      await _ensureStaffLoaded();
+      final existingRecords = await _service.getAttendanceForDate(date);
 
-      await staffFetchFuture; // Wait for staff fetch first
-      final existingRecords = await attendanceFuture; // Wait for attendance fetch
-
-      // 2. Access lists directly from provider (no type-casting errors here)
       final teachers = _staffProvider.teachers;
-      final staffOnly = _staffProvider.staffOnly;
+      final schoolStaff = _staffProvider.schoolStaff;
+      final academyStaff = _staffProvider.academyStaff;
 
-      // 3. Build O(1) lookup map for existing records
       final existingMap = <String, AttendanceRecord>{};
       for (final rec in existingRecords) {
         existingMap[rec.staffId] = rec;
       }
 
-      // 4. Determine active staff list
       List<StaffMember> activeStaff = [];
       if (typeFilter == 'teacher') {
         activeStaff = teachers;
       } else if (typeFilter == 'staff') {
-        activeStaff = staffOnly;
+        activeStaff = schoolStaff;
+      } else if (typeFilter == 'academy_staff') {
+        activeStaff = academyStaff;
       } else {
-        activeStaff = [...teachers, ...staffOnly];
+        activeStaff = [...teachers, ...schoolStaff, ...academyStaff];
       }
 
-      // 5. ★ Is this particular date a Sunday? If so, and there's no
-      // explicit saved record, default to 'holiday' rather than 'absent'.
       bool isSunday = false;
       try {
         isSunday = DateTime.parse(date).weekday == DateTime.sunday;
       } catch (_) {}
 
-      // 6. Map instantly using the lookup map
       _historyRecords = activeStaff.map((staff) {
         final existing = existingMap[staff.id];
         return AttendanceRecord(
@@ -775,7 +877,6 @@ class AttendanceProvider extends ChangeNotifier {
           isSaved: existing != null,
         );
       }).toList();
-
     } catch (e) {
       _historyError = 'Failed to load attendance: $e';
       _historyRecords = [];
@@ -785,17 +886,7 @@ class AttendanceProvider extends ChangeNotifier {
     }
   }
 
-  // ★ FIXED / REWRITTEN:
-  // 1. Date range now stops at "today" when the requested month is the
-  //    current month, instead of always going to the end of the month —
-  //    e.g. selecting July 2026 on 16-Jul-2026 shows 1 Jul → 16 Jul only.
-  //    Past months still show the full month (1st → last day).
-  //    Future months yield an empty range (nothing to show yet).
-  // 2. Every day in that range is now included in the result, even if no
-  //    Firestore record exists for it — previously, days with no saved
-  //    attendance were silently skipped instead of showing as "absent".
-  // 3. Sundays with no explicit saved record default to 'holiday' instead
-  //    of 'absent'.
+  // By Person (monthly view)
   Future<void> loadHistoryForPerson({
     required String staffId,
     required int year,
@@ -806,14 +897,14 @@ class AttendanceProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      await _ensureStaffLoaded();
+
       final now = DateTime.now();
       final monthStart = DateTime(year, month, 1);
-      final monthEnd = DateTime(year, month + 1, 0); // last day of month
-
+      final monthEnd = DateTime(year, month + 1, 0);
       final isCurrentMonth = year == now.year && month == now.month;
       final today = DateTime(now.year, now.month, now.day);
 
-      // If it's a future month entirely, there's nothing to show.
       if (monthStart.isAfter(today)) {
         _historyRecords = [];
         _historyLoading = false;
@@ -821,7 +912,6 @@ class AttendanceProvider extends ChangeNotifier {
         return;
       }
 
-      // Effective end date: today (if current month) else full month end.
       final effectiveEnd = isCurrentMonth
           ? (monthEnd.isBefore(today) ? monthEnd : today)
           : monthEnd;
@@ -835,25 +925,21 @@ class AttendanceProvider extends ChangeNotifier {
         endDate: endStr,
       );
 
-      // Need staff meta (name/photo/type/designation) to fabricate
-      // placeholder records for days with no saved attendance.
+      // Find staff meta from all three lists
       final allStaff = [
         ..._staffProvider.teachers,
-        ..._staffProvider.staffOnly,
+        ..._staffProvider.schoolStaff,
+        ..._staffProvider.academyStaff,
       ];
       StaffMember? staffMeta;
       final metaMatches = allStaff.where((s) => s.id == staffId);
       if (metaMatches.isNotEmpty) staffMeta = metaMatches.first;
 
-      // Lookup map for O(1) access to existing Firestore records by date.
       final existingByDate = <String, AttendanceRecord>{};
       for (final rec in fetched) {
         existingByDate[rec.date] = rec;
       }
 
-      // Build one record per day in [monthStart, effectiveEnd], filling
-      // gaps with 'holiday' (Sunday) or 'absent' (any other day) when no
-      // explicit record was saved.
       final results = <AttendanceRecord>[];
       var cursor = monthStart;
       while (!cursor.isAfter(effectiveEnd)) {
@@ -882,9 +968,7 @@ class AttendanceProvider extends ChangeNotifier {
 
       _historyRecords = results;
     } catch (e) {
-      _historyError = 'Failed to load history. If this is the first time '
-          'loading "By Person", Firestore may need a composite index '
-          '(staffId + date) — check console logs for a creation link.\n$e';
+      _historyError = 'Failed to load history: $e';
       _historyRecords = [];
     } finally {
       _historyLoading = false;
@@ -914,7 +998,7 @@ class AttendanceProvider extends ChangeNotifier {
     }
   }
 
-  // ─── Bulk attendance state ────────────────────────────────────────
+  // ─── Bulk Attendance ──────────────────────────────────────
   List<AttendanceRecord> _bulkRecords = [];
   bool _bulkLoading = false;
   String? _bulkError;
@@ -947,10 +1031,17 @@ class AttendanceProvider extends ChangeNotifier {
           activeStaff = _staffProvider.teachers;
           break;
         case 'staff':
-          activeStaff = _staffProvider.staffOnly;
+          activeStaff = _staffProvider.schoolStaff;
+          break;
+        case 'academy_staff':
+          activeStaff = _staffProvider.academyStaff;
           break;
         default:
-          activeStaff = [..._staffProvider.teachers, ..._staffProvider.staffOnly];
+          activeStaff = [
+            ..._staffProvider.teachers,
+            ..._staffProvider.schoolStaff,
+            ..._staffProvider.academyStaff,
+          ];
       }
 
       final now = DateTime.now();
@@ -969,7 +1060,6 @@ class AttendanceProvider extends ChangeNotifier {
           ));
       final allResults = await Future.wait(fetchFutures);
 
-      // Build lookup map
       final existingMap = <String, Map<String, AttendanceRecord>>{};
       for (int i = 0; i < activeStaff.length; i++) {
         final staff = activeStaff[i];
@@ -1005,10 +1095,9 @@ class AttendanceProvider extends ChangeNotifier {
             String defaultRemarks;
             bool defaultIsSaved;
             if (isFuture) {
-              // Future dates are locked, cannot be changed
-              defaultStatus = '';        // empty = unset / gray
+              defaultStatus = '';
               defaultRemarks = 'Future date';
-              defaultIsSaved = true;     // treat as saved so UI knows it’s readonly
+              defaultIsSaved = true;
             } else if (isBeforeJoin) {
               defaultStatus = 'holiday';
               defaultRemarks = 'Before joining';
@@ -1069,29 +1158,24 @@ class AttendanceProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Reload with the same parameters
   Future<void> reloadBulk() =>
       loadBulkAttendance(year: _bulkYear, month: _bulkMonth, typeFilter: _bulkFilter);
 
-  // Update a single bulk record's status (called from UI)
   void updateBulkStatus(String staffId, String date, String newStatus) {
     final index = _bulkRecords.indexWhere(
           (r) => r.staffId == staffId && r.date == date,
     );
     if (index == -1) return;
-    // Only allow changes if the record is not read‑only (future date / before joining)
     if (_bulkRecords[index].isSaved &&
         (_bulkRecords[index].remarks == 'Before joining' ||
             _bulkRecords[index].remarks == 'Future date')) {
       return;
     }
     _bulkRecords[index].status = newStatus;
-    // Mark as unsaved so it will be included in save
     _bulkRecords[index].isSaved = false;
     notifyListeners();
   }
 
-  // Save all unsaved bulk records (including updates to existing)
   Future<void> saveBulkAttendance() async {
     final toSave = _bulkRecords.where(
           (r) => !r.isSaved && r.status != 'holiday',
@@ -1115,7 +1199,8 @@ class AttendanceProvider extends ChangeNotifier {
     if (_staffLoaded) return;
     await Future.wait([
       _staffProvider.fetchTeachers(),
-      _staffProvider.fetchStaffOnly(),
+      _staffProvider.fetchSchoolStaff(),
+      _staffProvider.fetchAcademyStaff(),
     ]);
     _staffLoaded = true;
   }
