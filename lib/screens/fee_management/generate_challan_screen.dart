@@ -1,3 +1,6 @@
+//
+//
+//
 // import 'package:flutter/material.dart';
 // import 'package:provider/provider.dart';
 //
@@ -12,14 +15,39 @@
 // //  Family-wise (class filter skipped), Regular admissions only.
 // //  Auto-generation (28th of month) is NOT wired up here — this
 // //  screen is manual-only. Generated Date / Due Date are shown
-// //  pre-filled with the 28th / next-month-10th defaults but are
-// //  fully editable before hitting Generate.
+// //  pre-filled with defaults but are fully editable before hitting
+// //  Generate.
 // //
 // //  Duplicate prevention is STUDENT-LEVEL, not family-level:
 // //  a family already fully challaned for the month is skipped, but a
 // //  family with a newly-added student (not present in that earlier
 // //  challan) is still selectable — only the new student's line gets
 // //  generated.
+// //
+// //  LEDGER MODEL (per Umair)
+// //  -------------------------
+// //  A challan is a PURE DEBIT entry — student-wise detail plus
+// //  currentMonthTotal, nothing else. It carries no amountPaid,
+// //  status, or previousBalance. Any running family balance is
+// //  computed live elsewhere (FeeCollectionProvider) from
+// //  sum(all challans) - sum(all collections), never cached here.
+// //
+// //  FEE COMPOSITION (per student, per challan)
+// //  --------------------------------------------
+// //  - Monthly Fee: every challan
+// //  - Academy Fee: every challan (same cadence as Monthly Fee)
+// //  - Annual Fee + Registration Fee: first challan only
+// //
+// //  EXTRA CHARGES (optional, ad-hoc)
+// //  -----------------------------------
+// //  Two independent, stackable sources:
+// //   1) "Overall" — one label + amount applied to EVERY family
+// //      selected for this generation run.
+// //   2) "Family-wise" — a label + amount entered against one
+// //      specific family, applied only to that family's challan.
+// //  Both can be active at the same time; their amounts are summed
+// //  onto currentMonthTotal and stored as separate line items on the
+// //  challan for transparency (see ChallanExtraCharge).
 // // ─────────────────────────────────────────────
 // class GenerateChallanScreen extends StatelessWidget {
 //   const GenerateChallanScreen({super.key});
@@ -53,6 +81,17 @@
 //   String _searchQuery = '';
 //   final Set<String> _selectedFamilyDocIds = {};
 //
+//   // ── Overall extra-charge state ──
+//   final _overallExtraAmountCtrl = TextEditingController();
+//   final _overallExtraLabelCtrl = TextEditingController(text: 'Extra Charge');
+//   bool _overallExtraEnabled = false;
+//
+//   // ── Family-wise extra-charge state ──
+//   // familyDocId -> controllers (created lazily, kept alive for the session)
+//   final Map<String, TextEditingController> _familyExtraAmountCtrls = {};
+//   final Map<String, TextEditingController> _familyExtraLabelCtrls = {};
+//   final Set<String> _familyExtraExpanded = {};
+//
 //   @override
 //   void initState() {
 //     super.initState();
@@ -73,26 +112,24 @@
 //   @override
 //   void dispose() {
 //     _searchCtrl.dispose();
+//     _overallExtraAmountCtrl.dispose();
+//     _overallExtraLabelCtrl.dispose();
+//     for (final c in _familyExtraAmountCtrls.values) c.dispose();
+//     for (final c in _familyExtraLabelCtrls.values) c.dispose();
 //     super.dispose();
 //   }
 //
-//   // DateTime _defaultGeneratedDate(int month, int year) => DateTime(year, month, 28);
 //   DateTime _defaultGeneratedDate(int month, int year) => DateTime(year, month, 1);
 //
-//
-//   // DateTime _defaultDueDate(int month, int year) {
-//   //   final nextMonth = month == 12 ? 1 : month + 1;
-//   //   final nextYear = month == 12 ? year + 1 : year;
-//   //   return DateTime(nextYear, nextMonth, 10);
-//   // }
 //   DateTime _defaultDueDate(int month, int year) => DateTime(year, month, 10);
-//
 //
 //   void _onBillingMonthYearChanged() {
 //     setState(() {
 //       _generatedDate = _defaultGeneratedDate(_billingMonth, _billingYear);
 //       _dueDate = _defaultDueDate(_billingMonth, _billingYear);
 //       _selectedFamilyDocIds.clear();
+//       _familyExtraExpanded.clear();
+//       for (final c in _familyExtraAmountCtrls.values) c.clear();
 //     });
 //     context.read<FeeChallanProvider>().clearResults();
 //     context
@@ -137,6 +174,18 @@
 //
 //   String _fmt(DateTime d) =>
 //       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+//
+//   // ─── Helper to build a clean fee breakdown string ───
+//   String _buildFeeBreakdown(ChallanStudentLine s) {
+//     final parts = <String>[];
+//     if (s.isFirstChallan) {
+//       if (s.registrationFee > 0) parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
+//       if (s.annualFee > 0) parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+//     }
+//     if (s.monthlyFee > 0) parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
+//     if (s.academyFee > 0) parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+//     return parts.join('  •  ');
+//   }
 //
 //   @override
 //   Widget build(BuildContext context) {
@@ -183,6 +232,7 @@
 //       body: Column(
 //         children: [
 //           _buildDateHeader(),
+//           _buildOverallExtraChargeCard(),
 //           if (challanProvider.error != null) _buildErrorBanner(challanProvider),
 //           if (challanProvider.lastGeneratedChallans.isNotEmpty ||
 //               challanProvider.lastGenerationSkippedCount > 0)
@@ -202,6 +252,14 @@
 //                 final eligibleCount =
 //                     challanProvider.eligibleStudentsFor(family).length;
 //                 final selected = _selectedFamilyDocIds.contains(family.familyDocId);
+//
+//                 // Lazily create controllers for this family's extra-charge fields
+//                 final extraAmountCtrl = _familyExtraAmountCtrls.putIfAbsent(
+//                     family.familyDocId, () => TextEditingController());
+//                 final extraLabelCtrl = _familyExtraLabelCtrls.putIfAbsent(
+//                     family.familyDocId,
+//                         () => TextEditingController(text: 'Extra Charge'));
+//
 //                 return _FamilySelectTile(
 //                   family: family,
 //                   selected: selected,
@@ -219,6 +277,19 @@
 //                       }
 //                     });
 //                   },
+//                   extraExpanded: _familyExtraExpanded.contains(family.familyDocId),
+//                   onToggleExtra: () {
+//                     setState(() {
+//                       if (_familyExtraExpanded.contains(family.familyDocId)) {
+//                         _familyExtraExpanded.remove(family.familyDocId);
+//                         extraAmountCtrl.clear();
+//                       } else {
+//                         _familyExtraExpanded.add(family.familyDocId);
+//                       }
+//                     });
+//                   },
+//                   extraAmountCtrl: extraAmountCtrl,
+//                   extraLabelCtrl: extraLabelCtrl,
 //                 );
 //               },
 //             ),
@@ -302,7 +373,7 @@
 //   // Year list is generated relative to today's date every time this
 //   // widget builds (currentYear - 1 .. currentYear + 4), so it always
 //   // includes the current year and automatically slides forward into
-//   // 2030, 2031, etc. with no manual code update ever needed. As a
+//   // future years with no manual code update ever needed. As a
 //   // safety net, _billingYear is folded in too, in case it was ever
 //   // set outside this range (e.g. editing an old record).
 //   Widget _yearDropdown() {
@@ -370,6 +441,88 @@
 //             ),
 //           ],
 //         ),
+//       ),
+//     );
+//   }
+//
+//   // ── Overall extra-charge card (applies to every selected family) ──
+//   Widget _buildOverallExtraChargeCard() {
+//     return Container(
+//       margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+//       padding: const EdgeInsets.all(12),
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.circular(12),
+//         border: Border.all(color: Colors.grey.shade200),
+//       ),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Row(
+//             children: [
+//               Checkbox(
+//                 value: _overallExtraEnabled,
+//                 activeColor: _purple,
+//                 onChanged: (v) => setState(() => _overallExtraEnabled = v ?? false),
+//               ),
+//               const Expanded(
+//                 child: Text(
+//                   'Apply extra charge to ALL selected families',
+//                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+//                 ),
+//               ),
+//               Icon(Icons.groups_outlined,
+//                   size: 18,
+//                   color: _overallExtraEnabled ? _purple : Colors.grey.shade400),
+//             ],
+//           ),
+//           if (_overallExtraEnabled) ...[
+//             const SizedBox(height: 6),
+//             Row(
+//               children: [
+//                 Expanded(
+//                   flex: 2,
+//                   child: TextField(
+//                     controller: _overallExtraLabelCtrl,
+//                     decoration: InputDecoration(
+//                       labelText: 'Label / Note',
+//                       isDense: true,
+//                       filled: true,
+//                       fillColor: _lightPurple,
+//                       border: OutlineInputBorder(
+//                         borderRadius: BorderRadius.circular(8),
+//                         borderSide: BorderSide.none,
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//                 const SizedBox(width: 10),
+//                 Expanded(
+//                   child: TextField(
+//                     controller: _overallExtraAmountCtrl,
+//                     keyboardType: TextInputType.number,
+//                     decoration: InputDecoration(
+//                       labelText: 'Amount',
+//                       prefixText: 'Rs ',
+//                       isDense: true,
+//                       filled: true,
+//                       fillColor: _lightPurple,
+//                       border: OutlineInputBorder(
+//                         borderRadius: BorderRadius.circular(8),
+//                         borderSide: BorderSide.none,
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//               ],
+//             ),
+//             const SizedBox(height: 4),
+//             Text(
+//               'Yeh amount + note har selected family ki is generation ki challan mein add ho jayega.',
+//               style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500),
+//             ),
+//           ],
+//         ],
 //       ),
 //     );
 //   }
@@ -582,6 +735,26 @@
 //   }
 //
 //   Future<void> _confirmAndGenerate(List<FamilyForChallan> selected) async {
+//     // ── Collect family-wise extra amounts/labels for currently expanded rows ──
+//     final Map<String, double> familyExtraAmounts = {};
+//     final Map<String, String> familyExtraLabels = {};
+//     for (final familyDocId in _familyExtraExpanded) {
+//       final amtCtrl = _familyExtraAmountCtrls[familyDocId];
+//       final labelCtrl = _familyExtraLabelCtrls[familyDocId];
+//       final amt = double.tryParse(amtCtrl?.text.trim() ?? '');
+//       if (amt != null && amt > 0) {
+//         familyExtraAmounts[familyDocId] = amt;
+//         familyExtraLabels[familyDocId] =
+//         (labelCtrl?.text.trim().isEmpty ?? true) ? 'Extra Charge' : labelCtrl!.text.trim();
+//       }
+//     }
+//
+//     final overallAmt = _overallExtraEnabled
+//         ? double.tryParse(_overallExtraAmountCtrl.text.trim())
+//         : null;
+//     final hasOverallExtra = overallAmt != null && overallAmt > 0;
+//     final hasFamilyExtra = familyExtraAmounts.isNotEmpty;
+//
 //     final confirmed = await showDialog<bool>(
 //       context: context,
 //       builder: (ctx) => AlertDialog(
@@ -589,7 +762,9 @@
 //         content: Text(
 //             'Challans will be generated for ${selected.length} famil${selected.length != 1 ? 'ies' : 'y'} '
 //                 'for ${FeeChallanModel.monthNames[_billingMonth]} $_billingYear.\n\n'
-//                 'Generated Date: ${_fmt(_generatedDate)}\nDue Date: ${_fmt(_dueDate)}'),
+//                 'Generated Date: ${_fmt(_generatedDate)}\nDue Date: ${_fmt(_dueDate)}'
+//                 '${hasOverallExtra ? '\n\nOverall extra charge: Rs ${overallAmt!.toStringAsFixed(0)} (${_overallExtraLabelCtrl.text.trim().isEmpty ? 'Extra Charge' : _overallExtraLabelCtrl.text.trim()}) — applies to all selected families.' : ''}'
+//                 '${hasFamilyExtra ? '\n\n${familyExtraAmounts.length} family-specific extra charge(s) will also be applied.' : ''}'),
 //         actions: [
 //           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
 //           ElevatedButton(
@@ -610,10 +785,20 @@
 //       year: _billingYear,
 //       generatedDate: _generatedDate,
 //       dueDate: _dueDate,
+//       overallExtraAmount: hasOverallExtra ? overallAmt : null,
+//       overallExtraLabel: _overallExtraLabelCtrl.text.trim().isEmpty
+//           ? 'Extra Charge'
+//           : _overallExtraLabelCtrl.text.trim(),
+//       familyExtraAmounts: familyExtraAmounts,
+//       familyExtraLabels: familyExtraLabels,
 //     );
 //
 //     if (!mounted) return;
-//     setState(() => _selectedFamilyDocIds.clear());
+//     setState(() {
+//       _selectedFamilyDocIds.clear();
+//       _familyExtraExpanded.clear();
+//       for (final c in _familyExtraAmountCtrls.values) c.clear();
+//     });
 //   }
 // }
 //
@@ -628,6 +813,12 @@
 //   final int eligibleStudentCount;
 //   final VoidCallback? onTap;
 //
+//   // Family-wise extra charge
+//   final bool extraExpanded;
+//   final VoidCallback onToggleExtra;
+//   final TextEditingController extraAmountCtrl;
+//   final TextEditingController extraLabelCtrl;
+//
 //   const _FamilySelectTile({
 //     required this.family,
 //     required this.selected,
@@ -635,6 +826,10 @@
 //     required this.partiallyGenerated,
 //     required this.eligibleStudentCount,
 //     required this.onTap,
+//     required this.extraExpanded,
+//     required this.onToggleExtra,
+//     required this.extraAmountCtrl,
+//     required this.extraLabelCtrl,
 //   });
 //
 //   static const _purple = Color(0xFF534AB7);
@@ -642,8 +837,11 @@
 //
 //   @override
 //   Widget build(BuildContext context) {
-//     final totalMonthly =
-//     family.students.fold<double>(0, (s, st) => s + (st.monthlyFee ?? 0));
+//     // ── Include academyFee in the total preview ──
+//     final totalMonthly = family.students.fold<double>(
+//       0,
+//           (s, st) => s + (st.monthlyFee ?? 0) + (st.academyFee ?? 0),
+//     );
 //
 //     return Opacity(
 //       opacity: fullyGenerated ? 0.55 : 1,
@@ -655,101 +853,176 @@
 //           borderRadius: BorderRadius.circular(14),
 //           side: BorderSide(color: selected ? _purple : Colors.transparent, width: 1.5),
 //         ),
-//         child: InkWell(
-//           borderRadius: BorderRadius.circular(14),
-//           onTap: onTap,
-//           child: Padding(
-//             padding: const EdgeInsets.all(14),
-//             child: Row(
-//               children: [
-//                 Icon(
-//                   fullyGenerated
-//                       ? Icons.check_circle
-//                       : (selected ? Icons.check_circle : Icons.circle_outlined),
-//                   color: fullyGenerated
-//                       ? Colors.green.shade400
-//                       : (selected ? _purple : Colors.grey.shade300),
-//                   size: 22,
-//                 ),
-//                 const SizedBox(width: 12),
-//                 CircleAvatar(
-//                   radius: 20,
-//                   backgroundColor: _lightPurple,
-//                   child: Text(
-//                     family.familyName.isNotEmpty ? family.familyName[0].toUpperCase() : 'F',
-//                     style: const TextStyle(color: _purple, fontWeight: FontWeight.bold),
-//                   ),
-//                 ),
-//                 const SizedBox(width: 12),
-//                 Expanded(
-//                   child: Column(
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       Text(family.familyName,
-//                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-//                       const SizedBox(height: 3),
-//                       Text(
-//                         '${family.students.length} student${family.students.length != 1 ? 's' : ''} • ${family.fatherName}',
-//                         style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-//                         overflow: TextOverflow.ellipsis,
-//                       ),
-//                       if (partiallyGenerated) ...[
-//                         const SizedBox(height: 3),
-//                         Text(
-//                           '$eligibleStudentCount new student(s) — the rest already have a challan',
-//                           style: TextStyle(
-//                               fontSize: 11,
-//                               color: Colors.orange.shade700,
-//                               fontWeight: FontWeight.w600),
-//                         ),
-//                       ],
-//                     ],
-//                   ),
-//                 ),
-//                 Column(
-//                   crossAxisAlignment: CrossAxisAlignment.end,
+//         child: Column(
+//           children: [
+//             InkWell(
+//               borderRadius: BorderRadius.circular(14),
+//               onTap: onTap,
+//               child: Padding(
+//                 padding: const EdgeInsets.all(14),
+//                 child: Row(
 //                   children: [
-//                     if (totalMonthly > 0)
-//                       Text('Rs ${totalMonthly.toStringAsFixed(0)}',
-//                           style: const TextStyle(
-//                               fontWeight: FontWeight.bold, color: _purple, fontSize: 13)),
-//                     if (fullyGenerated)
-//                       Padding(
-//                         padding: const EdgeInsets.only(top: 3),
-//                         child: Container(
-//                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-//                           decoration: BoxDecoration(
-//                             color: Colors.green.shade50,
-//                             borderRadius: BorderRadius.circular(6),
-//                           ),
-//                           child: Text('Generated',
-//                               style: TextStyle(
-//                                   fontSize: 9,
-//                                   color: Colors.green.shade700,
-//                                   fontWeight: FontWeight.w600)),
-//                         ),
-//                       )
-//                     else if (partiallyGenerated)
-//                       Padding(
-//                         padding: const EdgeInsets.only(top: 3),
-//                         child: Container(
-//                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-//                           decoration: BoxDecoration(
-//                             color: Colors.orange.shade50,
-//                             borderRadius: BorderRadius.circular(6),
-//                           ),
-//                           child: Text('Partial',
-//                               style: TextStyle(
-//                                   fontSize: 9,
-//                                   color: Colors.orange.shade700,
-//                                   fontWeight: FontWeight.w600)),
-//                         ),
+//                     Icon(
+//                       fullyGenerated
+//                           ? Icons.check_circle
+//                           : (selected ? Icons.check_circle : Icons.circle_outlined),
+//                       color: fullyGenerated
+//                           ? Colors.green.shade400
+//                           : (selected ? _purple : Colors.grey.shade300),
+//                       size: 22,
+//                     ),
+//                     const SizedBox(width: 12),
+//                     CircleAvatar(
+//                       radius: 20,
+//                       backgroundColor: _lightPurple,
+//                       child: Text(
+//                         family.familyName.isNotEmpty ? family.familyName[0].toUpperCase() : 'F',
+//                         style: const TextStyle(color: _purple, fontWeight: FontWeight.bold),
 //                       ),
+//                     ),
+//                     const SizedBox(width: 12),
+//                     Expanded(
+//                       child: Column(
+//                         crossAxisAlignment: CrossAxisAlignment.start,
+//                         children: [
+//                           Text(family.familyName,
+//                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+//                           const SizedBox(height: 3),
+//                           Text(
+//                             '${family.students.length} student${family.students.length != 1 ? 's' : ''} • ${family.fatherName}',
+//                             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+//                             overflow: TextOverflow.ellipsis,
+//                           ),
+//                           if (partiallyGenerated) ...[
+//                             const SizedBox(height: 3),
+//                             Text(
+//                               '$eligibleStudentCount new student(s) — the rest already have a challan',
+//                               style: TextStyle(
+//                                   fontSize: 11,
+//                                   color: Colors.orange.shade700,
+//                                   fontWeight: FontWeight.w600),
+//                             ),
+//                           ],
+//                         ],
+//                       ),
+//                     ),
+//                     Column(
+//                       crossAxisAlignment: CrossAxisAlignment.end,
+//                       children: [
+//                         if (totalMonthly > 0)
+//                           Text('Rs ${totalMonthly.toStringAsFixed(0)}',
+//                               style: const TextStyle(
+//                                   fontWeight: FontWeight.bold, color: _purple, fontSize: 13)),
+//                         if (fullyGenerated)
+//                           Padding(
+//                             padding: const EdgeInsets.only(top: 3),
+//                             child: Container(
+//                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+//                               decoration: BoxDecoration(
+//                                 color: Colors.green.shade50,
+//                                 borderRadius: BorderRadius.circular(6),
+//                               ),
+//                               child: Text('Generated',
+//                                   style: TextStyle(
+//                                       fontSize: 9,
+//                                       color: Colors.green.shade700,
+//                                       fontWeight: FontWeight.w600)),
+//                             ),
+//                           )
+//                         else if (partiallyGenerated)
+//                           Padding(
+//                             padding: const EdgeInsets.only(top: 3),
+//                             child: Container(
+//                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+//                               decoration: BoxDecoration(
+//                                 color: Colors.orange.shade50,
+//                                 borderRadius: BorderRadius.circular(6),
+//                               ),
+//                               child: Text('Partial',
+//                                   style: TextStyle(
+//                                       fontSize: 9,
+//                                       color: Colors.orange.shade700,
+//                                       fontWeight: FontWeight.w600)),
+//                             ),
+//                           ),
+//                       ],
+//                     ),
 //                   ],
 //                 ),
-//               ],
+//               ),
 //             ),
-//           ),
+//             // ── Family-wise extra charge toggle + fields ──
+//             if (!fullyGenerated)
+//               Padding(
+//                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+//                 child: Column(
+//                   crossAxisAlignment: CrossAxisAlignment.start,
+//                   children: [
+//                     InkWell(
+//                       onTap: onToggleExtra,
+//                       child: Row(
+//                         children: [
+//                           Icon(
+//                             extraExpanded ? Icons.remove_circle_outline : Icons.add_circle_outline,
+//                             size: 16,
+//                             color: _purple,
+//                           ),
+//                           const SizedBox(width: 6),
+//                           Text(
+//                             extraExpanded
+//                                 ? 'Remove extra charge'
+//                                 : 'Add extra charge for this family',
+//                             style: const TextStyle(
+//                                 fontSize: 12, color: _purple, fontWeight: FontWeight.w600),
+//                           ),
+//                         ],
+//                       ),
+//                     ),
+//                     if (extraExpanded) ...[
+//                       const SizedBox(height: 8),
+//                       Row(
+//                         children: [
+//                           Expanded(
+//                             flex: 2,
+//                             child: TextField(
+//                               controller: extraLabelCtrl,
+//                               decoration: InputDecoration(
+//                                 labelText: 'Label / Note',
+//                                 isDense: true,
+//                                 filled: true,
+//                                 fillColor: _lightPurple,
+//                                 border: OutlineInputBorder(
+//                                   borderRadius: BorderRadius.circular(8),
+//                                   borderSide: BorderSide.none,
+//                                 ),
+//                               ),
+//                             ),
+//                           ),
+//                           const SizedBox(width: 10),
+//                           Expanded(
+//                             child: TextField(
+//                               controller: extraAmountCtrl,
+//                               keyboardType: TextInputType.number,
+//                               decoration: InputDecoration(
+//                                 labelText: 'Amount',
+//                                 prefixText: 'Rs ',
+//                                 isDense: true,
+//                                 filled: true,
+//                                 fillColor: _lightPurple,
+//                                 border: OutlineInputBorder(
+//                                   borderRadius: BorderRadius.circular(8),
+//                                   borderSide: BorderSide.none,
+//                                 ),
+//                               ),
+//                             ),
+//                           ),
+//                         ],
+//                       ),
+//                     ],
+//                   ],
+//                 ),
+//               ),
+//           ],
 //         ),
 //       ),
 //     );
@@ -757,7 +1030,10 @@
 // }
 //
 // // ─────────────────────────────────────────────
-// //  Generated Challan Card — expandable, per-student breakdown
+// //  Generated Challan Card — expandable, per-student breakdown.
+// //  Shows currentMonthTotal (pure debit) plus any extra charges.
+// //  No previousBalance/grandTotal, since the challan model no
+// //  longer carries those fields.
 // // ─────────────────────────────────────────────
 // class _GeneratedChallanCard extends StatefulWidget {
 //   final FeeChallanModel challan;
@@ -773,6 +1049,18 @@
 //
 //   String _fmtDate(DateTime d) =>
 //       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+//
+//   // ─── Helper to build a clean fee breakdown string ───
+//   String _buildFeeBreakdown(ChallanStudentLine s) {
+//     final parts = <String>[];
+//     if (s.isFirstChallan) {
+//       if (s.registrationFee > 0) parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
+//       if (s.annualFee > 0) parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+//     }
+//     if (s.monthlyFee > 0) parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
+//     if (s.academyFee > 0) parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+//     return parts.join('  •  ');
+//   }
 //
 //   @override
 //   Widget build(BuildContext context) {
@@ -805,7 +1093,7 @@
 //                       ],
 //                     ),
 //                   ),
-//                   Text('Rs ${c.grandTotal.toStringAsFixed(0)}',
+//                   Text('Rs ${c.currentMonthTotal.toStringAsFixed(0)}',
 //                       style: const TextStyle(fontWeight: FontWeight.bold, color: _purple, fontSize: 13)),
 //                   const SizedBox(width: 4),
 //                   Icon(_expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
@@ -860,26 +1148,47 @@
 //                                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
 //                           ],
 //                         ),
-//                         if (s.isFirstChallan) ...[
-//                           const SizedBox(height: 2),
-//                           Padding(
-//                             padding: const EdgeInsets.only(left: 4),
-//                             child: Text(
-//                               'Admission: Rs ${s.registrationFee.toStringAsFixed(0)}  •  '
-//                                   'Annual: Rs ${s.annualFee.toStringAsFixed(0)}  •  '
-//                                   'Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}',
-//                               style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
-//                             ),
+//                         const SizedBox(height: 2),
+//                         Padding(
+//                           padding: const EdgeInsets.only(left: 4),
+//                           child: Text(
+//                             _buildFeeBreakdown(s),
+//                             style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
 //                           ),
-//                         ],
+//                         ),
 //                       ],
 //                     ),
 //                   )),
+//                   if (c.extraCharges.isNotEmpty) ...[
+//                     const Divider(height: 12),
+//                     ...c.extraCharges.map((ex) => Padding(
+//                       padding: const EdgeInsets.only(bottom: 4),
+//                       child: Row(
+//                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                         children: [
+//                           Row(
+//                             children: [
+//                               Icon(
+//                                 ex.source == 'overall'
+//                                     ? Icons.groups_outlined
+//                                     : Icons.person_outline,
+//                                 size: 12,
+//                                 color: Colors.grey.shade500,
+//                               ),
+//                               const SizedBox(width: 4),
+//                               Text(ex.label,
+//                                   style:
+//                                   TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+//                             ],
+//                           ),
+//                           Text('Rs ${ex.amount.toStringAsFixed(0)}',
+//                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+//                         ],
+//                       ),
+//                     )),
+//                   ],
 //                   const Divider(height: 12),
-//                   _totalRow('Current Month', c.currentMonthTotal),
-//                   if (c.previousBalance > 0) _totalRow('Previous Balance', c.previousBalance),
-//                   if (c.previousBalance < 0) _totalRow('Advance Carried Forward', c.previousBalance),
-//                   _totalRow('Grand Total', c.grandTotal, bold: true),
+//                   _totalRow('This Challan (Debit)', c.currentMonthTotal, bold: true),
 //                   const SizedBox(height: 4),
 //                   Text('Due: ${_fmtDate(c.dueDate)}',
 //                       style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
@@ -925,25 +1234,7 @@ import 'challan_list_screen.dart';
 
 // ─────────────────────────────────────────────
 //  Generate Fee Challan Screen
-//  Family-wise (class filter skipped), Regular admissions only.
-//  Auto-generation (28th of month) is NOT wired up here — this
-//  screen is manual-only. Generated Date / Due Date are shown
-//  pre-filled with defaults but are fully editable before hitting
-//  Generate.
-//
-//  Duplicate prevention is STUDENT-LEVEL, not family-level:
-//  a family already fully challaned for the month is skipped, but a
-//  family with a newly-added student (not present in that earlier
-//  challan) is still selectable — only the new student's line gets
-//  generated.
-//
-//  LEDGER MODEL (per Umair)
-//  -------------------------
-//  A challan is a PURE DEBIT entry — student-wise detail plus
-//  currentMonthTotal, nothing else. It carries no amountPaid,
-//  status, or previousBalance. Any running family balance is
-//  computed live elsewhere (FeeCollectionProvider) from
-//  sum(all challans) - sum(all collections), never cached here.
+//  (same logic as before, UI improvements)
 // ─────────────────────────────────────────────
 class GenerateChallanScreen extends StatelessWidget {
   const GenerateChallanScreen({super.key});
@@ -977,6 +1268,16 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
   String _searchQuery = '';
   final Set<String> _selectedFamilyDocIds = {};
 
+  // ── Overall extra-charge state ──
+  final _overallExtraAmountCtrl = TextEditingController();
+  final _overallExtraLabelCtrl = TextEditingController(text: 'Extra Charge');
+  bool _overallExtraEnabled = false;
+
+  // ── Family-wise extra-charge state ──
+  final Map<String, TextEditingController> _familyExtraAmountCtrls = {};
+  final Map<String, TextEditingController> _familyExtraLabelCtrls = {};
+  final Set<String> _familyExtraExpanded = {};
+
   @override
   void initState() {
     super.initState();
@@ -997,11 +1298,14 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _overallExtraAmountCtrl.dispose();
+    _overallExtraLabelCtrl.dispose();
+    for (final c in _familyExtraAmountCtrls.values) c.dispose();
+    for (final c in _familyExtraLabelCtrls.values) c.dispose();
     super.dispose();
   }
 
   DateTime _defaultGeneratedDate(int month, int year) => DateTime(year, month, 1);
-
   DateTime _defaultDueDate(int month, int year) => DateTime(year, month, 10);
 
   void _onBillingMonthYearChanged() {
@@ -1009,6 +1313,8 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
       _generatedDate = _defaultGeneratedDate(_billingMonth, _billingYear);
       _dueDate = _defaultDueDate(_billingMonth, _billingYear);
       _selectedFamilyDocIds.clear();
+      _familyExtraExpanded.clear();
+      for (final c in _familyExtraAmountCtrls.values) c.clear();
     });
     context.read<FeeChallanProvider>().clearResults();
     context
@@ -1016,17 +1322,13 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
         .refreshAlreadyGenerated(_billingMonth, _billingYear);
   }
 
-  // Regular admissions only, grouped by familyDocId. Class filtering
-  // is skipped — every regular student in the family rides along.
   List<FamilyForChallan> _buildEligibleFamilies(List<AdmissionModel> admissions) {
     final regular = admissions.where((a) => a.type == AdmissionType.regular).toList();
-
     final Map<String, List<AdmissionModel>> grouped = {};
     for (final a in regular) {
-      if (a.familyDocId.isEmpty) continue; // needs a valid family link
+      if (a.familyDocId.isEmpty) continue;
       grouped.putIfAbsent(a.familyDocId, () => []).add(a);
     }
-
     final List<FamilyForChallan> result = [];
     grouped.forEach((familyDocId, admissionsForFamily) {
       final rep = admissionsForFamily.first;
@@ -1035,7 +1337,6 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
           .where((s) => s.studentId.isNotEmpty)
           .toList();
       if (students.isEmpty) return;
-
       result.add(FamilyForChallan(
         familyDocId: familyDocId,
         familyId: rep.familyId,
@@ -1045,20 +1346,28 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
         students: students,
       ));
     });
-
-    result.sort(
-            (a, b) => a.familyName.toLowerCase().compareTo(b.familyName.toLowerCase()));
+    result.sort((a, b) => a.familyName.toLowerCase().compareTo(b.familyName.toLowerCase()));
     return result;
   }
 
   String _fmt(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
+  String _buildFeeBreakdown(ChallanStudentLine s) {
+    final parts = <String>[];
+    if (s.isFirstChallan) {
+      if (s.registrationFee > 0) parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
+      if (s.annualFee > 0) parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+    }
+    if (s.monthlyFee > 0) parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
+    if (s.academyFee > 0) parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+    return parts.join('  •  ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final admissions = context.watch<AdmissionProvider>().admissions;
     final eligibleFamilies = _buildEligibleFamilies(admissions);
-
     final filtered = eligibleFamilies.where((f) {
       final q = _searchQuery.toLowerCase();
       return q.isEmpty ||
@@ -1067,7 +1376,6 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
           f.familyId.toLowerCase().contains(q) ||
           f.fatherPhone.contains(q);
     }).toList();
-
     final challanProvider = context.watch<FeeChallanProvider>();
 
     return Scaffold(
@@ -1099,6 +1407,7 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
       body: Column(
         children: [
           _buildDateHeader(),
+          _buildOverallExtraChargeCard(),
           if (challanProvider.error != null) _buildErrorBanner(challanProvider),
           if (challanProvider.lastGeneratedChallans.isNotEmpty ||
               challanProvider.lastGenerationSkippedCount > 0)
@@ -1113,11 +1422,15 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
               itemBuilder: (context, i) {
                 final family = filtered[i];
                 final fullyDone = challanProvider.isFamilyFullyGenerated(family);
-                final partiallyDone =
-                challanProvider.isFamilyPartiallyGenerated(family);
-                final eligibleCount =
-                    challanProvider.eligibleStudentsFor(family).length;
+                final partiallyDone = challanProvider.isFamilyPartiallyGenerated(family);
+                final eligibleCount = challanProvider.eligibleStudentsFor(family).length;
                 final selected = _selectedFamilyDocIds.contains(family.familyDocId);
+
+                final extraAmountCtrl = _familyExtraAmountCtrls.putIfAbsent(
+                    family.familyDocId, () => TextEditingController());
+                final extraLabelCtrl = _familyExtraLabelCtrls.putIfAbsent(
+                    family.familyDocId, () => TextEditingController(text: 'Extra Charge'));
+
                 return _FamilySelectTile(
                   family: family,
                   selected: selected,
@@ -1135,6 +1448,19 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
                       }
                     });
                   },
+                  extraExpanded: _familyExtraExpanded.contains(family.familyDocId),
+                  onToggleExtra: () {
+                    setState(() {
+                      if (_familyExtraExpanded.contains(family.familyDocId)) {
+                        _familyExtraExpanded.remove(family.familyDocId);
+                        extraAmountCtrl.clear();
+                      } else {
+                        _familyExtraExpanded.add(family.familyDocId);
+                      }
+                    });
+                  },
+                  extraAmountCtrl: extraAmountCtrl,
+                  extraLabelCtrl: extraLabelCtrl,
                 );
               },
             ),
@@ -1145,7 +1471,7 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
     );
   }
 
-  // ── Date + Month/Year Header ──
+  // ─── Date Header ──────────────────────────────────────────────
   Widget _buildDateHeader() {
     return Container(
       decoration: const BoxDecoration(
@@ -1160,8 +1486,7 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Billing Month',
-              style: TextStyle(
-                  color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+              style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -1215,18 +1540,10 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
     );
   }
 
-  // Year list is generated relative to today's date every time this
-  // widget builds (currentYear - 1 .. currentYear + 4), so it always
-  // includes the current year and automatically slides forward into
-  // future years with no manual code update ever needed. As a
-  // safety net, _billingYear is folded in too, in case it was ever
-  // set outside this range (e.g. editing an old record).
   Widget _yearDropdown() {
     final currentYear = DateTime.now().year;
     final years = {currentYear - 1, currentYear, currentYear + 1, currentYear + 2,
-      currentYear + 3, currentYear + 4, _billingYear}.toList()
-      ..sort();
-
+      currentYear + 3, currentYear + 4, _billingYear}.toList()..sort();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
@@ -1290,7 +1607,88 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
     );
   }
 
-  // ── Error banner ──
+  // ─── Overall extra charge ──────────────────────────────────────
+  Widget _buildOverallExtraChargeCard() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Checkbox(
+                value: _overallExtraEnabled,
+                activeColor: _purple,
+                onChanged: (v) => setState(() => _overallExtraEnabled = v ?? false),
+              ),
+              const Expanded(
+                child: Text(
+                  'Apply extra charge to ALL selected families',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Icon(Icons.groups_outlined,
+                  size: 18, color: _overallExtraEnabled ? _purple : Colors.grey.shade400),
+            ],
+          ),
+          if (_overallExtraEnabled) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _overallExtraLabelCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Label / Note',
+                      isDense: true,
+                      filled: true,
+                      fillColor: _lightPurple,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _overallExtraAmountCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Amount',
+                      prefixText: 'Rs ',
+                      isDense: true,
+                      filled: true,
+                      fillColor: _lightPurple,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Yeh amount + note har selected family ki is generation ki challan mein add ho jayega.',
+              style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ─── Error banner ──────────────────────────────────────────────
   Widget _buildErrorBanner(FeeChallanProvider p) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -1316,7 +1714,7 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
     );
   }
 
-  // ── Results banner (post-generation preview) ──
+  // ─── Results banner (with scrollable cards) ────────────────────
   Widget _buildResultsBanner(FeeChallanProvider p) {
     final count = p.lastGeneratedChallans.length;
     final skipped = p.lastGenerationSkippedCount;
@@ -1354,22 +1752,32 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
             ],
           ),
           if (count > 0) ...[
-            const SizedBox(height: 4),
-            ...p.lastGeneratedChallans.map((c) => _GeneratedChallanCard(challan: c)),
+            const SizedBox(height: 8),
+            Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.35,
+              ),
+              child: ListView(
+                shrinkWrap: true,
+                physics: const ClampingScrollPhysics(),
+                children: p.lastGeneratedChallans
+                    .map((c) => _GeneratedChallanCard(challan: c))
+                    .toList(),
+              ),
+            ),
           ],
         ],
       ),
     );
   }
 
-  // ── Search + Select All ──
+  // ─── Search + Select All ──────────────────────────────────────
   Widget _buildSearchAndSelectAll(List<FamilyForChallan> filtered, FeeChallanProvider p) {
     final selectableIds = filtered
         .where((f) => !p.isFamilyFullyGenerated(f))
         .map((f) => f.familyDocId)
         .toSet();
-    final allSelected =
-        selectableIds.isNotEmpty && selectableIds.every(_selectedFamilyDocIds.contains);
+    final allSelected = selectableIds.isNotEmpty && selectableIds.every(_selectedFamilyDocIds.contains);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -1436,8 +1844,8 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
           const SizedBox(height: 16),
           Text(
             _searchQuery.isEmpty ? 'No eligible family found' : 'No search results found',
-            style:
-            TextStyle(color: Colors.grey.shade500, fontSize: 16, fontWeight: FontWeight.w500),
+            style: TextStyle(
+                color: Colors.grey.shade500, fontSize: 16, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 6),
           Text(
@@ -1449,7 +1857,7 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
     );
   }
 
-  // ── Bottom action bar ──
+  // ─── Bottom bar ──────────────────────────────────────────────
   Widget _buildBottomBar(List<FamilyForChallan> eligibleFamilies, FeeChallanProvider p) {
     final selectedFamilies = eligibleFamilies
         .where((f) => _selectedFamilyDocIds.contains(f.familyDocId))
@@ -1498,6 +1906,25 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
   }
 
   Future<void> _confirmAndGenerate(List<FamilyForChallan> selected) async {
+    final Map<String, double> familyExtraAmounts = {};
+    final Map<String, String> familyExtraLabels = {};
+    for (final familyDocId in _familyExtraExpanded) {
+      final amtCtrl = _familyExtraAmountCtrls[familyDocId];
+      final labelCtrl = _familyExtraLabelCtrls[familyDocId];
+      final amt = double.tryParse(amtCtrl?.text.trim() ?? '');
+      if (amt != null && amt > 0) {
+        familyExtraAmounts[familyDocId] = amt;
+        familyExtraLabels[familyDocId] =
+        (labelCtrl?.text.trim().isEmpty ?? true) ? 'Extra Charge' : labelCtrl!.text.trim();
+      }
+    }
+
+    final overallAmt = _overallExtraEnabled
+        ? double.tryParse(_overallExtraAmountCtrl.text.trim())
+        : null;
+    final hasOverallExtra = overallAmt != null && overallAmt > 0;
+    final hasFamilyExtra = familyExtraAmounts.isNotEmpty;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1505,12 +1932,15 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
         content: Text(
             'Challans will be generated for ${selected.length} famil${selected.length != 1 ? 'ies' : 'y'} '
                 'for ${FeeChallanModel.monthNames[_billingMonth]} $_billingYear.\n\n'
-                'Generated Date: ${_fmt(_generatedDate)}\nDue Date: ${_fmt(_dueDate)}'),
+                'Generated Date: ${_fmt(_generatedDate)}\nDue Date: ${_fmt(_dueDate)}'
+                '${hasOverallExtra ? '\n\nOverall extra charge: Rs ${overallAmt!.toStringAsFixed(0)} (${_overallExtraLabelCtrl.text.trim().isEmpty ? 'Extra Charge' : _overallExtraLabelCtrl.text.trim()}) — applies to all selected families.' : ''}'
+                '${hasFamilyExtra ? '\n\n${familyExtraAmounts.length} family-specific extra charge(s) will also be applied.' : ''}'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: _purple, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: _purple, foregroundColor: Colors.white),
             child: const Text('Generate'),
           ),
         ],
@@ -1526,16 +1956,24 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
       year: _billingYear,
       generatedDate: _generatedDate,
       dueDate: _dueDate,
+      overallExtraAmount: hasOverallExtra ? overallAmt : null,
+      overallExtraLabel: _overallExtraLabelCtrl.text.trim().isEmpty
+          ? 'Extra Charge'
+          : _overallExtraLabelCtrl.text.trim(),
+      familyExtraAmounts: familyExtraAmounts,
+      familyExtraLabels: familyExtraLabels,
     );
 
     if (!mounted) return;
-    setState(() => _selectedFamilyDocIds.clear());
+    setState(() {
+      _selectedFamilyDocIds.clear();
+      _familyExtraExpanded.clear();
+      for (final c in _familyExtraAmountCtrls.values) c.clear();
+    });
   }
 }
 
-// ─────────────────────────────────────────────
-//  Family Select Tile
-// ─────────────────────────────────────────────
+// ─── Family Select Tile (updated) ──────────────────────────────
 class _FamilySelectTile extends StatelessWidget {
   final FamilyForChallan family;
   final bool selected;
@@ -1543,6 +1981,10 @@ class _FamilySelectTile extends StatelessWidget {
   final bool partiallyGenerated;
   final int eligibleStudentCount;
   final VoidCallback? onTap;
+  final bool extraExpanded;
+  final VoidCallback onToggleExtra;
+  final TextEditingController extraAmountCtrl;
+  final TextEditingController extraLabelCtrl;
 
   const _FamilySelectTile({
     required this.family,
@@ -1551,6 +1993,10 @@ class _FamilySelectTile extends StatelessWidget {
     required this.partiallyGenerated,
     required this.eligibleStudentCount,
     required this.onTap,
+    required this.extraExpanded,
+    required this.onToggleExtra,
+    required this.extraAmountCtrl,
+    required this.extraLabelCtrl,
   });
 
   static const _purple = Color(0xFF534AB7);
@@ -1558,8 +2004,10 @@ class _FamilySelectTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalMonthly =
-    family.students.fold<double>(0, (s, st) => s + (st.monthlyFee ?? 0));
+    final totalMonthly = family.students.fold<double>(
+      0,
+          (s, st) => s + (st.monthlyFee ?? 0) + (st.academyFee ?? 0),
+    );
 
     return Opacity(
       opacity: fullyGenerated ? 0.55 : 1,
@@ -1571,113 +2019,182 @@ class _FamilySelectTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           side: BorderSide(color: selected ? _purple : Colors.transparent, width: 1.5),
         ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Icon(
-                  fullyGenerated
-                      ? Icons.check_circle
-                      : (selected ? Icons.check_circle : Icons.circle_outlined),
-                  color: fullyGenerated
-                      ? Colors.green.shade400
-                      : (selected ? _purple : Colors.grey.shade300),
-                  size: 22,
-                ),
-                const SizedBox(width: 12),
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: _lightPurple,
-                  child: Text(
-                    family.familyName.isNotEmpty ? family.familyName[0].toUpperCase() : 'F',
-                    style: const TextStyle(color: _purple, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(family.familyName,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${family.students.length} student${family.students.length != 1 ? 's' : ''} • ${family.fatherName}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (partiallyGenerated) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          '$eligibleStudentCount new student(s) — the rest already have a challan',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.orange.shade700,
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+        child: Column(
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
                   children: [
-                    if (totalMonthly > 0)
-                      Text('Rs ${totalMonthly.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, color: _purple, fontSize: 13)),
-                    if (fullyGenerated)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 3),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text('Generated',
-                              style: TextStyle(
-                                  fontSize: 9,
-                                  color: Colors.green.shade700,
-                                  fontWeight: FontWeight.w600)),
-                        ),
-                      )
-                    else if (partiallyGenerated)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 3),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text('Partial',
-                              style: TextStyle(
-                                  fontSize: 9,
-                                  color: Colors.orange.shade700,
-                                  fontWeight: FontWeight.w600)),
-                        ),
+                    Icon(
+                      fullyGenerated
+                          ? Icons.check_circle
+                          : (selected ? Icons.check_circle : Icons.circle_outlined),
+                      color: fullyGenerated
+                          ? Colors.green.shade400
+                          : (selected ? _purple : Colors.grey.shade300),
+                      size: 22,
+                    ),
+                    const SizedBox(width: 12),
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: _lightPurple,
+                      child: Text(
+                        family.familyName.isNotEmpty ? family.familyName[0].toUpperCase() : 'F',
+                        style: const TextStyle(color: _purple, fontWeight: FontWeight.bold),
                       ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(family.familyName,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${family.students.length} student${family.students.length != 1 ? 's' : ''} • ${family.fatherName}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (partiallyGenerated) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              '$eligibleStudentCount new student(s) — the rest already have a challan',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.orange.shade700,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (totalMonthly > 0)
+                          Text('Rs ${totalMonthly.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, color: _purple, fontSize: 13)),
+                        if (fullyGenerated)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 3),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text('Generated',
+                                  style: TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.green.shade700,
+                                      fontWeight: FontWeight.w600)),
+                            ),
+                          )
+                        else if (partiallyGenerated)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 3),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text('Partial',
+                                  style: TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.orange.shade700,
+                                      fontWeight: FontWeight.w600)),
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
+            if (!fullyGenerated)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    InkWell(
+                      onTap: onToggleExtra,
+                      child: Row(
+                        children: [
+                          Icon(
+                            extraExpanded ? Icons.remove_circle_outline : Icons.add_circle_outline,
+                            size: 16,
+                            color: _purple,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            extraExpanded
+                                ? 'Remove extra charge'
+                                : 'Add extra charge for this family',
+                            style: const TextStyle(
+                                fontSize: 12, color: _purple, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (extraExpanded) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: TextField(
+                              controller: extraLabelCtrl,
+                              decoration: InputDecoration(
+                                labelText: 'Label / Note',
+                                isDense: true,
+                                filled: true,
+                                fillColor: _lightPurple,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              controller: extraAmountCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: 'Amount',
+                                prefixText: 'Rs ',
+                                isDense: true,
+                                filled: true,
+                                fillColor: _lightPurple,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────
-//  Generated Challan Card — expandable, per-student breakdown.
-//  Shows only currentMonthTotal (pure debit) — no
-//  previousBalance/grandTotal, since the challan model no longer
-//  carries those fields.
-// ─────────────────────────────────────────────
+// ─── Generated Challan Card (with overflow fix) ──────────────
 class _GeneratedChallanCard extends StatefulWidget {
   final FeeChallanModel challan;
   const _GeneratedChallanCard({required this.challan});
@@ -1692,6 +2209,17 @@ class _GeneratedChallanCardState extends State<_GeneratedChallanCard> {
 
   String _fmtDate(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  String _buildFeeBreakdown(ChallanStudentLine s) {
+    final parts = <String>[];
+    if (s.isFirstChallan) {
+      if (s.registrationFee > 0) parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
+      if (s.annualFee > 0) parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+    }
+    if (s.monthlyFee > 0) parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
+    if (s.academyFee > 0) parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+    return parts.join('  •  ');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1725,7 +2253,8 @@ class _GeneratedChallanCardState extends State<_GeneratedChallanCard> {
                     ),
                   ),
                   Text('Rs ${c.currentMonthTotal.toStringAsFixed(0)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: _purple, fontSize: 13)),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, color: _purple, fontSize: 13)),
                   const SizedBox(width: 4),
                   Icon(_expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                       color: Colors.grey.shade400, size: 18),
@@ -1759,8 +2288,8 @@ class _GeneratedChallanCardState extends State<_GeneratedChallanCard> {
                                   if (s.isFirstChallan) ...[
                                     const SizedBox(width: 5),
                                     Container(
-                                      padding:
-                                      const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 5, vertical: 1),
                                       decoration: BoxDecoration(
                                         color: Colors.orange.shade50,
                                         borderRadius: BorderRadius.circular(4),
@@ -1776,24 +2305,50 @@ class _GeneratedChallanCardState extends State<_GeneratedChallanCard> {
                               ),
                             ),
                             Text('Rs ${s.lineTotal.toStringAsFixed(0)}',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                style: const TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.w700)),
                           ],
                         ),
-                        if (s.isFirstChallan) ...[
-                          const SizedBox(height: 2),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 4),
-                            child: Text(
-                              'Admission: Rs ${s.registrationFee.toStringAsFixed(0)}  •  '
-                                  'Annual: Rs ${s.annualFee.toStringAsFixed(0)}  •  '
-                                  'Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}',
-                              style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
-                            ),
+                        const SizedBox(height: 2),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: Text(
+                            _buildFeeBreakdown(s),
+                            style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
                           ),
-                        ],
+                        ),
                       ],
                     ),
                   )),
+                  if (c.extraCharges.isNotEmpty) ...[
+                    const Divider(height: 12),
+                    ...c.extraCharges.map((ex) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                ex.source == 'overall'
+                                    ? Icons.groups_outlined
+                                    : Icons.person_outline,
+                                size: 12,
+                                color: Colors.grey.shade500,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(ex.label,
+                                  style:
+                                  TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                            ],
+                          ),
+                          Text('Rs ${ex.amount.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    )),
+                  ],
                   const Divider(height: 12),
                   _totalRow('This Challan (Debit)', c.currentMonthTotal, bold: true),
                   const SizedBox(height: 4),

@@ -61,6 +61,18 @@ String _initials(String name) {
   return '?';
 }
 
+
+String _staffTypeLabel(String type) {
+  switch (type) {
+    case 'teacher':
+      return 'Teacher';
+    case 'academy_staff':
+      return 'Academy Staff';
+    default:
+      return 'Staff';
+  }
+}
+
 /// Fallback display-category logic (in case StaffTransaction.displayCategory
 /// isn't accessible / doesn't exist under that exact name).
 String _displayCategory(StaffTransaction t) {
@@ -178,7 +190,7 @@ Future<Uint8List> generateEmployeeLedgerPdf({
                     pw.Text(
                       (employee.designation != null && employee.designation!.isNotEmpty)
                           ? employee.designation!
-                          : (employee.type == 'teacher' ? 'Teacher' : 'Staff'),
+                          : _staffTypeLabel(employee.type),
                       style: pw.TextStyle(fontSize: 8.5, font: regularFont, color: _grey600),
                     ),
                   ],
@@ -186,7 +198,7 @@ Future<Uint8List> generateEmployeeLedgerPdf({
               ),
               pw.Expanded(
                 flex: 2,
-                child: _miniInfo('Type', employee.type == 'teacher' ? 'Teacher' : 'Staff',
+                child: _miniInfo('Type', _staffTypeLabel(employee.type),
                     regularFont: regularFont, boldFont: boldFont),
               ),
               pw.Expanded(

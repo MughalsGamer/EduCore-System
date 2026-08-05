@@ -163,6 +163,10 @@ class FeeChallanProvider extends ChangeNotifier {
     required int year,
     required DateTime generatedDate,
     required DateTime dueDate,
+    double? overallExtraAmount,          // ★ NEW — applied to every family below
+    String overallExtraLabel = 'Extra Charge',   // ★ NEW
+    Map<String, double>? familyExtraAmounts,     // ★ NEW familyDocId -> amount
+    Map<String, String>? familyExtraLabels,      // ★ NEW familyDocId -> label
   }) async {
     _isGenerating = true;
     _error = null;
@@ -284,11 +288,37 @@ class FeeChallanProvider extends ChangeNotifier {
             monthlyFee: s.monthlyFee ?? 0,
             annualFee: isFirst ? (s.annualFee ?? 0) : 0,
             registrationFee: isFirst ? (s.registrationFee ?? 0) : 0,
+            academyFee: s.academyFee ?? 0,   // ★ NEW — repeats every challan
             isFirstChallan: isFirst,
           );
           lines.add(line);
           currentMonthTotal += line.lineTotal;
         }
+
+// ★ NEW — Extra charges: overall (applies to every family in this
+// batch) and/or family-specific (only this family), both allowed
+// together and simply summed onto currentMonthTotal.
+        final extraCharges = <ChallanExtraCharge>[];
+
+        if (overallExtraAmount != null && overallExtraAmount > 0) {
+          extraCharges.add(ChallanExtraCharge(
+            label: overallExtraLabel.trim().isEmpty ? 'Extra Charge' : overallExtraLabel.trim(),
+            amount: overallExtraAmount,
+            source: 'overall',
+          ));
+        }
+
+        final familyExtra = familyExtraAmounts?[family.familyDocId];
+        if (familyExtra != null && familyExtra > 0) {
+          final familyLabel = familyExtraLabels?[family.familyDocId] ?? 'Extra Charge';
+          extraCharges.add(ChallanExtraCharge(
+            label: familyLabel.trim().isEmpty ? 'Extra Charge' : familyLabel.trim(),
+            amount: familyExtra,
+            source: 'family',
+          ));
+        }
+
+        currentMonthTotal += extraCharges.fold(0.0, (s, e) => s + e.amount);
 
         // Live balance BEFORE this new challan's debit is added —
         // exactly what FeeCollectionProvider.loadBalanceForFamily
@@ -315,6 +345,7 @@ class FeeChallanProvider extends ChangeNotifier {
           generatedDate: generatedDate,
           dueDate: dueDate,
           students: lines,
+          extraCharges: extraCharges,   // ★ NEW
           currentMonthTotal: currentMonthTotal,
           previousBalance: previousBalanceSnapshot,
         );

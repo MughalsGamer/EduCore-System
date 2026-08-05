@@ -1,83 +1,6 @@
 
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ─────────────────────────────────────────────
-//  Per-Student Line Item inside a Challan
-//  First-ever challan for a student carries
-//  Admission (registration) + Annual + Monthly.
-//  Every challan after that carries Monthly only.
-// ─────────────────────────────────────────────
-class ChallanStudentLine {
-  String studentId;
-  String name;
-  String? className;
-  String? sectionName;
-  double monthlyFee;
-  double annualFee;        // > 0 only when isFirstChallan == true
-  double registrationFee;  // > 0 only when isFirstChallan == true (Admission Fee)
-  bool isFirstChallan;
-
-  ChallanStudentLine({
-    required this.studentId,
-    required this.name,
-    this.className,
-    this.sectionName,
-    this.monthlyFee = 0,
-    this.annualFee = 0,
-    this.registrationFee = 0,
-    this.isFirstChallan = false,
-  });
-
-  double get lineTotal => monthlyFee + annualFee + registrationFee;
-
-  Map<String, dynamic> toMap() => {
-    'studentId': studentId,
-    'name': name,
-    'className': className,
-    'sectionName': sectionName,
-    'monthlyFee': monthlyFee,
-    'annualFee': annualFee,
-    'registrationFee': registrationFee,
-    'isFirstChallan': isFirstChallan,
-  };
-
-  factory ChallanStudentLine.fromMap(Map<String, dynamic> m) => ChallanStudentLine(
-    studentId: m['studentId'] ?? '',
-    name: m['name'] ?? '',
-    className: m['className'],
-    sectionName: m['sectionName'],
-    monthlyFee: (m['monthlyFee'] as num?)?.toDouble() ?? 0,
-    annualFee: (m['annualFee'] as num?)?.toDouble() ?? 0,
-    registrationFee: (m['registrationFee'] as num?)?.toDouble() ?? 0,
-    isFirstChallan: m['isFirstChallan'] ?? false,
-  );
-}
-
-// ─────────────────────────────────────────────
-//  Fee Challan — one document per family, per billing month.
-//
-//  DEBIT ENTRY + FROZEN DISPLAY SNAPSHOT.
-//
-//  currentMonthTotal is STILL the pure debit amount for this
-//  challan alone (student-wise lines summed) — this is what the
-//  live balance formula uses:
-//
-//      balance = sum(all challans.currentMonthTotal)
-//                - sum(all collections.amount)
-//
-//  That formula NEVER changes and NEVER reads previousBalance.
-//  This keeps the real running balance always conflict-free and
-//  always live/self-correcting, exactly as before.
-//
-//  `previousBalance` below is a PURE DISPLAY SNAPSHOT — the
-//  family's live balance at the exact moment this challan was
-//  generated, captured once and frozen forever. It exists only so
-//  the PDF can print "Previous Balance" + "Net Payable" for THIS
-//  challan exactly as they were on the day it was generated, even
-//  if new challans/payments happen afterwards. It is never used in
-//  any balance math elsewhere in the app — purely cosmetic/history.
-// ─────────────────────────────────────────────
 class FeeChallanModel {
   String? id;
   String challanNumber;      // e.g. CH-0001
@@ -99,6 +22,8 @@ class FeeChallanModel {
   DateTime dueDate;          // Last date to pay
 
   List<ChallanStudentLine> students;
+  List<ChallanExtraCharge> extraCharges;   // ★ NEW
+
 
   double currentMonthTotal;  // sum of all student lineTotal for this challan (pure debit, unchanged)
 
@@ -129,12 +54,18 @@ class FeeChallanModel {
     required this.generatedDate,
     required this.dueDate,
     List<ChallanStudentLine>? students,
+    List<ChallanExtraCharge>? extraCharges,   // ★ NEW
+
     this.currentMonthTotal = 0,
     this.previousBalance = 0,
     DateTime? createdAt,
   })  : students = students ?? [],
-        createdAt = createdAt ?? DateTime.now();
+        extraCharges = extraCharges ?? [],     // ★ NEW
 
+      createdAt = createdAt ?? DateTime.now();
+
+  double get extraChargesTotal =>
+      extraCharges.fold(0.0, (s, e) => s + e.amount);   // ★ NEW helper
   List<String> get studentIds => students.map((s) => s.studentId).toList();
 
   Map<String, dynamic> toMap() => {
@@ -150,6 +81,8 @@ class FeeChallanModel {
     'generatedDate': generatedDate.toIso8601String(),
     'dueDate': dueDate.toIso8601String(),
     'students': students.map((s) => s.toMap()).toList(),
+    'extraCharges': extraCharges.map((e) => e.toMap()).toList(),   // ★ NEW
+
     'studentIds': studentIds,
     'currentMonthTotal': currentMonthTotal,
     'previousBalance': previousBalance,
@@ -178,6 +111,10 @@ class FeeChallanModel {
           ?.map((s) => ChallanStudentLine.fromMap(Map<String, dynamic>.from(s as Map)))
           .toList() ??
           [],
+      extraCharges: (m['extraCharges'] as List<dynamic>?)               // ★ NEW
+          ?.map((e) => ChallanExtraCharge.fromMap(Map<String, dynamic>.from(e as Map)))
+          .toList() ??
+          [],
       currentMonthTotal: (m['currentMonthTotal'] as num?)?.toDouble() ?? 0,
       previousBalance: (m['previousBalance'] as num?)?.toDouble() ?? 0,
     );
@@ -189,4 +126,90 @@ class FeeChallanModel {
   ];
 
   String get monthLabel => (month >= 1 && month <= 12) ? monthNames[month] : '—';
+}
+
+
+
+class ChallanStudentLine {
+  String studentId;
+  String name;
+  String? className;
+  String? sectionName;
+  double monthlyFee;
+  double annualFee;        // > 0 only when isFirstChallan == true
+  double registrationFee;  // > 0 only when isFirstChallan == true (Admission Fee)
+  double academyFee;       // repeats every challan, like monthlyFee
+  bool isFirstChallan;
+
+  ChallanStudentLine({
+    required this.studentId,
+    required this.name,
+    this.className,
+    this.sectionName,
+    this.monthlyFee = 0,
+    this.annualFee = 0,
+    this.registrationFee = 0,
+    this.academyFee = 0,
+    this.isFirstChallan = false,
+  });
+
+  double get lineTotal => monthlyFee + annualFee + registrationFee + academyFee;
+
+  Map<String, dynamic> toMap() => {
+    'studentId': studentId,
+    'name': name,
+    'className': className,
+    'sectionName': sectionName,
+    'monthlyFee': monthlyFee,
+    'annualFee': annualFee,
+    'registrationFee': registrationFee,
+    'academyFee': academyFee,
+    'isFirstChallan': isFirstChallan,
+  };
+
+  factory ChallanStudentLine.fromMap(Map<String, dynamic> m) => ChallanStudentLine(
+    studentId: m['studentId'] ?? '',
+    name: m['name'] ?? '',
+    className: m['className'],
+    sectionName: m['sectionName'],
+    monthlyFee: (m['monthlyFee'] as num?)?.toDouble() ?? 0,
+    annualFee: (m['annualFee'] as num?)?.toDouble() ?? 0,
+    registrationFee: (m['registrationFee'] as num?)?.toDouble() ?? 0,
+    academyFee: (m['academyFee'] as num?)?.toDouble() ?? 0,
+    isFirstChallan: m['isFirstChallan'] ?? false,
+  );
+}
+
+
+
+// ─────────────────────────────────────────────
+//  Extra Charge — optional ad-hoc debit line added on top of the
+//  regular fee breakdown. Can come from "Overall" (same label +
+//  amount applied to every selected family) and/or "Family-wise"
+//  (a specific amount + label entered just for that one family).
+//  Both can co-exist on the same challan — their amounts are
+//  simply summed and both lines are kept for transparency.
+// ─────────────────────────────────────────────
+class ChallanExtraCharge {
+  String label;   // default "Extra Charge", user-editable
+  double amount;
+  String source;  // 'overall' | 'family'
+
+  ChallanExtraCharge({
+    this.label = 'Extra Charge',
+    required this.amount,
+    required this.source,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'label': label,
+    'amount': amount,
+    'source': source,
+  };
+
+  factory ChallanExtraCharge.fromMap(Map<String, dynamic> m) => ChallanExtraCharge(
+    label: m['label'] ?? 'Extra Charge',
+    amount: (m['amount'] as num?)?.toDouble() ?? 0,
+    source: m['source'] ?? 'family',
+  );
 }

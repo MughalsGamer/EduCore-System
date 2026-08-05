@@ -1,11 +1,11 @@
 //
-// //running code
 // import 'package:flutter/material.dart';
 // import 'package:provider/provider.dart';
 //
 // import '../../models/fee_challan_model.dart';
 // import '../../pdf_files/fee_challan_pdf_service.dart';
 // import '../../providers/fee_challan_provider.dart';
+// import '../../providers/fee_collection_provider.dart';
 // import '../../providers/school_setting_prodvider.dart';
 //
 // class ChallanListScreen extends StatefulWidget {
@@ -55,9 +55,6 @@
 //         .read<FeeChallanProvider>()
 //         .loadAllChallans(month: _filterMonth, year: _filterYear);
 //   }
-//
-//   String _fmtDate(DateTime d) =>
-//       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 //
 //   List<FeeChallanModel> _applySearch(List<FeeChallanModel> list) {
 //     final q = _searchQuery.toLowerCase();
@@ -168,6 +165,18 @@
 //         behavior: SnackBarBehavior.floating,
 //       ),
 //     );
+//   }
+//
+//   // ─── Helper to build a clean fee breakdown string ───
+//   String _buildFeeBreakdown(ChallanStudentLine s) {
+//     final parts = <String>[];
+//     if (s.isFirstChallan) {
+//       if (s.registrationFee > 0) parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
+//       if (s.annualFee > 0) parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+//     }
+//     if (s.monthlyFee > 0) parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
+//     if (s.academyFee > 0) parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+//     return parts.join('  •  ');
 //   }
 //
 //   // ─── Build methods ───
@@ -498,8 +507,7 @@
 //                   const Expanded(flex: 3, child: _HeaderCell('Family')),
 //                   const Expanded(flex: 2, child: _HeaderCell('Month')),
 //                   const Expanded(flex: 1, child: _HeaderCell('Students')),
-//                   const Expanded(flex: 2, child: _HeaderCell('Grand Total')),
-//                   const Expanded(flex: 2, child: _HeaderCell('Status')),
+//                   const Expanded(flex: 2, child: _HeaderCell('This Month')),
 //                   const Expanded(flex: 2, child: _HeaderCell('Due Date')),
 //                   const SizedBox(width: 96),
 //                 ],
@@ -608,6 +616,18 @@
 //   String _fmtDate(DateTime d) =>
 //       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 //
+//   // ─── Helper to build a clean fee breakdown string ───
+//   String _buildFeeBreakdown(ChallanStudentLine s) {
+//     final parts = <String>[];
+//     if (s.isFirstChallan) {
+//       if (s.registrationFee > 0) parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
+//       if (s.annualFee > 0) parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+//     }
+//     if (s.monthlyFee > 0) parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
+//     if (s.academyFee > 0) parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+//     return parts.join('  •  ');
+//   }
+//
 //   @override
 //   Widget build(BuildContext context) {
 //     final c = widget.challan;
@@ -664,10 +684,9 @@
 //                       child: Text('${c.students.length}', style: const TextStyle(fontSize: 13))),
 //                   Expanded(
 //                       flex: 2,
-//                       child: Text('Rs ${c.grandTotal.toStringAsFixed(0)}',
+//                       child: Text('Rs ${c.currentMonthTotal.toStringAsFixed(0)}',
 //                           style: const TextStyle(
 //                               fontWeight: FontWeight.bold, color: _purple, fontSize: 13))),
-//                   Expanded(flex: 2, child: _StatusChip(status: c.status)),
 //                   Expanded(
 //                       flex: 2,
 //                       child: Text(_fmtDate(c.dueDate),
@@ -746,6 +765,18 @@
 //
 //   String _fmtDate(DateTime d) =>
 //       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+//
+//   // ─── Helper to build a clean fee breakdown string ───
+//   String _buildFeeBreakdown(ChallanStudentLine s) {
+//     final parts = <String>[];
+//     if (s.isFirstChallan) {
+//       if (s.registrationFee > 0) parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
+//       if (s.annualFee > 0) parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+//     }
+//     if (s.monthlyFee > 0) parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
+//     if (s.academyFee > 0) parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+//     return parts.join('  •  ');
+//   }
 //
 //   @override
 //   Widget build(BuildContext context) {
@@ -828,19 +859,16 @@
 //                 children: [
 //                   Text('${c.students.length} student${c.students.length != 1 ? 's' : ''}',
 //                       style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-//                   _StatusChip(status: c.status),
+//                   Text('Due: ${_fmtDate(c.dueDate)}',
+//                       style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
 //                 ],
 //               ),
 //               const SizedBox(height: 8),
-//               Row(
-//                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                 children: [
-//                   Text('Due: ${_fmtDate(c.dueDate)}',
-//                       style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-//                   Text('Rs ${c.grandTotal.toStringAsFixed(0)}',
-//                       style: const TextStyle(
-//                           fontWeight: FontWeight.bold, color: _purple, fontSize: 15)),
-//                 ],
+//               Align(
+//                 alignment: Alignment.centerRight,
+//                 child: Text('Rs ${c.currentMonthTotal.toStringAsFixed(0)}',
+//                     style: const TextStyle(
+//                         fontWeight: FontWeight.bold, color: _purple, fontSize: 15)),
 //               ),
 //               if (_expanded && !widget.selectMode) ...[
 //                 const SizedBox(height: 10),
@@ -857,18 +885,61 @@
 // }
 //
 // // ─── Shared expanded detail panel ───
-// class _ChallanDetailPanel extends StatelessWidget {
+// // Shows student-wise breakdown (from the challan itself, a pure
+// // debit entry), any extra charges applied at generation time, the
+// // FROZEN previousBalance/netPayable snapshot captured at the moment
+// // this challan was generated, AND the family's LIVE running balance
+// // (fetched from FeeCollectionProvider only when this panel is
+// // actually expanded) so both the historical snapshot and the
+// // current live figure are visible side by side.
+// class _ChallanDetailPanel extends StatefulWidget {
 //   final FeeChallanModel challan;
 //   const _ChallanDetailPanel({required this.challan});
 //
+//   @override
+//   State<_ChallanDetailPanel> createState() => _ChallanDetailPanelState();
+// }
+//
+// class _ChallanDetailPanelState extends State<_ChallanDetailPanel> {
 //   static const _purple = Color(0xFF534AB7);
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     WidgetsBinding.instance.addPostFrameCallback((_) {
+//       if (!mounted) return;
+//       context
+//           .read<FeeCollectionProvider>()
+//           .loadBalanceForFamily(widget.challan.familyDocId);
+//     });
+//   }
 //
 //   String _fmtDate(DateTime d) =>
 //       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 //
+//   String _fmtMoney(double v) {
+//     final neg = v < 0;
+//     final abs = v.abs().toStringAsFixed(0);
+//     return '${neg ? '-' : ''}Rs $abs';
+//   }
+//
+//   // ─── Helper to build a clean fee breakdown string ───
+//   String _buildFeeBreakdown(ChallanStudentLine s) {
+//     final parts = <String>[];
+//     if (s.isFirstChallan) {
+//       if (s.registrationFee > 0) parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
+//       if (s.annualFee > 0) parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+//     }
+//     if (s.monthlyFee > 0) parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
+//     if (s.academyFee > 0) parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+//     return parts.join('  •  ');
+//   }
+//
 //   @override
 //   Widget build(BuildContext context) {
-//     final c = challan;
+//     final c = widget.challan;
+//     final collProvider = context.watch<FeeCollectionProvider>();
+//
 //     return Column(
 //       crossAxisAlignment: CrossAxisAlignment.start,
 //       children: [
@@ -931,25 +1002,151 @@
 //               Padding(
 //                 padding: const EdgeInsets.only(left: 4, top: 2),
 //                 child: Text(
-//                   s.isFirstChallan
-//                       ? 'Admission: Rs ${s.registrationFee.toStringAsFixed(0)}  •  '
-//                       'Annual: Rs ${s.annualFee.toStringAsFixed(0)}  •  '
-//                       'Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}'
-//                       : 'Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}',
+//                   _buildFeeBreakdown(s),
 //                   style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
 //                 ),
 //               ),
 //             ],
 //           ),
 //         )),
+//
+//         // Extra charges (overall / family‑wise)
+//         if (c.extraCharges.isNotEmpty) ...[
+//           const SizedBox(height: 4),
+//           const Divider(height: 12),
+//           Text('Extra Charges',
+//               style: TextStyle(
+//                   fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey.shade600)),
+//           const SizedBox(height: 6),
+//           ...c.extraCharges.map((ex) => Padding(
+//             padding: const EdgeInsets.only(bottom: 4),
+//             child: Row(
+//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//               children: [
+//                 Row(
+//                   children: [
+//                     Icon(
+//                       ex.source == 'overall'
+//                           ? Icons.groups_outlined
+//                           : Icons.person_outline,
+//                       size: 12,
+//                       color: Colors.grey.shade500,
+//                     ),
+//                     const SizedBox(width: 4),
+//                     Text(ex.label,
+//                         style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+//                   ],
+//                 ),
+//                 Text('Rs ${ex.amount.toStringAsFixed(0)}',
+//                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+//               ],
+//             ),
+//           )),
+//         ],
+//
 //         const SizedBox(height: 4),
 //         const Divider(height: 12),
-//         _totalRow('Current Month', c.currentMonthTotal),
-//         if (c.previousBalance > 0) _totalRow('Previous Balance', c.previousBalance),
-//         if (c.previousBalance < 0) _totalRow('Advance Carried Forward', c.previousBalance),
-//         _totalRow('Grand Total', c.grandTotal, bold: true),
-//         _totalRow('Amount Paid', c.amountPaid),
-//         _totalRow('Remaining Balance', c.remainingBalance, bold: true),
+//         _totalRow('This Challan (Debit)', c.currentMonthTotal, bold: true),
+//
+//         // Frozen snapshot at generation time
+//         const SizedBox(height: 8),
+//         Container(
+//           width: double.infinity,
+//           padding: const EdgeInsets.all(10),
+//           decoration: BoxDecoration(
+//             color: const Color(0xFFF5F5FA),
+//             borderRadius: BorderRadius.circular(8),
+//             border: Border.all(color: Colors.grey.shade200),
+//           ),
+//           child: Column(
+//             crossAxisAlignment: CrossAxisAlignment.start,
+//             children: [
+//               Row(
+//                 children: [
+//                   Icon(Icons.history, size: 12, color: Colors.grey.shade500),
+//                   const SizedBox(width: 4),
+//                   Text('At Generation (Frozen)',
+//                       style: TextStyle(
+//                           fontSize: 10,
+//                           fontWeight: FontWeight.w700,
+//                           color: Colors.grey.shade600)),
+//                 ],
+//               ),
+//               const SizedBox(height: 6),
+//               Row(
+//                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                 children: [
+//                   Text('Previous Balance',
+//                       style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+//                   Text(_fmtMoney(c.previousBalance),
+//                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+//                 ],
+//               ),
+//               const SizedBox(height: 3),
+//               Row(
+//                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                 children: [
+//                   Text('Net Payable',
+//                       style: TextStyle(
+//                           fontSize: 11,
+//                           color: Colors.grey.shade700,
+//                           fontWeight: FontWeight.w600)),
+//                   Text(_fmtMoney(c.netPayableSnapshot),
+//                       style: const TextStyle(
+//                           fontSize: 13, fontWeight: FontWeight.bold, color: _purple)),
+//                 ],
+//               ),
+//             ],
+//           ),
+//         ),
+//
+//         const SizedBox(height: 8),
+//
+//         // Live family balance
+//         collProvider.isLoadingBalance
+//             ? const Padding(
+//           padding: EdgeInsets.symmetric(vertical: 8),
+//           child: SizedBox(
+//               width: 16,
+//               height: 16,
+//               child: CircularProgressIndicator(strokeWidth: 2)),
+//         )
+//             : Container(
+//           width: double.infinity,
+//           padding: const EdgeInsets.all(10),
+//           decoration: BoxDecoration(
+//             color: collProvider.currentBalance > 0
+//                 ? Colors.orange.shade50
+//                 : (collProvider.currentBalance < 0
+//                 ? Colors.green.shade50
+//                 : Colors.grey.shade50),
+//             borderRadius: BorderRadius.circular(8),
+//           ),
+//           child: Row(
+//             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//             children: [
+//               Text(
+//                 collProvider.currentBalance > 0
+//                     ? 'Family Balance (Pending)'
+//                     : (collProvider.currentBalance < 0
+//                     ? 'Family Advance Balance'
+//                     : 'Family Balance'),
+//                 style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+//               ),
+//               Text(
+//                 _fmtMoney(collProvider.currentBalance),
+//                 style: TextStyle(
+//                     fontSize: 14,
+//                     fontWeight: FontWeight.bold,
+//                     color: collProvider.currentBalance > 0
+//                         ? Colors.orange.shade800
+//                         : (collProvider.currentBalance < 0
+//                         ? Colors.green.shade800
+//                         : Colors.black87)),
+//               ),
+//             ],
+//           ),
+//         ),
 //         const SizedBox(height: 6),
 //         Text('Generated: ${_fmtDate(c.generatedDate)}   •   Due: ${_fmtDate(c.dueDate)}',
 //             style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
@@ -978,47 +1175,6 @@
 //     );
 //   }
 // }
-//
-// // ─── Status chip ───
-// class _StatusChip extends StatelessWidget {
-//   final String status;
-//   const _StatusChip({required this.status});
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     Color bg;
-//     Color fg;
-//     String label;
-//     switch (status) {
-//       case 'paid':
-//         bg = Colors.green.shade50;
-//         fg = Colors.green.shade700;
-//         label = 'Paid';
-//         break;
-//       case 'partial':
-//         bg = Colors.orange.shade50;
-//         fg = Colors.orange.shade700;
-//         label = 'Partial';
-//         break;
-//       default:
-//         bg = Colors.red.shade50;
-//         fg = Colors.red.shade700;
-//         label = 'Pending';
-//     }
-//     return Container(
-//       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-//       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-//       child: Text(label,
-//           style: TextStyle(fontSize: 10, color: fg, fontWeight: FontWeight.w700)),
-//     );
-//   }
-// }
-//
-//
-
-
-
-//running code
 
 
 
@@ -1125,7 +1281,7 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
     });
   }
 
-  // ─── Single challan PDF actions ───
+  // ─── PDF actions ──────────────────────────────────────────────
   Future<void> _printSingle(FeeChallanModel challan) async {
     final settings = context.read<SchoolSettingsProvider>().settings;
     try {
@@ -1145,7 +1301,7 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
     }
   }
 
-  // ─── Bulk PDF actions ───
+  // ─── Bulk actions ─────────────────────────────────────────────
   Future<void> _bulkPrint(List<FeeChallanModel> allChallans) async {
     if (_selectedIds.isEmpty || _bulkBusy) return;
     final selected = allChallans.where((c) => _selectedIds.contains(c.id)).toList();
@@ -1179,6 +1335,50 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
     }
   }
 
+  // ─── NEW: Bulk delete ────────────────────────────────────────
+  Future<void> _bulkDelete(List<FeeChallanModel> allChallans) async {
+    if (_selectedIds.isEmpty || _bulkBusy) return;
+    final selected = allChallans.where((c) => _selectedIds.contains(c.id)).toList();
+    if (selected.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete selected challans?'),
+        content: Text(
+            'You are about to delete ${selected.length} challan${selected.length != 1 ? 's' : ''}.\n\nThis action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade600, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    setState(() => _bulkBusy = true);
+
+    final provider = context.read<FeeChallanProvider>();
+    int deleted = 0;
+    int failed = 0;
+    for (final c in selected) {
+      final ok = await provider.deleteChallan(c);
+      if (ok) deleted++; else failed++;
+    }
+
+    if (mounted) {
+      setState(() => _bulkBusy = false);
+      _selectedIds.clear();
+      _selectMode = false;
+      _showSnack('$deleted deleted${failed > 0 ? ', $failed failed' : ''}',
+          isError: failed > 0);
+    }
+  }
+
   void _showSnack(String msg, {bool isError = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1190,7 +1390,19 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
     );
   }
 
-  // ─── Build methods ───
+  // ─── Helper for fee breakdown ────────────────────────────────
+  String _buildFeeBreakdown(ChallanStudentLine s) {
+    final parts = <String>[];
+    if (s.isFirstChallan) {
+      if (s.registrationFee > 0) parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
+      if (s.annualFee > 0) parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+    }
+    if (s.monthlyFee > 0) parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
+    if (s.academyFee > 0) parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+    return parts.join('  •  ');
+  }
+
+  // ─── Build ────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<FeeChallanProvider>();
@@ -1255,6 +1467,7 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
     );
   }
 
+  // ─── Bulk action bar (with delete) ───────────────────────────
   Widget _buildBulkActionBar(List<FeeChallanModel> challans) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -1272,10 +1485,7 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
         top: false,
         child: Row(
           children: [
-            const Icon(Icons.checklist, color: _purple, size: 20),
-            const SizedBox(width: 8),
-            Text('${_selectedIds.length} selected',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+
             const Spacer(),
             OutlinedButton.icon(
               onPressed: _bulkBusy ? null : () => _bulkPrint(challans),
@@ -1295,6 +1505,7 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
               ),
             ),
             const SizedBox(width: 10),
+
             ElevatedButton.icon(
               onPressed: _bulkBusy ? null : () => _bulkSave(challans),
               icon: _bulkBusy
@@ -1312,19 +1523,43 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               ),
             ),
+            const SizedBox(width: 10),
+            OutlinedButton.icon(
+              onPressed: _bulkBusy ? null : () => _bulkDelete(challans),
+              icon: _bulkBusy
+                  ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+                  : Icon(Icons.delete_outline, size: 16, color: Colors.red.shade600),
+              label: Text('Delete',
+                  style: TextStyle(
+                      color: Colors.red.shade600, fontSize: 13, fontWeight: FontWeight.w600)),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.red.shade300),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              ),
+            ),
+
           ],
         ),
       ),
     );
   }
 
+  // ─── Filters ──────────────────────────────────────────────────
   Widget _buildFilters() {
     final currentYear = DateTime.now().year;
     final years = {
-      currentYear - 2, currentYear - 1, currentYear, currentYear + 1,
-      currentYear + 2, currentYear + 3, if (_filterYear != null) _filterYear!,
-    }.toList()
-      ..sort();
+      currentYear - 2,
+      currentYear - 1,
+      currentYear,
+      currentYear + 1,
+      currentYear + 2,
+      currentYear + 3,
+      if (_filterYear != null) _filterYear!,
+    }.toList()..sort();
 
     return Container(
       color: Colors.white,
@@ -1474,6 +1709,7 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
     );
   }
 
+  // ─── Mobile List ──────────────────────────────────────────────
   Widget _buildMobileList(List<FeeChallanModel> challans, FeeChallanProvider provider) {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
@@ -1494,6 +1730,7 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
     );
   }
 
+  // ─── Desktop Table ────────────────────────────────────────────
   Widget _buildDesktopTable(List<FeeChallanModel> challans, FeeChallanProvider provider) {
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -1527,8 +1764,7 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
             Expanded(
               child: ListView.separated(
                 itemCount: challans.length,
-                separatorBuilder: (_, __) =>
-                    Divider(height: 1, color: Colors.grey.shade100),
+                separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade100),
                 itemBuilder: (context, i) {
                   final c = challans[i];
                   return _ChallanRow(
@@ -1583,7 +1819,7 @@ class _ChallanListScreenState extends State<ChallanListScreen> {
   }
 }
 
-// ─── Desktop table header cell ───
+// ─── Header Cell ────────────────────────────────────────────────
 class _HeaderCell extends StatelessWidget {
   final String text;
   const _HeaderCell(this.text);
@@ -1596,7 +1832,7 @@ class _HeaderCell extends StatelessWidget {
   }
 }
 
-// ─── Desktop table row ───
+// ─── Desktop Row ────────────────────────────────────────────────
 class _ChallanRow extends StatefulWidget {
   final FeeChallanModel challan;
   final bool selectMode;
@@ -1626,6 +1862,17 @@ class _ChallanRowState extends State<_ChallanRow> {
 
   String _fmtDate(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  String _buildFeeBreakdown(ChallanStudentLine s) {
+    final parts = <String>[];
+    if (s.isFirstChallan) {
+      if (s.registrationFee > 0) parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
+      if (s.annualFee > 0) parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+    }
+    if (s.monthlyFee > 0) parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
+    if (s.academyFee > 0) parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+    return parts.join('  •  ');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1676,11 +1923,12 @@ class _ChallanRowState extends State<_ChallanRow> {
                   ),
                   Expanded(
                       flex: 2,
-                      child:
-                      Text('${c.monthLabel} ${c.year}', style: const TextStyle(fontSize: 13))),
+                      child: Text('${c.monthLabel} ${c.year}',
+                          style: const TextStyle(fontSize: 13))),
                   Expanded(
                       flex: 1,
-                      child: Text('${c.students.length}', style: const TextStyle(fontSize: 13))),
+                      child: Text('${c.students.length}',
+                          style: const TextStyle(fontSize: 13))),
                   Expanded(
                       flex: 2,
                       child: Text('Rs ${c.currentMonthTotal.toStringAsFixed(0)}',
@@ -1697,24 +1945,30 @@ class _ChallanRowState extends State<_ChallanRow> {
                         : Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+
                         IconButton(
-                          icon: Icon(Icons.print_outlined, color: Colors.grey.shade600, size: 18),
+                          icon: Icon(Icons.print_outlined,
+                              color: Colors.grey.shade600, size: 18),
                           onPressed: widget.onPrint,
                           tooltip: 'Print',
                           visualDensity: VisualDensity.compact,
                         ),
+
                         IconButton(
-                          icon: const Icon(Icons.download_rounded, color: _purple, size: 18),
+                          icon: const Icon(Icons.download_rounded,
+                              color: _purple, size: 18),
                           onPressed: widget.onSave,
                           tooltip: 'Save',
                           visualDensity: VisualDensity.compact,
                         ),
                         IconButton(
-                          icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 18),
+                          icon: Icon(Icons.delete_outline,
+                              color: Colors.red.shade400, size: 18),
                           onPressed: widget.onDelete,
                           tooltip: 'Delete',
                           visualDensity: VisualDensity.compact,
                         ),
+
                       ],
                     ),
                   ),
@@ -1733,7 +1987,7 @@ class _ChallanRowState extends State<_ChallanRow> {
   }
 }
 
-// ─── Mobile card ───
+// ─── Mobile Card ────────────────────────────────────────────────
 class _ChallanCard extends StatefulWidget {
   final FeeChallanModel challan;
   final bool selectMode;
@@ -1764,6 +2018,17 @@ class _ChallanCardState extends State<_ChallanCard> {
 
   String _fmtDate(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  String _buildFeeBreakdown(ChallanStudentLine s) {
+    final parts = <String>[];
+    if (s.isFirstChallan) {
+      if (s.registrationFee > 0) parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
+      if (s.annualFee > 0) parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+    }
+    if (s.monthlyFee > 0) parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
+    if (s.academyFee > 0) parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+    return parts.join('  •  ');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1871,10 +2136,7 @@ class _ChallanCardState extends State<_ChallanCard> {
   }
 }
 
-// ─── Shared expanded detail panel ───
-// Shows student-wise breakdown (from the challan itself, a pure
-// debit entry) plus the family's LIVE running balance, fetched from
-// FeeCollectionProvider only when this panel is actually expanded.
+// ─── Detail Panel ──────────────────────────────────────────────
 class _ChallanDetailPanel extends StatefulWidget {
   final FeeChallanModel challan;
   const _ChallanDetailPanel({required this.challan});
@@ -1904,6 +2166,17 @@ class _ChallanDetailPanelState extends State<_ChallanDetailPanel> {
     final neg = v < 0;
     final abs = v.abs().toStringAsFixed(0);
     return '${neg ? '-' : ''}Rs $abs';
+  }
+
+  String _buildFeeBreakdown(ChallanStudentLine s) {
+    final parts = <String>[];
+    if (s.isFirstChallan) {
+      if (s.registrationFee > 0) parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
+      if (s.annualFee > 0) parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+    }
+    if (s.monthlyFee > 0) parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
+    if (s.academyFee > 0) parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+    return parts.join('  •  ');
   }
 
   @override
@@ -1944,8 +2217,10 @@ class _ChallanDetailPanelState extends State<_ChallanDetailPanel> {
                         ),
                         if (s.className != null && s.className!.isNotEmpty) ...[
                           const SizedBox(width: 5),
-                          Text('(${s.className}${s.sectionName != null && s.sectionName!.isNotEmpty ? ' - ${s.sectionName}' : ''})',
-                              style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                          Text(
+                              '(${s.className}${s.sectionName != null && s.sectionName!.isNotEmpty ? ' - ${s.sectionName}' : ''})',
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.grey.shade500)),
                         ],
                         if (s.isFirstChallan) ...[
                           const SizedBox(width: 5),
@@ -1967,29 +2242,114 @@ class _ChallanDetailPanelState extends State<_ChallanDetailPanel> {
                     ),
                   ),
                   Text('Rs ${s.lineTotal.toStringAsFixed(0)}',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w700)),
                 ],
               ),
               Padding(
                 padding: const EdgeInsets.only(left: 4, top: 2),
                 child: Text(
-                  s.isFirstChallan
-                      ? 'Admission: Rs ${s.registrationFee.toStringAsFixed(0)}  •  '
-                      'Annual: Rs ${s.annualFee.toStringAsFixed(0)}  •  '
-                      'Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}'
-                      : 'Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}',
+                  _buildFeeBreakdown(s),
                   style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
                 ),
               ),
             ],
           ),
         )),
+
+        // Extra charges
+        if (c.extraCharges.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          const Divider(height: 12),
+          Text('Extra Charges',
+              style: TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey.shade600)),
+          const SizedBox(height: 6),
+          ...c.extraCharges.map((ex) => Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      ex.source == 'overall'
+                          ? Icons.groups_outlined
+                          : Icons.person_outline,
+                      size: 12,
+                      color: Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(ex.label,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                  ],
+                ),
+                Text('Rs ${ex.amount.toStringAsFixed(0)}',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          )),
+        ],
+
         const SizedBox(height: 4),
         const Divider(height: 12),
         _totalRow('This Challan (Debit)', c.currentMonthTotal, bold: true),
+
+        // Frozen snapshot
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F5FA),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.history, size: 12, color: Colors.grey.shade500),
+                  const SizedBox(width: 4),
+                  Text('At Generation (Frozen)',
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.grey.shade600)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Previous Balance',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                  Text(_fmtMoney(c.previousBalance),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                ],
+              ),
+              const SizedBox(height: 3),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Net Payable',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w600)),
+                  Text(_fmtMoney(c.netPayableSnapshot),
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.bold, color: _purple)),
+                ],
+              ),
+            ],
+          ),
+        ),
+
         const SizedBox(height: 8),
 
-        // Live family balance — sum(all challans) - sum(all collections)
+        // Live balance
         collProvider.isLoadingBalance
             ? const Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
