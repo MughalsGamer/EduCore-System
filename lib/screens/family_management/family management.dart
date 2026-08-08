@@ -1,5 +1,4 @@
 //
-//
 // import 'dart:convert';
 // import 'package:flutter/material.dart';
 // import 'package:provider/provider.dart';
@@ -21,6 +20,8 @@
 // const _kSurface = Color(0xFFF7F7FB);
 // const _kGreen = Color(0xFF16A34A);
 // const _kOrange = Color(0xFFD97706);
+// const _kBlue = Color(0xFF2563EB);
+// const _kAcademyColor = Color(0xFF8B5CF6); // purple‑ish for Academy
 //
 // // ─────────────────────────────────────────────
 // //  Family Management Screen
@@ -480,6 +481,7 @@
 //     final totalMonthly = allStudents.fold<double>(0, (s, st) => s + (st.monthlyFee ?? 0));
 //     final totalAnnual = allStudents.fold<double>(0, (s, st) => s + (st.annualFee ?? 0));
 //     final totalRegistration = allStudents.fold<double>(0, (s, st) => s + (st.registrationFee ?? 0));
+//     final totalAcademy = allStudents.fold<double>(0, (s, st) => s + (st.academyFee ?? 0));
 //
 //     return Container(
 //       color: _kSurface,
@@ -563,10 +565,12 @@
 //
 //               const SizedBox(height: 28),
 //
-//               // ── Fee summary strip ──
+//               // ── Fee summary strip (now includes Academy) ──
 //               Row(
 //                 children: [
-//                   Expanded(child: _feeStat('Monthly', totalMonthly, Icons.calendar_month_rounded, const Color(0xFF2563EB))),
+//                   Expanded(child: _feeStat('Monthly', totalMonthly, Icons.calendar_month_rounded, _kBlue)),
+//                   const SizedBox(width: 12),
+//                   Expanded(child: _feeStat('Academy', totalAcademy, Icons.school_rounded, _kAcademyColor)),
 //                   const SizedBox(width: 12),
 //                   Expanded(child: _feeStat('Annual', totalAnnual, Icons.calendar_today_rounded, _kGreen)),
 //                   const SizedBox(width: 12),
@@ -721,6 +725,10 @@
 //   }
 //
 //   Widget _studentTile(AdmissionStudent s) {
+//     final monthly = s.monthlyFee ?? 0;
+//     final academy = s.academyFee ?? 0;
+//     final totalMonthly = monthly + academy;
+//
 //     return Container(
 //       margin: const EdgeInsets.only(bottom: 10),
 //       padding: const EdgeInsets.all(12),
@@ -756,9 +764,17 @@
 //               ],
 //             ),
 //           ),
-//           if (s.monthlyFee != null && s.monthlyFee! > 0)
-//             Text('Rs ${s.monthlyFee!.toStringAsFixed(0)}/mo',
-//                 style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _kPurple)),
+//           if (totalMonthly > 0)
+//             Column(
+//               crossAxisAlignment: CrossAxisAlignment.end,
+//               children: [
+//                 Text('Rs $totalMonthly/mo',
+//                     style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _kPurple)),
+//                 if (academy > 0)
+//                   Text('(incl. Academy Rs ${academy.toStringAsFixed(0)})',
+//                       style: TextStyle(fontSize: 9.5, color: Colors.grey.shade500)),
+//               ],
+//             ),
 //         ],
 //       ),
 //     );
@@ -778,7 +794,7 @@
 //   Widget build(BuildContext context) {
 //     final rep = admissions.first;
 //     final allStudents = admissions.expand((a) => a.students).toList();
-//     final totalMonthlyFee = allStudents.fold<double>(0, (sum, s) => sum + (s.monthlyFee ?? 0));
+//     final totalMonthlyFee = allStudents.fold<double>(0, (sum, s) => sum + (s.monthlyFee ?? 0) + (s.academyFee ?? 0));
 //     final hasMultipleAdmissions = admissions.length > 1;
 //
 //     return Container(
@@ -967,6 +983,7 @@
 //     final totalMonthly = allStudents.fold<double>(0, (s, st) => s + (st.monthlyFee ?? 0));
 //     final totalAnnual = allStudents.fold<double>(0, (s, st) => s + (st.annualFee ?? 0));
 //     final totalRegistration = allStudents.fold<double>(0, (s, st) => s + (st.registrationFee ?? 0));
+//     final totalAcademy = allStudents.fold<double>(0, (s, st) => s + (st.academyFee ?? 0));
 //
 //     return Scaffold(
 //       backgroundColor: _kSurface,
@@ -1064,7 +1081,9 @@
 //                   const SizedBox(height: 10),
 //                   Row(
 //                     children: [
-//                       _feeCard('Monthly', 'Rs ${totalMonthly.toStringAsFixed(0)}', Icons.calendar_month_rounded, const Color(0xFF2563EB)),
+//                       _feeCard('Monthly', 'Rs ${totalMonthly.toStringAsFixed(0)}', Icons.calendar_month_rounded, _kBlue),
+//                       const SizedBox(width: 10),
+//                       _feeCard('Academy', 'Rs ${totalAcademy.toStringAsFixed(0)}', Icons.school_rounded, _kAcademyColor),
 //                       const SizedBox(width: 10),
 //                       _feeCard('Annual', 'Rs ${totalAnnual.toStringAsFixed(0)}', Icons.calendar_today_rounded, _kGreen),
 //                       const SizedBox(width: 10),
@@ -1253,6 +1272,8 @@
 //     final s = widget.student;
 //     final admission = widget.admission;
 //     final isRegular = admission.type == AdmissionType.regular;
+//     final monthly = s.monthlyFee ?? 0;
+//     final academy = s.academyFee ?? 0;
 //
 //     return Card(
 //       margin: const EdgeInsets.only(bottom: 10),
@@ -1310,9 +1331,11 @@
 //                   Column(
 //                     crossAxisAlignment: CrossAxisAlignment.end,
 //                     children: [
-//                       if (s.monthlyFee != null && s.monthlyFee! > 0)
-//                         Text('Rs ${s.monthlyFee!.toStringAsFixed(0)}',
-//                             style: const TextStyle(fontWeight: FontWeight.bold, color: _kPurple, fontSize: 14)),
+//                       if (monthly > 0 || academy > 0)
+//                         Text(
+//                           'Rs ${(monthly + academy).toStringAsFixed(0)}',
+//                           style: const TextStyle(fontWeight: FontWeight.bold, color: _kPurple, fontSize: 14),
+//                         ),
 //                       const SizedBox(height: 4),
 //                       Icon(_expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: Colors.grey.shade400, size: 20),
 //                     ],
@@ -1348,18 +1371,28 @@
 //                   Container(
 //                     padding: const EdgeInsets.all(10),
 //                     decoration: BoxDecoration(color: _kPurpleTint, borderRadius: BorderRadius.circular(8)),
-//                     child: Row(
+//                     child: Column(
+//                       crossAxisAlignment: CrossAxisAlignment.start,
 //                       children: [
-//                         const Icon(Icons.payments_outlined, color: _kPurple, size: 15),
-//                         const SizedBox(width: 6),
-//                         const Text('Fees: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _kPurple)),
-//                         Text(
-//                           [
-//                             if (s.monthlyFee != null && s.monthlyFee! > 0) 'Monthly: Rs ${s.monthlyFee!.toStringAsFixed(0)}',
-//                             if (s.annualFee != null && s.annualFee! > 0) 'Annual: Rs ${s.annualFee!.toStringAsFixed(0)}',
-//                             if (s.registrationFee != null && s.registrationFee! > 0) 'Reg: Rs ${s.registrationFee!.toStringAsFixed(0)}',
-//                           ].join('  •  '),
-//                           style: const TextStyle(fontSize: 12, color: _kPurple),
+//                         const Text('Fees', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _kPurple)),
+//                         const SizedBox(height: 4),
+//                         Row(
+//                           children: [
+//                             const Icon(Icons.payments_outlined, color: _kPurple, size: 15),
+//                             const SizedBox(width: 6),
+//                             Expanded(
+//                               child: Wrap(
+//                                 spacing: 8,
+//                                 runSpacing: 4,
+//                                 children: [
+//                                   if (monthly > 0) _feeChip('Monthly', monthly),
+//                                   if (academy > 0) _feeChip('Academy', academy),
+//                                   if (s.annualFee != null && s.annualFee! > 0) _feeChip('Annual', s.annualFee!),
+//                                   if (s.registrationFee != null && s.registrationFee! > 0) _feeChip('Reg', s.registrationFee!),
+//                                 ],
+//                               ),
+//                             ),
+//                           ],
 //                         ),
 //                       ],
 //                     ),
@@ -1368,6 +1401,21 @@
 //               ),
 //             ),
 //         ],
+//       ),
+//     );
+//   }
+//
+//   Widget _feeChip(String label, double amount) {
+//     return Container(
+//       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.circular(12),
+//         border: Border.all(color: _kPurple.withOpacity(0.2)),
+//       ),
+//       child: Text(
+//         '$label: Rs ${amount.toStringAsFixed(0)}',
+//         style: const TextStyle(fontSize: 11, color: _kPurple, fontWeight: FontWeight.w500),
 //       ),
 //     );
 //   }
@@ -1404,13 +1452,13 @@
 // }
 
 
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/admission_model.dart';
 import '../../providers/admission_provider.dart';
 import 'family_ledger_screen.dart';
+import 'family_report_screen.dart';
 
 // ─────────────────────────────────────────────
 //  Design tokens
@@ -1475,6 +1523,13 @@ class _FamilyManagementScreenState extends State<FamilyManagementScreen> {
     );
   }
 
+  void _openReport(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FamilyReportScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width >= 900;
@@ -1506,6 +1561,13 @@ class _FamilyManagementScreenState extends State<FamilyManagementScreen> {
         backgroundColor: _kPurple,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          // IconButton(
+          //   icon: const Icon(Icons.summarize_outlined),
+          //   tooltip: 'Families Report',
+          //   onPressed: () => _openReport(context),
+          // ),
+        ],
       ),
       body: isDesktop
           ? _buildDesktop(grouped, filteredKeys, admissions, isLoading)
@@ -1573,6 +1635,7 @@ class _FamilyManagementScreenState extends State<FamilyManagementScreen> {
             familyKey: selectedKey,
             admissions: grouped[selectedKey]!,
             onLedgerTap: () => _openLedger(context, grouped[selectedKey]!.first),
+            onReportTap: () => _openReport(context),
           ),
         ),
       ],
@@ -1586,8 +1649,18 @@ class _FamilyManagementScreenState extends State<FamilyManagementScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Families',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _kInk, letterSpacing: -0.3)),
+          // Row(
+          //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          //   children: [
+          //     const Text('Families',
+          //         style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _kInk, letterSpacing: -0.3)),
+          //     IconButton(
+          //       icon: const Icon(Icons.summarize_outlined, color: _kPurple),
+          //       tooltip: 'Families Report',
+          //       onPressed: () => _openReport(context),
+          //     ),
+          //   ],
+          // ),
           const SizedBox(height: 4),
           Text(
             '${grouped.length} families  •  $totalStudents students',
@@ -1599,40 +1672,210 @@ class _FamilyManagementScreenState extends State<FamilyManagementScreen> {
   }
 
   Widget _desktopSearchBar() {
+    final bool isSearching = _searchQuery.isNotEmpty;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-      child: Container(
-        height: 42,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        height: 58,
         decoration: BoxDecoration(
-          color: _kSurface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _kBorder),
-        ),
-        child: TextField(
-          controller: _searchCtrl,
-          onChanged: (v) => setState(() => _searchQuery = v.trim()),
-          style: const TextStyle(fontSize: 13.5),
-          decoration: InputDecoration(
-            hintText: 'Search families...',
-            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.5),
-            prefixIcon: Icon(Icons.search_rounded, color: Colors.grey.shade400, size: 20),
-            suffixIcon: _searchQuery.isNotEmpty
-                ? IconButton(
-              icon: Icon(Icons.close_rounded, color: Colors.grey.shade400, size: 16),
-              onPressed: () {
-                _searchCtrl.clear();
-                setState(() => _searchQuery = '');
-              },
-            )
-                : null,
-            border: InputBorder.none,
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(vertical: 11),
+          gradient: LinearGradient(
+            colors: isSearching
+                ? [
+              _kPurple.withOpacity(0.12),
+              _kPurple.withOpacity(0.04),
+            ]
+                : [
+              _kPurple.withOpacity(0.07),
+              _kPurple.withOpacity(0.025),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(
+            color: isSearching
+                ? _kPurple.withOpacity(0.75)
+                : _kPurple.withOpacity(0.35),
+            width: isSearching ? 1.8 : 1.4,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: _kPurple.withOpacity(
+                isSearching ? 0.20 : 0.10,
+              ),
+              blurRadius: isSearching ? 22 : 14,
+              spreadRadius: isSearching ? 1 : 0,
+              offset: const Offset(0, 7),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Search Icon
+            Container(
+              width: 43,
+              height: 43,
+              margin: const EdgeInsets.only(left: 7),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    _kPurple,
+                    _kPurpleDeep,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: _kPurple.withOpacity(0.25),
+                    blurRadius: 9,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.search_rounded,
+                color: Colors.white,
+                size: 21,
+              ),
+            ),
+
+            const SizedBox(width: 13),
+
+            // Search Text
+            Expanded(
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.trim();
+                  });
+                },
+                cursorColor: _kPurple,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: _kInk,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Search families...',
+                  hintStyle: TextStyle(
+                    color: _kPurple.withOpacity(0.55),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 18,
+                  ),
+                ),
+              ),
+            ),
+
+            // Search Status
+            if (!isSearching)
+              Container(
+                margin: const EdgeInsets.only(right: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: _kPurple.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _kPurple.withOpacity(0.15),
+                  ),
+                ),
+                child: Text(
+                  'Search',
+                  style: TextStyle(
+                    color: _kPurple.withOpacity(0.70),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+
+            // Clear
+            if (isSearching)
+              Padding(
+                padding: const EdgeInsets.only(right: 9),
+                child: IconButton(
+                  tooltip: 'Clear search',
+                  splashRadius: 21,
+                  onPressed: () {
+                    _searchCtrl.clear();
+                    setState(() {
+                      _searchQuery = '';
+                    });
+                  },
+                  icon: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: _kPurple.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _kPurple.withOpacity(0.18),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      color: _kPurple,
+                      size: 17,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
+
+  // Widget _desktopSearchBar() {
+  //   return Padding(
+  //     padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+  //     child: Container(
+  //       height: 42,
+  //       decoration: BoxDecoration(
+  //         color: _kSurface,
+  //         borderRadius: BorderRadius.circular(10),
+  //         border: Border.all(color: _kBorder),
+  //       ),
+  //       child:
+  //       TextField(
+  //         controller: _searchCtrl,
+  //         onChanged: (v) => setState(() => _searchQuery = v.trim()),
+  //         style: const TextStyle(fontSize: 13.5),
+  //         decoration: InputDecoration(
+  //           hintText: 'Search families...',
+  //           hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.5),
+  //           prefixIcon: Icon(Icons.search_rounded, color: Colors.grey.shade400, size: 20),
+  //           suffixIcon: _searchQuery.isNotEmpty
+  //               ? IconButton(
+  //             icon: Icon(Icons.close_rounded, color: Colors.grey.shade400, size: 16),
+  //             onPressed: () {
+  //               _searchCtrl.clear();
+  //               setState(() => _searchQuery = '');
+  //             },
+  //           )
+  //               : null,
+  //           border: InputBorder.none,
+  //           isDense: true,
+  //           contentPadding: const EdgeInsets.symmetric(vertical: 11),
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _desktopEmptyDetail() {
     return Container(
@@ -1684,6 +1927,7 @@ class _FamilyManagementScreenState extends State<FamilyManagementScreen> {
       bool isLoading,
       ) {
     final totalStudents = admissions.fold<int>(0, (sum, a) => sum + a.students.length);
+    final bool isSearching = _searchQuery.isNotEmpty;
 
     return CustomScrollView(
       slivers: [
@@ -1709,31 +1953,78 @@ class _FamilyManagementScreenState extends State<FamilyManagementScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Container(
+                // ── Prominent search field (matches desktop style) ──
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  height: 54,
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))],
-                  ),
-                  child: TextField(
-                    controller: _searchCtrl,
-                    onChanged: (v) => setState(() => _searchQuery = v.trim()),
-                    decoration: InputDecoration(
-                      hintText: 'Family, father, phone se search...',
-                      hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.5),
-                      prefixIcon: const Icon(Icons.search_rounded, color: _kPurple, size: 21),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                        icon: Icon(Icons.close_rounded, color: Colors.grey.shade400, size: 18),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                          : null,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(
+                      color: isSearching ? _kPurple.withOpacity(0.6) : Colors.transparent,
+                      width: 1.6,
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isSearching ? 0.12 : 0.08),
+                        blurRadius: isSearching ? 18 : 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        margin: const EdgeInsets.only(left: 7),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [_kPurple, _kPurpleDeep],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(11),
+                          boxShadow: [
+                            BoxShadow(color: _kPurple.withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 3)),
+                          ],
+                        ),
+                        child: const Icon(Icons.search_rounded, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _searchCtrl,
+                          onChanged: (v) => setState(() => _searchQuery = v.trim()),
+                          cursorColor: _kPurple,
+                          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: _kInk),
+                          decoration: InputDecoration(
+                            hintText: 'Family, father, phone se search...',
+                            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13, fontWeight: FontWeight.w500),
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
+                      ),
+                      if (isSearching)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: IconButton(
+                            splashRadius: 20,
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                            icon: Container(
+                              width: 30,
+                              height: 30,
+                              decoration: BoxDecoration(color: _kPurpleTint, shape: BoxShape.circle),
+                              child: const Icon(Icons.close_rounded, color: _kPurple, size: 16),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],
@@ -1764,6 +2055,95 @@ class _FamilyManagementScreenState extends State<FamilyManagementScreen> {
       ],
     );
   }
+
+  // Widget _buildMobile(
+  //     Map<String, List<AdmissionModel>> grouped,
+  //     List<String> filteredKeys,
+  //     List<AdmissionModel> admissions,
+  //     bool isLoading,
+  //     )
+  // {
+  //   final totalStudents = admissions.fold<int>(0, (sum, a) => sum + a.students.length);
+  //
+  //   return CustomScrollView(
+  //     slivers: [
+  //       SliverToBoxAdapter(
+  //         child: Container(
+  //           decoration: const BoxDecoration(
+  //             gradient: LinearGradient(
+  //               colors: [_kPurple, _kPurpleDeep],
+  //               begin: Alignment.topLeft,
+  //               end: Alignment.bottomRight,
+  //             ),
+  //           ),
+  //           padding: const EdgeInsets.fromLTRB(16, 4, 16, 22),
+  //           child: Column(
+  //             children: [
+  //               Row(
+  //                 children: [
+  //                   _mobileStat(icon: Icons.family_restroom_rounded, label: 'Families', value: grouped.length.toString()),
+  //                   const SizedBox(width: 10),
+  //                   _mobileStat(icon: Icons.people_alt_rounded, label: 'Students', value: totalStudents.toString()),
+  //                   const SizedBox(width: 10),
+  //                   _mobileStat(icon: Icons.how_to_reg_rounded, label: 'Admissions', value: admissions.length.toString()),
+  //                 ],
+  //               ),
+  //               const SizedBox(height: 16),
+  //               Container(
+  //                 decoration: BoxDecoration(
+  //                   color: Colors.white,
+  //                   borderRadius: BorderRadius.circular(14),
+  //                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))],
+  //                 ),
+  //                 child: TextField(
+  //                   controller: _searchCtrl,
+  //                   onChanged: (v) => setState(() => _searchQuery = v.trim()),
+  //                   decoration: InputDecoration(
+  //                     hintText: 'Family, father, phone se search...',
+  //                     hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.5),
+  //                     prefixIcon: const Icon(Icons.search_rounded, color: _kPurple, size: 21),
+  //                     suffixIcon: _searchQuery.isNotEmpty
+  //                         ? IconButton(
+  //                       icon: Icon(Icons.close_rounded, color: Colors.grey.shade400, size: 18),
+  //                       onPressed: () {
+  //                         _searchCtrl.clear();
+  //                         setState(() => _searchQuery = '');
+  //                       },
+  //                     )
+  //                         : null,
+  //                     border: InputBorder.none,
+  //                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+  //                   ),
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       ),
+  //       if (isLoading)
+  //         const SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: _kPurple)))
+  //       else if (filteredKeys.isEmpty)
+  //         SliverFillRemaining(child: _buildEmpty())
+  //       else
+  //         SliverPadding(
+  //           padding: const EdgeInsets.fromLTRB(14, 16, 14, 20),
+  //           sliver: SliverList(
+  //             delegate: SliverChildBuilderDelegate(
+  //                   (context, i) {
+  //                 final key = filteredKeys[i];
+  //                 final reps = grouped[key]!;
+  //                 return _MobileFamilyCard(
+  //                   admissions: reps,
+  //                   onLedgerTap: () => _openLedger(context, reps.first),
+  //                 );
+  //               },
+  //               childCount: filteredKeys.length,
+  //             ),
+  //           ),
+  //         ),
+  //     ],
+  //   );
+  // }
 
   Widget _mobileStat({required IconData icon, required String label, required String value}) {
     return Expanded(
@@ -1877,8 +2257,15 @@ class _DesktopFamilyDetail extends StatelessWidget {
   final String familyKey;
   final List<AdmissionModel> admissions;
   final VoidCallback onLedgerTap;
+  final VoidCallback onReportTap;
 
-  const _DesktopFamilyDetail({super.key, required this.familyKey, required this.admissions, required this.onLedgerTap});
+  const _DesktopFamilyDetail({
+    super.key,
+    required this.familyKey,
+    required this.admissions,
+    required this.onLedgerTap,
+    required this.onReportTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1939,6 +2326,19 @@ class _DesktopFamilyDetail extends StatelessWidget {
                       ],
                     ),
                   ),
+                  OutlinedButton.icon(
+                    onPressed: onReportTap,
+                    icon: const Icon(Icons.summarize_outlined, size: 16),
+                    label: const Text('Report'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _kPurple,
+                      side: const BorderSide(color: _kBorder),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+                      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   FilledButton.icon(
                     onPressed: onLedgerTap,
                     icon: const Icon(Icons.receipt_long_rounded, size: 17),
@@ -2381,6 +2781,13 @@ class FamilyDetailScreen extends StatelessWidget {
 
   const FamilyDetailScreen({super.key, required this.familyKey, required this.admissions});
 
+  void _openReport(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FamilyReportScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rep = admissions.first;
@@ -2401,6 +2808,14 @@ class FamilyDetailScreen extends StatelessWidget {
             backgroundColor: _kPurple,
             foregroundColor: Colors.white,
             actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: TextButton.icon(
+                  onPressed: () => _openReport(context),
+                  icon: const Icon(Icons.summarize_outlined, color: Colors.white, size: 18),
+                  label: const Text('Report', style: TextStyle(color: Colors.white)),
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: TextButton.icon(
