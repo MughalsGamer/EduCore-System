@@ -2,6 +2,20 @@
 // import 'package:cloud_firestore/cloud_firestore.dart';
 //
 // // ─────────────────────────────────────────────
+// //  Academy Model
+// // ─────────────────────────────────────────────
+// class Academy {
+//   final String id;
+//   final String name;
+//   Academy({required this.id, required this.name});
+//
+//   factory Academy.fromFirestore(DocumentSnapshot doc) {
+//     final data = doc.data() as Map<String, dynamic>;
+//     return Academy(id: doc.id, name: data['name'] ?? '');
+//   }
+// }
+//
+// // ─────────────────────────────────────────────
 // //  Admission Type Enum
 // // ─────────────────────────────────────────────
 // enum AdmissionType { preAdmission, regular }
@@ -17,10 +31,10 @@
 // }
 //
 // // ─────────────────────────────────────────────
-// //  Student Entry (per student inside one admission)
+// //  Student Entry
 // // ─────────────────────────────────────────────
 // class AdmissionStudent {
-//   String studentId;       // Auto-generated on name entry
+//   String studentId;
 //   String name;
 //   String? picBase64;
 //   String? classId;
@@ -28,11 +42,20 @@
 //   String? sectionId;
 //   String? sectionName;
 //   String? classRollNo;
-//   String? bFormCnic;      // Optional in Pre-Admission
+//   String? bFormCnic;
 //   DateTime? dob;
 //   double? annualFee;
 //   double? registrationFee;
 //   double? monthlyFee;
+//
+//   // ─── Institution selections ───
+//   bool hasSchool;
+//   bool hasAcademy;
+//
+//   // Academy
+//   String? academyId;
+//   String? academyName;
+//   double? academyFee;
 //
 //   AdmissionStudent({
 //     this.studentId = '',
@@ -48,6 +71,11 @@
 //     this.annualFee,
 //     this.registrationFee,
 //     this.monthlyFee,
+//     this.hasSchool = true,
+//     this.hasAcademy = false,
+//     this.academyId,
+//     this.academyName,
+//     this.academyFee,
 //   });
 //
 //   Map<String, dynamic> toMap() => {
@@ -64,6 +92,11 @@
 //     'annualFee': annualFee,
 //     'registrationFee': registrationFee,
 //     'monthlyFee': monthlyFee,
+//     'hasSchool': hasSchool,
+//     'hasAcademy': hasAcademy,
+//     'academyId': academyId,
+//     'academyName': academyName,
+//     'academyFee': academyFee,
 //   };
 //
 //   factory AdmissionStudent.fromMap(Map<String, dynamic> m) => AdmissionStudent(
@@ -80,6 +113,11 @@
 //     annualFee: m['annualFee']?.toDouble(),
 //     registrationFee: m['registrationFee']?.toDouble(),
 //     monthlyFee: m['monthlyFee']?.toDouble(),
+//     hasSchool: m['hasSchool'] ?? true,
+//     hasAcademy: m['hasAcademy'] ?? false,
+//     academyId: m['academyId'],
+//     academyName: m['academyName'],
+//     academyFee: m['academyFee']?.toDouble(),
 //   );
 //
 //   AdmissionStudent copyWith({
@@ -96,6 +134,11 @@
 //     double? annualFee,
 //     double? registrationFee,
 //     double? monthlyFee,
+//     bool? hasSchool,
+//     bool? hasAcademy,
+//     String? academyId,
+//     String? academyName,
+//     double? academyFee,
 //   }) =>
 //       AdmissionStudent(
 //         studentId: studentId ?? this.studentId,
@@ -111,6 +154,11 @@
 //         annualFee: annualFee ?? this.annualFee,
 //         registrationFee: registrationFee ?? this.registrationFee,
 //         monthlyFee: monthlyFee ?? this.monthlyFee,
+//         hasSchool: hasSchool ?? this.hasSchool,
+//         hasAcademy: hasAcademy ?? this.hasAcademy,
+//         academyId: academyId ?? this.academyId,
+//         academyName: academyName ?? this.academyName,
+//         academyFee: academyFee ?? this.academyFee,
 //       );
 // }
 //
@@ -120,33 +168,23 @@
 // class AdmissionModel {
 //   String? id;
 //   AdmissionType type;
-//
-//   // Auto-generated IDs
-//   String inquiryOrRegId;   // Inquiry ID (Pre) / Registration ID (Regular)
-//   DateTime admissionDate;  // Inquiry date / Registration date
-//
-//   // Previous school info
+//   String inquiryOrRegId;
+//   DateTime admissionDate;
 //   String? previousSchoolName;
 //   String? previousClassName;
 //   String? previousClassMarks;
-//
-//   // Family link
-//   String familyDocId;      // Firestore doc ID of the `families` collection entry (REQUIRED)
-//   String familyId;         // Human-readable family ID, e.g. KHA-0001
+//   String familyDocId;
+//   String familyId;
 //   String familyName;
-//
-//   // Parent Details (denormalized copy at time of this admission)
 //   String fatherName;
-//   String? fatherOccupation; // Optional in Pre-Admission
-//   String? fatherCnic;       // Optional in Pre-Admission
+//   String? fatherOccupation;
+//   String? fatherCnic;
 //   String fatherPhone;
 //   String motherName;
 //   String? motherCnic;
 //   String? motherPhone;
 //   String? caste;
 //   String? address;
-//
-//   // Students list (1 or more)
 //   List<AdmissionStudent> students;
 //
 //   AdmissionModel({
@@ -221,25 +259,11 @@
 //       caste: m['caste'],
 //       address: m['address'],
 //       students: (m['students'] as List<dynamic>?)
-//           ?.map((s) => AdmissionStudent.fromMap(s as Map<String, dynamic>))
+//           ?.map((s) =>
+//           AdmissionStudent.fromMap(s as Map<String, dynamic>))
 //           .toList() ??
 //           [AdmissionStudent()],
 //     );
-//   }
-//
-//   static List<AdmissionStudent> _parseStudents(dynamic raw) {
-//     if (raw == null) return [AdmissionStudent()];
-//     if (raw is List) {
-//       return raw
-//           .map((s) => AdmissionStudent.fromMap(Map<String, dynamic>.from(s as Map)))
-//           .toList();
-//     }
-//     if (raw is Map) {
-//       return raw.values
-//           .map((s) => AdmissionStudent.fromMap(Map<String, dynamic>.from(s as Map)))
-//           .toList();
-//     }
-//     return [AdmissionStudent()];
 //   }
 // }
 
@@ -276,6 +300,57 @@ extension AdmissionTypeExt on AdmissionType {
 }
 
 // ─────────────────────────────────────────────
+//  Student Status Enum (mirrors StaffMember's active/terminated pattern)
+// ─────────────────────────────────────────────
+enum StudentDeactivationReason { leftSchool, terminated }
+
+extension StudentDeactivationReasonExt on StudentDeactivationReason {
+  String get label => this == StudentDeactivationReason.leftSchool
+      ? 'Left School'
+      : 'Terminated';
+  String get value => this == StudentDeactivationReason.leftSchool
+      ? 'left_school'
+      : 'terminated';
+
+  static StudentDeactivationReason fromString(String? v) =>
+      v == 'terminated'
+          ? StudentDeactivationReason.terminated
+          : StudentDeactivationReason.leftSchool;
+}
+
+// ─────────────────────────────────────────────
+//  Student status history event (joined / deactivated / rejoined)
+// ─────────────────────────────────────────────
+class StudentStatusEvent {
+  String type; // 'joined' | 'deactivated' | 'rejoined'
+  String date; // ISO date string (yyyy-MM-dd)
+  String? reason; // only for 'deactivated' events
+  String? note;
+
+  StudentStatusEvent({
+    required this.type,
+    required this.date,
+    this.reason,
+    this.note,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'type': type,
+    'date': date,
+    'reason': reason,
+    'note': note,
+  };
+
+  factory StudentStatusEvent.fromMap(Map<String, dynamic> m) =>
+      StudentStatusEvent(
+        type: m['type'] ?? '',
+        date: m['date'] ?? '',
+        reason: m['reason'],
+        note: m['note'],
+      );
+}
+
+// ─────────────────────────────────────────────
 //  Student Entry
 // ─────────────────────────────────────────────
 class AdmissionStudent {
@@ -302,6 +377,13 @@ class AdmissionStudent {
   String? academyName;
   double? academyFee;
 
+  // ─── Status (active / deactivated) ───
+  bool isActive;
+  String? deactivationDate; // ISO date string
+  String? deactivationReason; // 'left_school' | 'terminated'
+  String? deactivationNote;
+  List<StudentStatusEvent> statusHistory;
+
   AdmissionStudent({
     this.studentId = '',
     this.name = '',
@@ -321,7 +403,12 @@ class AdmissionStudent {
     this.academyId,
     this.academyName,
     this.academyFee,
-  });
+    this.isActive = true,
+    this.deactivationDate,
+    this.deactivationReason,
+    this.deactivationNote,
+    List<StudentStatusEvent>? statusHistory,
+  }) : statusHistory = statusHistory ?? [];
 
   Map<String, dynamic> toMap() => {
     'studentId': studentId,
@@ -342,6 +429,11 @@ class AdmissionStudent {
     'academyId': academyId,
     'academyName': academyName,
     'academyFee': academyFee,
+    'isActive': isActive,
+    'deactivationDate': deactivationDate,
+    'deactivationReason': deactivationReason,
+    'deactivationNote': deactivationNote,
+    'statusHistory': statusHistory.map((e) => e.toMap()).toList(),
   };
 
   factory AdmissionStudent.fromMap(Map<String, dynamic> m) => AdmissionStudent(
@@ -363,6 +455,14 @@ class AdmissionStudent {
     academyId: m['academyId'],
     academyName: m['academyName'],
     academyFee: m['academyFee']?.toDouble(),
+    isActive: m['isActive'] ?? true,
+    deactivationDate: m['deactivationDate'],
+    deactivationReason: m['deactivationReason'],
+    deactivationNote: m['deactivationNote'],
+    statusHistory: (m['statusHistory'] as List<dynamic>?)
+        ?.map((e) => StudentStatusEvent.fromMap(Map<String, dynamic>.from(e as Map)))
+        .toList() ??
+        [],
   );
 
   AdmissionStudent copyWith({
@@ -384,6 +484,11 @@ class AdmissionStudent {
     String? academyId,
     String? academyName,
     double? academyFee,
+    bool? isActive,
+    String? deactivationDate,
+    String? deactivationReason,
+    String? deactivationNote,
+    List<StudentStatusEvent>? statusHistory,
   }) =>
       AdmissionStudent(
         studentId: studentId ?? this.studentId,
@@ -404,6 +509,11 @@ class AdmissionStudent {
         academyId: academyId ?? this.academyId,
         academyName: academyName ?? this.academyName,
         academyFee: academyFee ?? this.academyFee,
+        isActive: isActive ?? this.isActive,
+        deactivationDate: deactivationDate ?? this.deactivationDate,
+        deactivationReason: deactivationReason ?? this.deactivationReason,
+        deactivationNote: deactivationNote ?? this.deactivationNote,
+        statusHistory: statusHistory ?? this.statusHistory,
       );
 }
 
@@ -505,7 +615,7 @@ class AdmissionModel {
       address: m['address'],
       students: (m['students'] as List<dynamic>?)
           ?.map((s) =>
-          AdmissionStudent.fromMap(s as Map<String, dynamic>))
+          AdmissionStudent.fromMap(Map<String, dynamic>.from(s as Map)))
           .toList() ??
           [AdmissionStudent()],
     );

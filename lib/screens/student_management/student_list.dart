@@ -23,7 +23,6 @@
 //     super.dispose();
 //   }
 //
-//   // ── Filter bottom sheet ──
 //   void _showFilters(BuildContext context, StudentProvider provider) {
 //     showModalBottomSheet(
 //       context: context,
@@ -38,9 +37,8 @@
 //             final classes  = provider.allClassNames;
 //             String? selFamily  = provider.selectedFamilyId;
 //             String? selClass   = provider.selectedClassName;
-//             String? selSection = provider.selectedSectionName;   // NEW
+//             String? selSection = provider.selectedSectionName;
 //
-//             // Sections for the currently selected class (if any)
 //             final sections = selClass != null
 //                 ? provider.sectionsForClass(selClass!)
 //                 : <String>[];
@@ -51,7 +49,6 @@
 //                 mainAxisSize: MainAxisSize.min,
 //                 crossAxisAlignment: CrossAxisAlignment.start,
 //                 children: [
-//                   // Handle
 //                   Center(
 //                     child: Container(
 //                       width: 40, height: 4,
@@ -81,7 +78,6 @@
 //                   ),
 //                   const SizedBox(height: 16),
 //
-//                   // ── Family Filter ──
 //                   const Text('Family',
 //                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
 //                   const SizedBox(height: 8),
@@ -112,7 +108,6 @@
 //
 //                   const SizedBox(height: 20),
 //
-//                   // ── Class Filter ──
 //                   const Text('Class',
 //                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
 //                   const SizedBox(height: 8),
@@ -128,7 +123,7 @@
 //                           onTap: () {
 //                             setSheetState(() {
 //                               selClass = null;
-//                               selSection = null;   // clear section when class resets
+//                               selSection = null;
 //                             });
 //                             provider.setClassFilter(null);
 //                           },
@@ -139,7 +134,7 @@
 //                           onTap: () {
 //                             setSheetState(() {
 //                               selClass = c;
-//                               selSection = null;   // class changed → reset section
+//                               selSection = null;
 //                             });
 //                             provider.setClassFilter(c);
 //                           },
@@ -147,7 +142,6 @@
 //                       ],
 //                     ),
 //
-//                   // ── Section Filter (NEW) – only if class selected & has sections ──
 //                   if (selClass != null && sections.isNotEmpty) ...[
 //                     const SizedBox(height: 20),
 //                     Text('Section',
@@ -196,147 +190,6 @@
 //       },
 //     );
 //   }
-//   // void _showFilters(BuildContext context, StudentProvider provider) {
-//   //   showModalBottomSheet(
-//   //     context: context,
-//   //     isScrollControlled: true,
-//   //     shape: const RoundedRectangleBorder(
-//   //       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-//   //     ),
-//   //     builder: (ctx) {
-//   //       return StatefulBuilder(
-//   //         builder: (ctx, setSheetState) {
-//   //           final families = provider.allFamilies;
-//   //           final classes  = provider.allClassNames;
-//   //           String? selFamily = provider.selectedFamilyId;
-//   //           String? selClass  = provider.selectedClassName;
-//   //
-//   //           return Padding(
-//   //             padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-//   //             child: Column(
-//   //               mainAxisSize: MainAxisSize.min,
-//   //               crossAxisAlignment: CrossAxisAlignment.start,
-//   //               children: [
-//   //                 // Handle
-//   //                 Center(
-//   //                   child: Container(
-//   //                     width: 40,
-//   //                     height: 4,
-//   //                     decoration: BoxDecoration(
-//   //                       color: Colors.grey.shade300,
-//   //                       borderRadius: BorderRadius.circular(2),
-//   //                     ),
-//   //                   ),
-//   //                 ),
-//   //                 const SizedBox(height: 16),
-//   //                 Row(
-//   //                   children: [
-//   //                     const Text('Filters',
-//   //                         style: TextStyle(
-//   //                             fontSize: 18, fontWeight: FontWeight.bold)),
-//   //                     const Spacer(),
-//   //                     if (provider.hasActiveFilters)
-//   //                       TextButton(
-//   //                         onPressed: () {
-//   //                           provider.clearAllFilters();
-//   //                           _searchCtrl.clear();
-//   //                           Navigator.pop(ctx);
-//   //                         },
-//   //                         child: const Text('Clear All',
-//   //                             style: TextStyle(color: Colors.red)),
-//   //                       ),
-//   //                   ],
-//   //                 ),
-//   //                 const SizedBox(height: 16),
-//   //
-//   //                 // ── Family Filter ──
-//   //                 const Text('Family',
-//   //                     style: TextStyle(
-//   //                         fontSize: 13, fontWeight: FontWeight.w600)),
-//   //                 const SizedBox(height: 8),
-//   //                 if (families.isEmpty)
-//   //                   Text('No families found',
-//   //                       style: TextStyle(
-//   //                           color: Colors.grey.shade500, fontSize: 13))
-//   //                 else
-//   //                   Wrap(
-//   //                     spacing: 8,
-//   //                     runSpacing: 6,
-//   //                     children: [
-//   //                       _filterChip(
-//   //                         label: 'All',
-//   //                         selected: selFamily == null,
-//   //                         onTap: () {
-//   //                           setSheetState(() => selFamily = null);
-//   //                           provider.setFamilyFilter(null);
-//   //                         },
-//   //                       ),
-//   //                       ...families.map((f) => _filterChip(
-//   //                         label: '${f.value} (${f.key})',
-//   //                         selected: selFamily == f.key,
-//   //                         onTap: () {
-//   //                           setSheetState(() => selFamily = f.key);
-//   //                           provider.setFamilyFilter(f.key);
-//   //                         },
-//   //                       )),
-//   //                     ],
-//   //                   ),
-//   //
-//   //                 const SizedBox(height: 20),
-//   //
-//   //                 // ── Class Filter ──
-//   //                 const Text('Class',
-//   //                     style: TextStyle(
-//   //                         fontSize: 13, fontWeight: FontWeight.w600)),
-//   //                 const SizedBox(height: 8),
-//   //                 if (classes.isEmpty)
-//   //                   Text('No classes found',
-//   //                       style: TextStyle(
-//   //                           color: Colors.grey.shade500, fontSize: 13))
-//   //                 else
-//   //                   Wrap(
-//   //                     spacing: 8,
-//   //                     runSpacing: 6,
-//   //                     children: [
-//   //                       _filterChip(
-//   //                         label: 'All',
-//   //                         selected: selClass == null,
-//   //                         onTap: () {
-//   //                           setSheetState(() => selClass = null);
-//   //                           provider.setClassFilter(null);
-//   //                         },
-//   //                       ),
-//   //                       ...classes.map((c) => _filterChip(
-//   //                         label: c,
-//   //                         selected: selClass == c,
-//   //                         onTap: () {
-//   //                           setSheetState(() => selClass = c);
-//   //                           provider.setClassFilter(c);
-//   //                         },
-//   //                       )),
-//   //                     ],
-//   //                   ),
-//   //
-//   //                 const SizedBox(height: 20),
-//   //                 ElevatedButton(
-//   //                   onPressed: () => Navigator.pop(ctx),
-//   //                   style: ElevatedButton.styleFrom(
-//   //                     backgroundColor: _purple,
-//   //                     foregroundColor: Colors.white,
-//   //                     minimumSize: const Size(double.infinity, 46),
-//   //                     shape: RoundedRectangleBorder(
-//   //                         borderRadius: BorderRadius.circular(12)),
-//   //                   ),
-//   //                   child: const Text('Apply'),
-//   //                 ),
-//   //               ],
-//   //             ),
-//   //           );
-//   //         },
-//   //       );
-//   //     },
-//   //   );
-//   // }
 //
 //   Widget _filterChip({
 //     required String label,
@@ -382,7 +235,6 @@
 //               builder: (context, provider, _) {
 //                 return Row(
 //                   children: [
-//                     // Search bar
 //                     Expanded(
 //                       child: TextField(
 //                         controller: _searchCtrl,
@@ -411,7 +263,6 @@
 //                       ),
 //                     ),
 //                     const SizedBox(width: 8),
-//                     // Filter button
 //                     Stack(
 //                       clipBehavior: Clip.none,
 //                       children: [
@@ -489,12 +340,10 @@
 //
 //           return Column(
 //             children: [
-//               // Active filter chips
 //               if (provider.selectedFamilyId != null ||
 //                   provider.selectedClassName != null)
 //                 _buildActiveFilterBar(provider),
 //
-//               // Count
 //               Padding(
 //                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
 //                 child: Row(
@@ -562,7 +411,6 @@
 //               labelStyle: const TextStyle(color: Colors.blue),
 //               side: BorderSide(color: Colors.blue.withOpacity(0.3)),
 //             ),
-//           // ── NEW: Section chip ──
 //           if (provider.selectedSectionName != null)
 //             Chip(
 //               label: Text(
@@ -580,7 +428,6 @@
 //       ),
 //     );
 //   }
-//
 //
 //   Widget _buildEmpty(StudentProvider provider) {
 //     final bool hasFilters = provider.hasActiveFilters;
@@ -625,9 +472,6 @@
 //   }
 // }
 //
-// // ─────────────────────────────────────────────
-// //  Student Card  ← now StatelessWidget, navigates to profile on tap
-// // ─────────────────────────────────────────────
 // class _StudentCard extends StatelessWidget {
 //   final StudentWithContext data;
 //   const _StudentCard({required this.data, Key? key}) : super(key: key);
@@ -655,11 +499,8 @@
 //           padding: const EdgeInsets.all(12),
 //           child: Row(
 //             children: [
-//               // Avatar
 //               _avatar(s.picBase64),
 //               const SizedBox(width: 12),
-//
-//               // Name + Class + ID
 //               Expanded(
 //                 child: Column(
 //                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -689,8 +530,6 @@
 //                   ],
 //                 ),
 //               ),
-//
-//               // Reg/Inq badge
 //               Container(
 //                 padding:
 //                 const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -709,8 +548,6 @@
 //                 ),
 //               ),
 //               const SizedBox(width: 6),
-//
-//               // Arrow indicating tappable
 //               const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
 //             ],
 //           ),
@@ -737,8 +574,10 @@
 // }
 
 
+
 import 'dart:convert';
 import 'package:educoresystem/screens/student_management/student_profile.dart';
+import 'package:educoresystem/screens/student_management/terminated_students_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/admission_model.dart';
@@ -965,6 +804,16 @@ class _StudentListScreenState extends State<StudentListScreen> {
         title: const Text('Students'),
         centerTitle: true,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_off_outlined),
+            tooltip: 'Deactivated / Terminated Students',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TerminatedStudentsScreen()),
+            ),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(
@@ -1210,11 +1059,46 @@ class _StudentListScreenState extends State<StudentListScreen> {
   }
 }
 
+// ─────────────────────────────────────────────
+//  Student Card
+// ─────────────────────────────────────────────
 class _StudentCard extends StatelessWidget {
   final StudentWithContext data;
   const _StudentCard({required this.data, Key? key}) : super(key: key);
 
   static const _purple = Color(0xFF534AB7);
+  static const _red = Color(0xFFB91C1C);
+
+  Future<void> _confirmDeactivate(BuildContext context) async {
+    final result = await showDialog<_DeactivateResult>(
+      context: context,
+      builder: (_) => _DeactivateStudentDialog(studentName: data.student.name),
+    );
+    if (result == null || !context.mounted) return;
+
+    try {
+      await context.read<StudentProvider>().deactivateStudent(
+        context: data,
+        reason: result.reason,
+        date: result.date,
+        note: result.note,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${data.student.name} has been deactivated'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1286,7 +1170,43 @@ class _StudentCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
+                onSelected: (value) {
+                  if (value == 'deactivate') {
+                    _confirmDeactivate(context);
+                  } else if (value == 'view') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => StudentProfileScreen(data: data),
+                      ),
+                    );
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'view',
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_outline, size: 18, color: _purple),
+                        SizedBox(width: 10),
+                        Text('View Profile'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'deactivate',
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_off_outlined, size: 18, color: _red),
+                        SizedBox(width: 10),
+                        Text('Deactivate', style: TextStyle(color: _red)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -1307,6 +1227,170 @@ class _StudentCard extends StatelessWidget {
       radius: 28,
       backgroundColor: Colors.purple.shade50,
       child: const Icon(Icons.person, size: 26, color: _purple),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Deactivate dialog — reason + date (defaults to today) + note
+// ─────────────────────────────────────────────
+class _DeactivateResult {
+  final String reason; // 'left_school' | 'terminated'
+  final DateTime date;
+  final String? note;
+  _DeactivateResult({required this.reason, required this.date, this.note});
+}
+
+class _DeactivateStudentDialog extends StatefulWidget {
+  final String studentName;
+  const _DeactivateStudentDialog({required this.studentName});
+
+  @override
+  State<_DeactivateStudentDialog> createState() =>
+      _DeactivateStudentDialogState();
+}
+
+class _DeactivateStudentDialogState extends State<_DeactivateStudentDialog> {
+  static const _purple = Color(0xFF534AB7);
+  String _reason = 'left_school';
+  DateTime _date = DateTime.now();
+  final _noteCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  String _formatDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      title: const Text('Deactivate Student',
+          style: TextStyle(fontWeight: FontWeight.w600)),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('"${widget.studentName}" will be moved to the Deactivated list.'),
+            const SizedBox(height: 16),
+            const Text('Reason *',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _reasonChip(
+                    label: 'Left School',
+                    value: 'left_school',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _reasonChip(
+                    label: 'Terminated',
+                    value: 'terminated',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text('Date *',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+            const SizedBox(height: 2),
+            Text('Defaults to today — tap to change if needed.',
+                style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500)),
+            const SizedBox(height: 6),
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _date,
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                );
+                if (picked != null) setState(() => _date = picked);
+              },
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  isDense: true,
+                  suffixIcon: const Icon(Icons.calendar_today, size: 16),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: Text(_formatDate(_date)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Note (optional)',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _noteCtrl,
+              maxLines: 2,
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: 'e.g. Family relocated to another city',
+                hintStyle: const TextStyle(fontSize: 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFB91C1C),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          onPressed: () {
+            Navigator.pop(
+              context,
+              _DeactivateResult(
+                reason: _reason,
+                date: _date,
+                note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+              ),
+            );
+          },
+          child: const Text('Deactivate'),
+        ),
+      ],
+    );
+  }
+
+  Widget _reasonChip({required String label, required String value}) {
+    final selected = _reason == value;
+    return GestureDetector(
+      onTap: () => setState(() => _reason = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? _purple : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: selected ? _purple : Colors.grey.shade300),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : Colors.black87,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
