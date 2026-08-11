@@ -1,9 +1,13 @@
 //
 // import 'dart:convert';
 // import 'package:educoresystem/screens/student_management/student_profile.dart';
+// import 'package:educoresystem/screens/student_management/terminated_students_screen.dart';
 // import 'package:flutter/material.dart';
 // import 'package:provider/provider.dart';
 // import '../../models/admission_model.dart';
+// import '../../models/class_model.dart';
+// import '../../providers/admission_provider.dart';
+// import '../../providers/class_provider.dart';
 // import '../../providers/student_provider.dart';
 //
 // class StudentListScreen extends StatefulWidget {
@@ -227,6 +231,16 @@
 //         title: const Text('Students'),
 //         centerTitle: true,
 //         elevation: 0,
+//         actions: [
+//           IconButton(
+//             icon: const Icon(Icons.person_off_outlined),
+//             tooltip: 'Deactivated / Terminated Students',
+//             onPressed: () => Navigator.push(
+//               context,
+//               MaterialPageRoute(builder: (_) => const TerminatedStudentsScreen()),
+//             ),
+//           ),
+//         ],
 //         bottom: PreferredSize(
 //           preferredSize: const Size.fromHeight(60),
 //           child: Padding(
@@ -472,11 +486,85 @@
 //   }
 // }
 //
+// // ─────────────────────────────────────────────
+// //  Student Card
+// // ─────────────────────────────────────────────
 // class _StudentCard extends StatelessWidget {
 //   final StudentWithContext data;
 //   const _StudentCard({required this.data, Key? key}) : super(key: key);
 //
 //   static const _purple = Color(0xFF534AB7);
+//   static const _red = Color(0xFFB91C1C);
+//
+//   Future<void> _confirmDeactivate(BuildContext context) async {
+//     final result = await showDialog<_DeactivateResult>(
+//       context: context,
+//       builder: (_) => _DeactivateStudentDialog(studentName: data.student.name),
+//     );
+//     if (result == null || !context.mounted) return;
+//
+//     try {
+//       await context.read<StudentProvider>().deactivateStudent(
+//         context: data,
+//         reason: result.reason,
+//         date: result.date,
+//         note: result.note,
+//       );
+//       if (context.mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           SnackBar(
+//             content: Text('${data.student.name} has been deactivated'),
+//             backgroundColor: Colors.green,
+//           ),
+//         );
+//       }
+//     } catch (e) {
+//       if (context.mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
+//         );
+//       }
+//     }
+//   }
+//
+//   Future<void> _confirmPromote(BuildContext context) async {
+//     final result = await showDialog<_PromoteResult>(
+//       context: context,
+//       builder: (_) => _PromoteStudentDialog(data: data),
+//     );
+//     if (result == null || !context.mounted) return;
+//
+//     try {
+//       await context.read<StudentProvider>().promoteStudent(
+//         context: data,
+//         action: result.action,
+//         date: result.date,
+//         note: result.note,
+//         classId: result.classId,
+//         className: result.className,
+//         sectionId: result.sectionId,
+//         sectionName: result.sectionName,
+//         monthlyFee: result.monthlyFee,
+//         annualFee: result.annualFee,
+//         registrationFee: result.registrationFee,
+//       );
+//       if (context.mounted) {
+//         final label = result.action == 'promoted' ? 'promoted' : 'demoted';
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           SnackBar(
+//             content: Text('${data.student.name} $label to ${result.className}'),
+//             backgroundColor: Colors.green,
+//           ),
+//         );
+//       }
+//     } catch (e) {
+//       if (context.mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
+//         );
+//       }
+//     }
+//   }
 //
 //   @override
 //   Widget build(BuildContext context) {
@@ -548,7 +636,55 @@
 //                 ),
 //               ),
 //               const SizedBox(width: 6),
-//               const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+//               PopupMenuButton<String>(
+//                 icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
+//                 onSelected: (value) {
+//                   if (value == 'deactivate') {
+//                     _confirmDeactivate(context);
+//                   } else if (value == 'view') {
+//                     Navigator.push(
+//                       context,
+//                       MaterialPageRoute(
+//                         builder: (_) => StudentProfileScreen(data: data),
+//                       ),
+//                     );
+//                   } else if (value == 'promote') {
+//                     _confirmPromote(context);
+//                   }
+//                 },
+//                 itemBuilder: (context) => [
+//                   const PopupMenuItem(
+//                     value: 'view',
+//                     child: Row(
+//                       children: [
+//                         Icon(Icons.person_outline, size: 18, color: _purple),
+//                         SizedBox(width: 10),
+//                         Text('View Profile'),
+//                       ],
+//                     ),
+//                   ),
+//                   const PopupMenuItem(
+//                     value: 'promote',
+//                     child: Row(
+//                       children: [
+//                         Icon(Icons.trending_up, size: 18, color: Colors.blue),
+//                         SizedBox(width: 10),
+//                         Text('Promote / Demote Class', style: TextStyle(color: Colors.blue)),
+//                       ],
+//                     ),
+//                   ),
+//                   const PopupMenuItem(
+//                     value: 'deactivate',
+//                     child: Row(
+//                       children: [
+//                         Icon(Icons.person_off_outlined, size: 18, color: _red),
+//                         SizedBox(width: 10),
+//                         Text('Deactivate', style: TextStyle(color: _red)),
+//                       ],
+//                     ),
+//                   ),
+//                 ],
+//               ),
 //             ],
 //           ),
 //         ),
@@ -572,7 +708,486 @@
 //     );
 //   }
 // }
-
+//
+// // ─────────────────────────────────────────────
+// //  Deactivate dialog — reason + date (defaults to today) + note
+// // ─────────────────────────────────────────────
+// class _DeactivateResult {
+//   final String reason; // 'left_school' | 'terminated'
+//   final DateTime date;
+//   final String? note;
+//   _DeactivateResult({required this.reason, required this.date, this.note});
+// }
+//
+// class _DeactivateStudentDialog extends StatefulWidget {
+//   final String studentName;
+//   const _DeactivateStudentDialog({required this.studentName});
+//
+//   @override
+//   State<_DeactivateStudentDialog> createState() =>
+//       _DeactivateStudentDialogState();
+// }
+//
+// class _DeactivateStudentDialogState extends State<_DeactivateStudentDialog> {
+//   static const _purple = Color(0xFF534AB7);
+//   String _reason = 'left_school';
+//   DateTime _date = DateTime.now();
+//   final _noteCtrl = TextEditingController();
+//
+//   @override
+//   void dispose() {
+//     _noteCtrl.dispose();
+//     super.dispose();
+//   }
+//
+//   String _formatDate(DateTime d) =>
+//       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return AlertDialog(
+//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+//       title: const Text('Deactivate Student',
+//           style: TextStyle(fontWeight: FontWeight.w600)),
+//       content: SingleChildScrollView(
+//         child: Column(
+//           mainAxisSize: MainAxisSize.min,
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             Text('"${widget.studentName}" will be moved to the Deactivated list.'),
+//             const SizedBox(height: 16),
+//             const Text('Reason *',
+//                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+//             const SizedBox(height: 8),
+//             Row(
+//               children: [
+//                 Expanded(
+//                   child: _reasonChip(
+//                     label: 'Left School',
+//                     value: 'left_school',
+//                   ),
+//                 ),
+//                 const SizedBox(width: 8),
+//                 Expanded(
+//                   child: _reasonChip(
+//                     label: 'Terminated',
+//                     value: 'terminated',
+//                   ),
+//                 ),
+//               ],
+//             ),
+//             const SizedBox(height: 16),
+//             const Text('Date *',
+//                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+//             const SizedBox(height: 2),
+//             Text('Defaults to today — tap to change if needed.',
+//                 style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500)),
+//             const SizedBox(height: 6),
+//             InkWell(
+//               onTap: () async {
+//                 final picked = await showDatePicker(
+//                   context: context,
+//                   initialDate: _date,
+//                   firstDate: DateTime(2000),
+//                   lastDate: DateTime(2100),
+//                 );
+//                 if (picked != null) setState(() => _date = picked);
+//               },
+//               child: InputDecorator(
+//                 decoration: InputDecoration(
+//                   isDense: true,
+//                   suffixIcon: const Icon(Icons.calendar_today, size: 16),
+//                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+//                 ),
+//                 child: Text(_formatDate(_date)),
+//               ),
+//             ),
+//             const SizedBox(height: 16),
+//             const Text('Note (optional)',
+//                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+//             const SizedBox(height: 6),
+//             TextField(
+//               controller: _noteCtrl,
+//               maxLines: 2,
+//               decoration: InputDecoration(
+//                 isDense: true,
+//                 hintText: 'e.g. Family relocated to another city',
+//                 hintStyle: const TextStyle(fontSize: 12),
+//                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//       actions: [
+//         TextButton(
+//           onPressed: () => Navigator.pop(context),
+//           child: const Text('Cancel'),
+//         ),
+//         ElevatedButton(
+//           style: ElevatedButton.styleFrom(
+//             backgroundColor: const Color(0xFFB91C1C),
+//             foregroundColor: Colors.white,
+//             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+//           ),
+//           onPressed: () {
+//             Navigator.pop(
+//               context,
+//               _DeactivateResult(
+//                 reason: _reason,
+//                 date: _date,
+//                 note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+//               ),
+//             );
+//           },
+//           child: const Text('Deactivate'),
+//         ),
+//       ],
+//     );
+//   }
+//
+//   Widget _reasonChip({required String label, required String value}) {
+//     final selected = _reason == value;
+//     return GestureDetector(
+//       onTap: () => setState(() => _reason = value),
+//       child: AnimatedContainer(
+//         duration: const Duration(milliseconds: 150),
+//         padding: const EdgeInsets.symmetric(vertical: 10),
+//         decoration: BoxDecoration(
+//           color: selected ? _purple : Colors.grey.shade100,
+//           borderRadius: BorderRadius.circular(8),
+//           border: Border.all(color: selected ? _purple : Colors.grey.shade300),
+//         ),
+//         child: Center(
+//           child: Text(
+//             label,
+//             style: TextStyle(
+//               fontSize: 13,
+//               fontWeight: FontWeight.w600,
+//               color: selected ? Colors.white : Colors.black87,
+//             ),
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
+//
+// // ─────────────────────────────────────────────
+// //  Promote / Demote dialog — pick new class, section & fees (admission-form style)
+// // ─────────────────────────────────────────────
+// class _PromoteResult {
+//   final String action; // 'promoted' | 'demoted'
+//   final DateTime date;
+//   final String classId;
+//   final String className;
+//   final String? sectionId;
+//   final String? sectionName;
+//   final double? monthlyFee;
+//   final double? annualFee;
+//   final double? registrationFee;
+//   final String? note;
+//   _PromoteResult({
+//     required this.action,
+//     required this.date,
+//     required this.classId,
+//     required this.className,
+//     this.sectionId,
+//     this.sectionName,
+//     this.monthlyFee,
+//     this.annualFee,
+//     this.registrationFee,
+//     this.note,
+//   });
+// }
+//
+// class _PromoteStudentDialog extends StatefulWidget {
+//   final StudentWithContext data;
+//   const _PromoteStudentDialog({required this.data});
+//
+//   @override
+//   State<_PromoteStudentDialog> createState() => _PromoteStudentDialogState();
+// }
+//
+// class _PromoteStudentDialogState extends State<_PromoteStudentDialog> {
+//   static const _purple = Color(0xFF534AB7);
+//
+//   String _action = 'promoted';
+//   DateTime _date = DateTime.now();
+//   String? _classId;
+//   String? _className;
+//   String? _sectionId;
+//   String? _sectionName;
+//   bool _loadingFees = false;
+//
+//   late TextEditingController _monthlyCtrl;
+//   late TextEditingController _annualCtrl;
+//   late TextEditingController _regCtrl;
+//   late TextEditingController _noteCtrl;
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     final s = widget.data.student;
+//     _monthlyCtrl = TextEditingController(text: s.monthlyFee?.toStringAsFixed(0) ?? '');
+//     _annualCtrl = TextEditingController(text: s.annualFee?.toStringAsFixed(0) ?? '');
+//     _regCtrl = TextEditingController(text: s.registrationFee?.toStringAsFixed(0) ?? '');
+//     _noteCtrl = TextEditingController();
+//   }
+//
+//   @override
+//   void dispose() {
+//     _monthlyCtrl.dispose();
+//     _annualCtrl.dispose();
+//     _regCtrl.dispose();
+//     _noteCtrl.dispose();
+//     super.dispose();
+//   }
+//
+//   String _formatDate(DateTime d) =>
+//       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+//
+//   double? _parse(String v) => v.trim().isEmpty ? null : double.tryParse(v.trim());
+//
+//   Future<void> _fetchFees() async {
+//     if (_classId == null) return;
+//     setState(() => _loadingFees = true);
+//     try {
+//       final fees = await context.read<AdmissionProvider>().fetchFees(_classId!, _sectionName);
+//       if (!mounted) return;
+//       setState(() {
+//         if (fees['monthlyFee'] != null) _monthlyCtrl.text = fees['monthlyFee']!.toStringAsFixed(0);
+//         if (fees['annualFee'] != null) _annualCtrl.text = fees['annualFee']!.toStringAsFixed(0);
+//         if (fees['registrationFee'] != null) _regCtrl.text = fees['registrationFee']!.toStringAsFixed(0);
+//         _loadingFees = false;
+//       });
+//     } catch (e) {
+//       if (mounted) setState(() => _loadingFees = false);
+//     }
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     final s = widget.data.student;
+//     final classes = context.watch<ClassProvider>().classes;
+//
+//     SchoolClass? selectedClass;
+//     if (_classId != null) {
+//       try {
+//         selectedClass = classes.firstWhere((c) => c.id == _classId);
+//       } catch (_) {}
+//     }
+//     final sections = selectedClass?.sections ?? [];
+//
+//     return AlertDialog(
+//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+//       title: const Text('Promote / Demote Student', style: TextStyle(fontWeight: FontWeight.w600)),
+//       content: SingleChildScrollView(
+//         child: Column(
+//           mainAxisSize: MainAxisSize.min,
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             Text(
+//               'Current Class: ${s.className ?? '—'}'
+//                   '${(s.sectionName != null && s.sectionName!.isNotEmpty) ? ' — ${s.sectionName}' : ''}',
+//               style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w600),
+//             ),
+//             const SizedBox(height: 16),
+//
+//             const Text('Action *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+//             const SizedBox(height: 8),
+//             Row(
+//               children: [
+//                 Expanded(child: _actionChip(label: '⬆ Promote', value: 'promoted')),
+//                 const SizedBox(width: 8),
+//                 Expanded(child: _actionChip(label: '⬇ Demote', value: 'demoted')),
+//               ],
+//             ),
+//             const SizedBox(height: 16),
+//
+//             const Text('Date *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+//             const SizedBox(height: 6),
+//             InkWell(
+//               onTap: () async {
+//                 final picked = await showDatePicker(
+//                   context: context,
+//                   initialDate: _date,
+//                   firstDate: DateTime(2000),
+//                   lastDate: DateTime(2100),
+//                 );
+//                 if (picked != null) setState(() => _date = picked);
+//               },
+//               child: InputDecorator(
+//                 decoration: InputDecoration(
+//                   isDense: true,
+//                   suffixIcon: const Icon(Icons.calendar_today, size: 16),
+//                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+//                 ),
+//                 child: Text(_formatDate(_date)),
+//               ),
+//             ),
+//             const SizedBox(height: 16),
+//
+//             const Text('New Class *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+//             const SizedBox(height: 6),
+//             DropdownButtonFormField<String>(
+//               value: classes.any((c) => c.id == _classId) ? _classId : null,
+//               decoration: InputDecoration(
+//                 isDense: true,
+//                 hintText: 'Select new class',
+//                 prefixIcon: const Icon(Icons.class_, size: 18),
+//                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+//               ),
+//               items: classes.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+//               onChanged: (val) async {
+//                 final newClass = classes.firstWhere((c) => c.id == val);
+//                 setState(() {
+//                   _classId = val;
+//                   _className = newClass.name;
+//                   if (newClass.sections.length == 1) {
+//                     _sectionId = newClass.sections.first.sectionName;
+//                     _sectionName = newClass.sections.first.sectionName;
+//                   } else {
+//                     _sectionId = null;
+//                     _sectionName = null;
+//                   }
+//                 });
+//                 await _fetchFees();
+//               },
+//             ),
+//             if (sections.isNotEmpty) ...[
+//               const SizedBox(height: 10),
+//               DropdownButtonFormField<String>(
+//                 value: sections.any((sec) => sec.sectionName == _sectionName) ? _sectionName : null,
+//                 decoration: InputDecoration(
+//                   isDense: true,
+//                   labelText: 'Section',
+//                   prefixIcon: const Icon(Icons.group_outlined, size: 18),
+//                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+//                 ),
+//                 items: sections
+//                     .map((sec) => DropdownMenuItem(value: sec.sectionName, child: Text(sec.sectionName)))
+//                     .toList(),
+//                 onChanged: (val) async {
+//                   setState(() {
+//                     _sectionName = val;
+//                     _sectionId = val;
+//                   });
+//                   await _fetchFees();
+//                 },
+//               ),
+//             ],
+//             const SizedBox(height: 18),
+//
+//             Row(
+//               children: [
+//                 Icon(Icons.payments_outlined, size: 15, color: _purple),
+//                 const SizedBox(width: 6),
+//                 const Text('Fee Structure', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+//                 if (_loadingFees) ...[
+//                   const SizedBox(width: 8),
+//                   const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+//                 ],
+//               ],
+//             ),
+//             const SizedBox(height: 8),
+//             _field('Monthly Fee', _monthlyCtrl, isNumber: true),
+//             const SizedBox(height: 10),
+//             Row(
+//               children: [
+//                 Expanded(child: _field('Annual Fee', _annualCtrl, isNumber: true)),
+//                 const SizedBox(width: 8),
+//                 Expanded(child: _field('Registration Fee', _regCtrl, isNumber: true)),
+//               ],
+//             ),
+//             const SizedBox(height: 16),
+//
+//             const Text('Note (optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+//             const SizedBox(height: 6),
+//             TextField(
+//               controller: _noteCtrl,
+//               maxLines: 2,
+//               decoration: InputDecoration(
+//                 isDense: true,
+//                 hintText: 'e.g. Annual result based promotion',
+//                 hintStyle: const TextStyle(fontSize: 12),
+//                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//       actions: [
+//         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+//         ElevatedButton(
+//           style: ElevatedButton.styleFrom(
+//             backgroundColor: _purple,
+//             foregroundColor: Colors.white,
+//             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+//           ),
+//           onPressed: () {
+//             if (_classId == null) {
+//               ScaffoldMessenger.of(context)
+//                   .showSnackBar(const SnackBar(content: Text('Please select the new class')));
+//               return;
+//             }
+//             Navigator.pop(
+//               context,
+//               _PromoteResult(
+//                 action: _action,
+//                 date: _date,
+//                 classId: _classId!,
+//                 className: _className ?? '',
+//                 sectionId: _sectionId,
+//                 sectionName: _sectionName,
+//                 monthlyFee: _parse(_monthlyCtrl.text),
+//                 annualFee: _parse(_annualCtrl.text),
+//                 registrationFee: _parse(_regCtrl.text),
+//                 note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+//               ),
+//             );
+//           },
+//           child: const Text('Confirm'),
+//         ),
+//       ],
+//     );
+//   }
+//
+//   Widget _actionChip({required String label, required String value}) {
+//     final selected = _action == value;
+//     return GestureDetector(
+//       onTap: () => setState(() => _action = value),
+//       child: AnimatedContainer(
+//         duration: const Duration(milliseconds: 150),
+//         padding: const EdgeInsets.symmetric(vertical: 10),
+//         decoration: BoxDecoration(
+//           color: selected ? _purple : Colors.grey.shade100,
+//           borderRadius: BorderRadius.circular(8),
+//           border: Border.all(color: selected ? _purple : Colors.grey.shade300),
+//         ),
+//         child: Center(
+//           child: Text(label,
+//               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: selected ? Colors.white : Colors.black87)),
+//         ),
+//       ),
+//     );
+//   }
+//
+//   Widget _field(String label, TextEditingController ctrl, {bool isNumber = false}) {
+//     return TextField(
+//       controller: ctrl,
+//       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+//       style: const TextStyle(fontSize: 13),
+//       decoration: InputDecoration(
+//         labelText: label,
+//         labelStyle: const TextStyle(fontSize: 12),
+//         isDense: true,
+//         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+//         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+//       ),
+//     );
+//   }
+// }
 
 
 import 'dart:convert';
@@ -581,6 +1196,9 @@ import 'package:educoresystem/screens/student_management/terminated_students_scr
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/admission_model.dart';
+import '../../models/class_model.dart';
+import '../../providers/admission_provider.dart';
+import '../../providers/class_provider.dart';
 import '../../providers/student_provider.dart';
 
 class StudentListScreen extends StatefulWidget {
@@ -1100,6 +1718,45 @@ class _StudentCard extends StatelessWidget {
     }
   }
 
+  Future<void> _confirmPromote(BuildContext context) async {
+    final result = await showDialog<_PromoteResult>(
+      context: context,
+      builder: (_) => _PromoteStudentDialog(data: data),
+    );
+    if (result == null || !context.mounted) return;
+
+    try {
+      await context.read<StudentProvider>().promoteStudent(
+        context: data,
+        action: result.action,
+        date: result.date,
+        note: result.note,
+        classId: result.classId,
+        className: result.className,
+        sectionId: result.sectionId,
+        sectionName: result.sectionName,
+        monthlyFee: result.monthlyFee,
+        annualFee: result.annualFee,
+        academyFee: result.academyFee,
+      );
+      if (context.mounted) {
+        final label = result.action == 'promoted' ? 'promoted' : 'demoted';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${data.student.name} $label to ${result.className}'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = data.student;
@@ -1182,6 +1839,8 @@ class _StudentCard extends StatelessWidget {
                         builder: (_) => StudentProfileScreen(data: data),
                       ),
                     );
+                  } else if (value == 'promote') {
+                    _confirmPromote(context);
                   }
                 },
                 itemBuilder: (context) => [
@@ -1192,6 +1851,16 @@ class _StudentCard extends StatelessWidget {
                         Icon(Icons.person_outline, size: 18, color: _purple),
                         SizedBox(width: 10),
                         Text('View Profile'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'promote',
+                    child: Row(
+                      children: [
+                        Icon(Icons.trending_up, size: 18, color: Colors.blue),
+                        SizedBox(width: 10),
+                        Text('Promote / Demote Class', style: TextStyle(color: Colors.blue)),
                       ],
                     ),
                   ),
@@ -1390,6 +2059,322 @@ class _DeactivateStudentDialogState extends State<_DeactivateStudentDialog> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Promote / Demote dialog — pick new class, section & fees (admission-form style)
+// ─────────────────────────────────────────────
+class _PromoteResult {
+  final String action; // 'promoted' | 'demoted'
+  final DateTime date;
+  final String classId;
+  final String className;
+  final String? sectionId;
+  final String? sectionName;
+  final double? monthlyFee;
+  final double? annualFee;
+  final double? academyFee;
+  final String? note;
+  _PromoteResult({
+    required this.action,
+    required this.date,
+    required this.classId,
+    required this.className,
+    this.sectionId,
+    this.sectionName,
+    this.monthlyFee,
+    this.annualFee,
+    this.academyFee,
+    this.note,
+  });
+}
+
+class _PromoteStudentDialog extends StatefulWidget {
+  final StudentWithContext data;
+  const _PromoteStudentDialog({required this.data});
+
+  @override
+  State<_PromoteStudentDialog> createState() => _PromoteStudentDialogState();
+}
+
+class _PromoteStudentDialogState extends State<_PromoteStudentDialog> {
+  static const _purple = Color(0xFF534AB7);
+
+  String _action = 'promoted';
+  DateTime _date = DateTime.now();
+  String? _classId;
+  String? _className;
+  String? _sectionId;
+  String? _sectionName;
+  bool _loadingFees = false;
+
+  late TextEditingController _monthlyCtrl;
+  late TextEditingController _annualCtrl;
+  late TextEditingController _academyCtrl;
+  late TextEditingController _noteCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    final s = widget.data.student;
+    _monthlyCtrl = TextEditingController(text: s.monthlyFee?.toStringAsFixed(0) ?? '');
+    _annualCtrl = TextEditingController(text: s.annualFee?.toStringAsFixed(0) ?? '');
+    _academyCtrl = TextEditingController(text: s.academyFee?.toStringAsFixed(0) ?? '');
+    _noteCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _monthlyCtrl.dispose();
+    _annualCtrl.dispose();
+    _academyCtrl.dispose();
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  String _formatDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  double? _parse(String v) => v.trim().isEmpty ? null : double.tryParse(v.trim());
+
+  Future<void> _fetchFees() async {
+    if (_classId == null) return;
+    setState(() => _loadingFees = true);
+    try {
+      final fees = await context.read<AdmissionProvider>().fetchFees(_classId!, _sectionName);
+      if (!mounted) return;
+      setState(() {
+        if (fees['monthlyFee'] != null) _monthlyCtrl.text = fees['monthlyFee']!.toStringAsFixed(0);
+        if (fees['annualFee'] != null) _annualCtrl.text = fees['annualFee']!.toStringAsFixed(0);
+        if (fees['academyFee'] != null) _academyCtrl.text = fees['academyFee']!.toStringAsFixed(0);
+        _loadingFees = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _loadingFees = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.data.student;
+    final classes = context.watch<ClassProvider>().classes;
+
+    SchoolClass? selectedClass;
+    if (_classId != null) {
+      try {
+        selectedClass = classes.firstWhere((c) => c.id == _classId);
+      } catch (_) {}
+    }
+    final sections = selectedClass?.sections ?? [];
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      title: const Text('Promote / Demote Student', style: TextStyle(fontWeight: FontWeight.w600)),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Current Class: ${s.className ?? '—'}'
+                  '${(s.sectionName != null && s.sectionName!.isNotEmpty) ? ' — ${s.sectionName}' : ''}',
+              style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+
+            const Text('Action *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _actionChip(label: '⬆ Promote', value: 'promoted')),
+                const SizedBox(width: 8),
+                Expanded(child: _actionChip(label: '⬇ Demote', value: 'demoted')),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            const Text('Date *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+            const SizedBox(height: 6),
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _date,
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                );
+                if (picked != null) setState(() => _date = picked);
+              },
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  isDense: true,
+                  suffixIcon: const Icon(Icons.calendar_today, size: 16),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: Text(_formatDate(_date)),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            const Text('New Class *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+            const SizedBox(height: 6),
+            DropdownButtonFormField<String>(
+              value: classes.any((c) => c.id == _classId) ? _classId : null,
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: 'Select new class',
+                prefixIcon: const Icon(Icons.class_, size: 18),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              items: classes.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+              onChanged: (val) async {
+                final newClass = classes.firstWhere((c) => c.id == val);
+                setState(() {
+                  _classId = val;
+                  _className = newClass.name;
+                  if (newClass.sections.length == 1) {
+                    _sectionId = newClass.sections.first.sectionName;
+                    _sectionName = newClass.sections.first.sectionName;
+                  } else {
+                    _sectionId = null;
+                    _sectionName = null;
+                  }
+                });
+                await _fetchFees();
+              },
+            ),
+            if (sections.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: sections.any((sec) => sec.sectionName == _sectionName) ? _sectionName : null,
+                decoration: InputDecoration(
+                  isDense: true,
+                  labelText: 'Section',
+                  prefixIcon: const Icon(Icons.group_outlined, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                items: sections
+                    .map((sec) => DropdownMenuItem(value: sec.sectionName, child: Text(sec.sectionName)))
+                    .toList(),
+                onChanged: (val) async {
+                  setState(() {
+                    _sectionName = val;
+                    _sectionId = val;
+                  });
+                  await _fetchFees();
+                },
+              ),
+            ],
+            const SizedBox(height: 18),
+
+            Row(
+              children: [
+                Icon(Icons.payments_outlined, size: 15, color: _purple),
+                const SizedBox(width: 6),
+                const Text('Fee Structure', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+                if (_loadingFees) ...[
+                  const SizedBox(width: 8),
+                  const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+                ],
+              ],
+            ),
+            const SizedBox(height: 8),
+            _field('Monthly Fee', _monthlyCtrl, isNumber: true),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: _field('Annual Fee', _annualCtrl, isNumber: true)),
+                const SizedBox(width: 8),
+                Expanded(child: _field('Academy Fee', _academyCtrl, isNumber: true)),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            const Text('Note (optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _noteCtrl,
+              maxLines: 2,
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: 'e.g. Annual result based promotion',
+                hintStyle: const TextStyle(fontSize: 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _purple,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          onPressed: () {
+            if (_classId == null) {
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(const SnackBar(content: Text('Please select the new class')));
+              return;
+            }
+            Navigator.pop(
+              context,
+              _PromoteResult(
+                action: _action,
+                date: _date,
+                classId: _classId!,
+                className: _className ?? '',
+                sectionId: _sectionId,
+                sectionName: _sectionName,
+                monthlyFee: _parse(_monthlyCtrl.text),
+                annualFee: _parse(_annualCtrl.text),
+                academyFee: _parse(_academyCtrl.text),
+                note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+              ),
+            );
+          },
+          child: const Text('Confirm'),
+        ),
+      ],
+    );
+  }
+
+  Widget _actionChip({required String label, required String value}) {
+    final selected = _action == value;
+    return GestureDetector(
+      onTap: () => setState(() => _action = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? _purple : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: selected ? _purple : Colors.grey.shade300),
+        ),
+        child: Center(
+          child: Text(label,
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: selected ? Colors.white : Colors.black87)),
+        ),
+      ),
+    );
+  }
+
+  Widget _field(String label, TextEditingController ctrl, {bool isNumber = false}) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      style: const TextStyle(fontSize: 13),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(fontSize: 12),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }

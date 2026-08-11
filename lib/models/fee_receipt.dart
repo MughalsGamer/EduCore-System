@@ -1,3 +1,51 @@
+// class FeeReceipt {
+//   String? id;
+//   String studentId;
+//   String studentName;
+//   String className;
+//   double amountPaid;
+//   DateTime date;
+//   String month; // for monthly fee
+//   String paymentType; // cash, online
+//
+//   FeeReceipt({
+//     this.id,
+//     required this.studentId,
+//     required this.studentName,
+//     required this.className,
+//     required this.amountPaid,
+//     required this.date,
+//     required this.month,
+//     required this.paymentType,
+//   });
+//
+//   Map<String, dynamic> toMap() {
+//     return {
+//       'studentId': studentId,
+//       'studentName': studentName,
+//       'className': className,
+//       'amountPaid': amountPaid,
+//       'date': date.toIso8601String(),
+//       'month': month,
+//       'paymentType': paymentType,
+//     };
+//   }
+//
+//   factory FeeReceipt.fromMap(Map<String, dynamic> map, String id) {
+//     return FeeReceipt(
+//       id: id,
+//       studentId: map['studentId'] ?? '',
+//       studentName: map['studentName'] ?? '',
+//       className: map['className'] ?? '',
+//       amountPaid: (map['amountPaid'] ?? 0).toDouble(),
+//       date: DateTime.tryParse(map['date'] ?? '') ?? DateTime.now(),
+//       month: map['month'] ?? '',
+//       paymentType: map['paymentType'] ?? 'cash',
+//     );
+//   }
+// }
+
+
 class FeeReceipt {
   String? id;
   String studentId;
@@ -8,6 +56,11 @@ class FeeReceipt {
   String month; // for monthly fee
   String paymentType; // cash, online
 
+  // ── Academy fields (NEW) ──
+  bool hasAcademy;
+  String? academyName;
+  double? academyFeeAmount;
+
   FeeReceipt({
     this.id,
     required this.studentId,
@@ -17,6 +70,9 @@ class FeeReceipt {
     required this.date,
     required this.month,
     required this.paymentType,
+    this.hasAcademy = false,
+    this.academyName,
+    this.academyFeeAmount,
   });
 
   Map<String, dynamic> toMap() {
@@ -28,6 +84,9 @@ class FeeReceipt {
       'date': date.toIso8601String(),
       'month': month,
       'paymentType': paymentType,
+      'hasAcademy': hasAcademy,
+      'academyName': academyName,
+      'academyFeeAmount': academyFeeAmount,
     };
   }
 
@@ -41,6 +100,9 @@ class FeeReceipt {
       date: DateTime.tryParse(map['date'] ?? '') ?? DateTime.now(),
       month: map['month'] ?? '',
       paymentType: map['paymentType'] ?? 'cash',
+      hasAcademy: map['hasAcademy'] ?? false,
+      academyName: map['academyName'],
+      academyFeeAmount: map['academyFeeAmount']?.toDouble(),
     );
   }
 }

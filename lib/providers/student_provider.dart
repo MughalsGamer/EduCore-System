@@ -21,6 +21,10 @@
 //   final String? address;
 //   final DateTime admissionDate;
 //   final String inquiryOrRegId;
+//   final String? previousSchoolName;
+//   final String? previousClassName;
+//   final String? previousClassMarks;
+//   final String familyDocId;
 //
 //   const StudentWithContext({
 //     required this.student,
@@ -39,13 +43,18 @@
 //     this.address,
 //     required this.admissionDate,
 //     required this.inquiryOrRegId,
+//     this.previousSchoolName,
+//     this.previousClassName,
+//     this.previousClassMarks,
+//     this.familyDocId = '',
 //   });
 // }
 //
 // class StudentProvider extends ChangeNotifier {
 //   final AdmissionFirestoreService _service = AdmissionFirestoreService();
 //
-//   List<StudentWithContext> _students = [];
+//   // Unfiltered — holds BOTH active and deactivated students.
+//   List<StudentWithContext> _allStudents = [];
 //   bool _isLoading = true;
 //   String? _error;
 //
@@ -53,7 +62,7 @@
 //   String  _searchQuery        = '';
 //   String? _selectedFamilyId;
 //   String? _selectedClassName;
-//   String? _selectedSectionName; // ← NEW
+//   String? _selectedSectionName;
 //
 //   StreamSubscription<List<AdmissionModel>>? _subscription;
 //
@@ -63,13 +72,23 @@
 //   String  get searchQuery          => _searchQuery;
 //   String? get selectedFamilyId     => _selectedFamilyId;
 //   String? get selectedClassName    => _selectedClassName;
-//   String? get selectedSectionName  => _selectedSectionName; // ← NEW
+//   String? get selectedSectionName  => _selectedSectionName;
 //
-//   // ── Unique family list ──
+//   // Only active students participate in the normal list/filters (unchanged
+//   // behaviour for existing screens).
+//   List<StudentWithContext> get _activeStudents =>
+//       _allStudents.where((s) => s.student.isActive).toList();
+//
+//   /// Deactivated (Left School / Terminated) students — shown on the
+//   /// Terminated Students screen.
+//   List<StudentWithContext> get deactivatedStudents =>
+//       _allStudents.where((s) => !s.student.isActive).toList();
+//
+//   // ── Unique family list ── (based on active students, same as before)
 //   List<MapEntry<String, String>> get allFamilies {
 //     final seen   = <String>{};
 //     final result = <MapEntry<String, String>>[];
-//     for (final s in _students) {
+//     for (final s in _activeStudents) {
 //       if (s.familyId.isNotEmpty && seen.add(s.familyId)) {
 //         result.add(MapEntry(s.familyId, s.familyName));
 //       }
@@ -80,7 +99,7 @@
 //
 //   // ── Unique class list ──
 //   List<String> get allClassNames {
-//     final names = _students
+//     final names = _activeStudents
 //         .map((s) => s.student.className ?? '')
 //         .where((c) => c.isNotEmpty)
 //         .toSet()
@@ -89,11 +108,9 @@
 //     return names;
 //   }
 //
-//   // ── Sections for a specific class ── (NEW)
-//   // Returns only sections that actually exist for that class.
-//   // Empty list means the class has no sections → hide the section filter row.
+//   // ── Sections for a specific class ──
 //   List<String> sectionsForClass(String className) {
-//     final secs = _students
+//     final secs = _activeStudents
 //         .where((s) => s.student.className == className)
 //         .map((s) => s.student.sectionName ?? '')
 //         .where((sec) => sec.isNotEmpty)
@@ -103,9 +120,9 @@
 //     return secs;
 //   }
 //
-//   // ── Filtered students ──
+//   // ── Filtered (active) students ──
 //   List<StudentWithContext> get students {
-//     var list = _students;
+//     var list = _activeStudents;
 //
 //     // Family filter
 //     if (_selectedFamilyId != null) {
@@ -119,7 +136,7 @@
 //           .toList();
 //     }
 //
-//     // Section filter (NEW)
+//     // Section filter
 //     if (_selectedSectionName != null) {
 //       list = list
 //           .where((s) => s.student.sectionName == _selectedSectionName)
@@ -177,11 +194,15 @@
 //               address: a.address,
 //               admissionDate: a.admissionDate,
 //               inquiryOrRegId: a.inquiryOrRegId,
+//               previousSchoolName: a.previousSchoolName,
+//               previousClassName: a.previousClassName,
+//               previousClassMarks: a.previousClassMarks,
+//               familyDocId: a.familyDocId,
 //             ));
 //           }
 //         }
 //         flat.sort((a, b) => b.admissionDate.compareTo(a.admissionDate));
-//         _students = flat;
+//         _allStudents = flat;
 //         _isLoading = false;
 //         notifyListeners();
 //       },
@@ -208,11 +229,10 @@
 //   /// Class change always resets section so stale section data never leaks.
 //   void setClassFilter(String? className) {
 //     _selectedClassName  = className;
-//     _selectedSectionName = null; // ← reset section when class changes
+//     _selectedSectionName = null;
 //     notifyListeners();
 //   }
 //
-//   /// NEW: set section filter independently.
 //   void setSectionFilter(String? sectionName) {
 //     _selectedSectionName = sectionName;
 //     notifyListeners();
@@ -222,7 +242,7 @@
 //     _searchQuery         = '';
 //     _selectedFamilyId    = null;
 //     _selectedClassName   = null;
-//     _selectedSectionName = null; // ← NEW
+//     _selectedSectionName = null;
 //     notifyListeners();
 //   }
 //
@@ -230,12 +250,126 @@
 //       _searchQuery.isNotEmpty ||
 //           _selectedFamilyId    != null ||
 //           _selectedClassName   != null ||
-//           _selectedSectionName != null; // ← NEW
+//           _selectedSectionName != null;
 //
 //   void clearError() {
 //     _error = null;
 //     notifyListeners();
 //   }
+//
+//   /// Live lookup used by the profile screen so it reflects deactivate/
+//   /// rejoin changes instantly instead of showing the stale snapshot
+//   /// passed in at navigation time.
+//   StudentWithContext? findStudent(String admissionId, String studentId) {
+//     try {
+//       return _allStudents.firstWhere(
+//             (s) => s.admissionId == admissionId && s.student.studentId == studentId,
+//       );
+//     } catch (_) {
+//       return null;
+//     }
+//   }
+//
+//   // ─────────────────────────────────────
+//   //  DEACTIVATE / REJOIN
+//   // ─────────────────────────────────────
+//
+//   /// Deactivates a student (Left School / Terminated). [reason] must be
+//   /// 'left_school' or 'terminated'. [date] defaults to today if omitted.
+//   Future<void> deactivateStudent({
+//     required StudentWithContext context,
+//     required String reason,
+//     DateTime? date,
+//     String? note,
+//   }) async {
+//     final iso = (date ?? DateTime.now()).toIso8601String().split('T').first;
+//     await _service.deactivateStudent(
+//       admissionId: context.admissionId,
+//       studentId: context.student.studentId,
+//       reason: reason,
+//       date: iso,
+//       note: note,
+//     );
+//     // Stream will push the updated data automatically.
+//   }
+//
+//   /// Rejoins a deactivated student. Class/section/fee fields default to
+//   /// the student's previous values unless explicitly overridden — pass
+//   /// them only when the user changed something on the rejoin dialog.
+//   Future<void> rejoinStudent({
+//     required StudentWithContext context,
+//     DateTime? date,
+//     String? note,
+//     String? classId,
+//     String? className,
+//     String? sectionId,
+//     String? sectionName,
+//     double? annualFee,
+//     double? registrationFee,
+//     double? monthlyFee,
+//     bool? hasAcademy,
+//     String? academyId,
+//     String? academyName,
+//     double? academyFee,
+//     String? picBase64, // NEW
+//
+//   }) async
+//   {
+//     final iso = (date ?? DateTime.now()).toIso8601String().split('T').first;
+//     await _service.rejoinStudent(
+//       admissionId: context.admissionId,
+//       studentId: context.student.studentId,
+//       rejoiningDate: iso,
+//       note: note,
+//       classId: classId,
+//       className: className,
+//       sectionId: sectionId,
+//       sectionName: sectionName,
+//       annualFee: annualFee,
+//       registrationFee: registrationFee,
+//       monthlyFee: monthlyFee,
+//       hasAcademy: hasAcademy,
+//       academyId: academyId,
+//       academyName: academyName,
+//       academyFee: academyFee,
+//       picBase64: picBase64, // NEW
+//
+//     );
+//   }
+//
+//
+//   /// Promotes or demotes a student to a new class/section, with fees,
+//   /// and records this transition in their status history.
+//   Future<void> promoteStudent({
+//     required StudentWithContext context,
+//     required String action, // 'promoted' | 'demoted'
+//     DateTime? date,
+//     String? note,
+//     required String classId,
+//     required String className,
+//     String? sectionId,
+//     String? sectionName,
+//     double? annualFee,
+//     double? registrationFee,
+//     double? monthlyFee,
+//   }) async {
+//     final iso = (date ?? DateTime.now()).toIso8601String().split('T').first;
+//     await _service.promoteStudent(
+//       admissionId: context.admissionId,
+//       studentId: context.student.studentId,
+//       date: iso,
+//       action: action,
+//       newClassId: classId,
+//       newClassName: className,
+//       newSectionId: sectionId,
+//       newSectionName: sectionName,
+//       annualFee: annualFee,
+//       registrationFee: registrationFee,
+//       monthlyFee: monthlyFee,
+//       note: note,
+//     );
+//   }
+//
 //
 //   @override
 //   void dispose() {
@@ -504,8 +638,8 @@ class StudentProvider extends ChangeNotifier {
   }
 
   /// Live lookup used by the profile screen so it reflects deactivate/
-  /// rejoin changes instantly instead of showing the stale snapshot
-  /// passed in at navigation time.
+  /// rejoin/promote changes instantly instead of showing the stale
+  /// snapshot passed in at navigation time.
   StudentWithContext? findStudent(String admissionId, String studentId) {
     try {
       return _allStudents.firstWhere(
@@ -557,6 +691,7 @@ class StudentProvider extends ChangeNotifier {
     String? academyId,
     String? academyName,
     double? academyFee,
+    String? picBase64,
   }) async {
     final iso = (date ?? DateTime.now()).toIso8601String().split('T').first;
     await _service.rejoinStudent(
@@ -575,6 +710,40 @@ class StudentProvider extends ChangeNotifier {
       academyId: academyId,
       academyName: academyName,
       academyFee: academyFee,
+      picBase64: picBase64,
+    );
+  }
+
+  /// Promotes or demotes a student to a new class/section, with fees
+  /// (Monthly, Annual, Academy — no Registration Fee here), and records
+  /// this transition in their status history.
+  Future<void> promoteStudent({
+    required StudentWithContext context,
+    required String action, // 'promoted' | 'demoted'
+    DateTime? date,
+    String? note,
+    required String classId,
+    required String className,
+    String? sectionId,
+    String? sectionName,
+    double? annualFee,
+    double? monthlyFee,
+    double? academyFee,
+  }) async {
+    final iso = (date ?? DateTime.now()).toIso8601String().split('T').first;
+    await _service.promoteStudent(
+      admissionId: context.admissionId,
+      studentId: context.student.studentId,
+      date: iso,
+      action: action,
+      newClassId: classId,
+      newClassName: className,
+      newSectionId: sectionId,
+      newSectionName: sectionName,
+      annualFee: annualFee,
+      monthlyFee: monthlyFee,
+      academyFee: academyFee,
+      note: note,
     );
   }
 

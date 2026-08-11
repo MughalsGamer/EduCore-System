@@ -1341,7 +1341,7 @@ import 'teacher_management/teacher_list.dart';
 import 'class_management/class_list.dart';
 import 'fee_management/fee_structure_screen.dart';
 import 'fee_management/fee_receipts.dart';
-import 'fee_management/student_ledger.dart';
+import 'student_management/student_ledger.dart';
 import 'expense_management/add_expense.dart';
 import 'expense_management/expense_list.dart';
 import 'reports/fee_report.dart';

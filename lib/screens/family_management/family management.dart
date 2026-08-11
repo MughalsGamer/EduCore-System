@@ -1,10 +1,12 @@
 //
+//
 // import 'dart:convert';
 // import 'package:flutter/material.dart';
 // import 'package:provider/provider.dart';
 // import '../../models/admission_model.dart';
 // import '../../providers/admission_provider.dart';
 // import 'family_ledger_screen.dart';
+// import 'family_report_screen.dart';
 //
 // // ─────────────────────────────────────────────
 // //  Design tokens
@@ -69,6 +71,13 @@
 //     );
 //   }
 //
+//   void _openReport(BuildContext context) {
+//     Navigator.push(
+//       context,
+//       MaterialPageRoute(builder: (_) => const FamilyReportScreen()),
+//     );
+//   }
+//
 //   @override
 //   Widget build(BuildContext context) {
 //     final isDesktop = MediaQuery.of(context).size.width >= 900;
@@ -100,6 +109,13 @@
 //         backgroundColor: _kPurple,
 //         foregroundColor: Colors.white,
 //         elevation: 0,
+//         actions: [
+//           // IconButton(
+//           //   icon: const Icon(Icons.summarize_outlined),
+//           //   tooltip: 'Families Report',
+//           //   onPressed: () => _openReport(context),
+//           // ),
+//         ],
 //       ),
 //       body: isDesktop
 //           ? _buildDesktop(grouped, filteredKeys, admissions, isLoading)
@@ -167,6 +183,7 @@
 //             familyKey: selectedKey,
 //             admissions: grouped[selectedKey]!,
 //             onLedgerTap: () => _openLedger(context, grouped[selectedKey]!.first),
+//             onReportTap: () => _openReport(context),
 //           ),
 //         ),
 //       ],
@@ -180,8 +197,18 @@
 //       child: Column(
 //         crossAxisAlignment: CrossAxisAlignment.start,
 //         children: [
-//           const Text('Families',
-//               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _kInk, letterSpacing: -0.3)),
+//           // Row(
+//           //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//           //   children: [
+//           //     const Text('Families',
+//           //         style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _kInk, letterSpacing: -0.3)),
+//           //     IconButton(
+//           //       icon: const Icon(Icons.summarize_outlined, color: _kPurple),
+//           //       tooltip: 'Families Report',
+//           //       onPressed: () => _openReport(context),
+//           //     ),
+//           //   ],
+//           // ),
 //           const SizedBox(height: 4),
 //           Text(
 //             '${grouped.length} families  •  $totalStudents students',
@@ -193,40 +220,210 @@
 //   }
 //
 //   Widget _desktopSearchBar() {
+//     final bool isSearching = _searchQuery.isNotEmpty;
+//
 //     return Padding(
-//       padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-//       child: Container(
-//         height: 42,
+//       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+//       child: AnimatedContainer(
+//         duration: const Duration(milliseconds: 220),
+//         height: 58,
 //         decoration: BoxDecoration(
-//           color: _kSurface,
-//           borderRadius: BorderRadius.circular(10),
-//           border: Border.all(color: _kBorder),
-//         ),
-//         child: TextField(
-//           controller: _searchCtrl,
-//           onChanged: (v) => setState(() => _searchQuery = v.trim()),
-//           style: const TextStyle(fontSize: 13.5),
-//           decoration: InputDecoration(
-//             hintText: 'Search families...',
-//             hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.5),
-//             prefixIcon: Icon(Icons.search_rounded, color: Colors.grey.shade400, size: 20),
-//             suffixIcon: _searchQuery.isNotEmpty
-//                 ? IconButton(
-//               icon: Icon(Icons.close_rounded, color: Colors.grey.shade400, size: 16),
-//               onPressed: () {
-//                 _searchCtrl.clear();
-//                 setState(() => _searchQuery = '');
-//               },
-//             )
-//                 : null,
-//             border: InputBorder.none,
-//             isDense: true,
-//             contentPadding: const EdgeInsets.symmetric(vertical: 11),
+//           gradient: LinearGradient(
+//             colors: isSearching
+//                 ? [
+//               _kPurple.withOpacity(0.12),
+//               _kPurple.withOpacity(0.04),
+//             ]
+//                 : [
+//               _kPurple.withOpacity(0.07),
+//               _kPurple.withOpacity(0.025),
+//             ],
+//             begin: Alignment.topLeft,
+//             end: Alignment.bottomRight,
 //           ),
+//           borderRadius: BorderRadius.circular(17),
+//           border: Border.all(
+//             color: isSearching
+//                 ? _kPurple.withOpacity(0.75)
+//                 : _kPurple.withOpacity(0.35),
+//             width: isSearching ? 1.8 : 1.4,
+//           ),
+//           boxShadow: [
+//             BoxShadow(
+//               color: _kPurple.withOpacity(
+//                 isSearching ? 0.20 : 0.10,
+//               ),
+//               blurRadius: isSearching ? 22 : 14,
+//               spreadRadius: isSearching ? 1 : 0,
+//               offset: const Offset(0, 7),
+//             ),
+//           ],
+//         ),
+//         child: Row(
+//           children: [
+//             // Search Icon
+//             Container(
+//               width: 43,
+//               height: 43,
+//               margin: const EdgeInsets.only(left: 7),
+//               decoration: BoxDecoration(
+//                 gradient: LinearGradient(
+//                   colors: [
+//                     _kPurple,
+//                     _kPurpleDeep,
+//                   ],
+//                   begin: Alignment.topLeft,
+//                   end: Alignment.bottomRight,
+//                 ),
+//                 borderRadius: BorderRadius.circular(12),
+//                 boxShadow: [
+//                   BoxShadow(
+//                     color: _kPurple.withOpacity(0.25),
+//                     blurRadius: 9,
+//                     offset: const Offset(0, 4),
+//                   ),
+//                 ],
+//               ),
+//               child: const Icon(
+//                 Icons.search_rounded,
+//                 color: Colors.white,
+//                 size: 21,
+//               ),
+//             ),
+//
+//             const SizedBox(width: 13),
+//
+//             // Search Text
+//             Expanded(
+//               child: TextField(
+//                 controller: _searchCtrl,
+//                 onChanged: (value) {
+//                   setState(() {
+//                     _searchQuery = value.trim();
+//                   });
+//                 },
+//                 cursorColor: _kPurple,
+//                 style: const TextStyle(
+//                   fontSize: 15,
+//                   fontWeight: FontWeight.w600,
+//                   color: _kInk,
+//                 ),
+//                 decoration: InputDecoration(
+//                   hintText: 'Search families...',
+//                   hintStyle: TextStyle(
+//                     color: _kPurple.withOpacity(0.55),
+//                     fontSize: 14,
+//                     fontWeight: FontWeight.w500,
+//                   ),
+//                   border: InputBorder.none,
+//                   enabledBorder: InputBorder.none,
+//                   focusedBorder: InputBorder.none,
+//                   isDense: true,
+//                   contentPadding: const EdgeInsets.symmetric(
+//                     vertical: 18,
+//                   ),
+//                 ),
+//               ),
+//             ),
+//
+//             // Search Status
+//             if (!isSearching)
+//               Container(
+//                 margin: const EdgeInsets.only(right: 14),
+//                 padding: const EdgeInsets.symmetric(
+//                   horizontal: 10,
+//                   vertical: 6,
+//                 ),
+//                 decoration: BoxDecoration(
+//                   color: _kPurple.withOpacity(0.08),
+//                   borderRadius: BorderRadius.circular(8),
+//                   border: Border.all(
+//                     color: _kPurple.withOpacity(0.15),
+//                   ),
+//                 ),
+//                 child: Text(
+//                   'Search',
+//                   style: TextStyle(
+//                     color: _kPurple.withOpacity(0.70),
+//                     fontSize: 11.5,
+//                     fontWeight: FontWeight.w700,
+//                   ),
+//                 ),
+//               ),
+//
+//             // Clear
+//             if (isSearching)
+//               Padding(
+//                 padding: const EdgeInsets.only(right: 9),
+//                 child: IconButton(
+//                   tooltip: 'Clear search',
+//                   splashRadius: 21,
+//                   onPressed: () {
+//                     _searchCtrl.clear();
+//                     setState(() {
+//                       _searchQuery = '';
+//                     });
+//                   },
+//                   icon: Container(
+//                     width: 32,
+//                     height: 32,
+//                     decoration: BoxDecoration(
+//                       color: _kPurple.withOpacity(0.12),
+//                       shape: BoxShape.circle,
+//                       border: Border.all(
+//                         color: _kPurple.withOpacity(0.18),
+//                       ),
+//                     ),
+//                     child: const Icon(
+//                       Icons.close_rounded,
+//                       color: _kPurple,
+//                       size: 17,
+//                     ),
+//                   ),
+//                 ),
+//               ),
+//           ],
 //         ),
 //       ),
 //     );
 //   }
+//
+//   // Widget _desktopSearchBar() {
+//   //   return Padding(
+//   //     padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+//   //     child: Container(
+//   //       height: 42,
+//   //       decoration: BoxDecoration(
+//   //         color: _kSurface,
+//   //         borderRadius: BorderRadius.circular(10),
+//   //         border: Border.all(color: _kBorder),
+//   //       ),
+//   //       child:
+//   //       TextField(
+//   //         controller: _searchCtrl,
+//   //         onChanged: (v) => setState(() => _searchQuery = v.trim()),
+//   //         style: const TextStyle(fontSize: 13.5),
+//   //         decoration: InputDecoration(
+//   //           hintText: 'Search families...',
+//   //           hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.5),
+//   //           prefixIcon: Icon(Icons.search_rounded, color: Colors.grey.shade400, size: 20),
+//   //           suffixIcon: _searchQuery.isNotEmpty
+//   //               ? IconButton(
+//   //             icon: Icon(Icons.close_rounded, color: Colors.grey.shade400, size: 16),
+//   //             onPressed: () {
+//   //               _searchCtrl.clear();
+//   //               setState(() => _searchQuery = '');
+//   //             },
+//   //           )
+//   //               : null,
+//   //           border: InputBorder.none,
+//   //           isDense: true,
+//   //           contentPadding: const EdgeInsets.symmetric(vertical: 11),
+//   //         ),
+//   //       ),
+//   //     ),
+//   //   );
+//   // }
 //
 //   Widget _desktopEmptyDetail() {
 //     return Container(
@@ -278,6 +475,7 @@
 //       bool isLoading,
 //       ) {
 //     final totalStudents = admissions.fold<int>(0, (sum, a) => sum + a.students.length);
+//     final bool isSearching = _searchQuery.isNotEmpty;
 //
 //     return CustomScrollView(
 //       slivers: [
@@ -303,31 +501,78 @@
 //                   ],
 //                 ),
 //                 const SizedBox(height: 16),
-//                 Container(
+//                 // ── Prominent search field (matches desktop style) ──
+//                 AnimatedContainer(
+//                   duration: const Duration(milliseconds: 220),
+//                   height: 54,
 //                   decoration: BoxDecoration(
 //                     color: Colors.white,
-//                     borderRadius: BorderRadius.circular(14),
-//                     boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))],
-//                   ),
-//                   child: TextField(
-//                     controller: _searchCtrl,
-//                     onChanged: (v) => setState(() => _searchQuery = v.trim()),
-//                     decoration: InputDecoration(
-//                       hintText: 'Family, father, phone se search...',
-//                       hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.5),
-//                       prefixIcon: const Icon(Icons.search_rounded, color: _kPurple, size: 21),
-//                       suffixIcon: _searchQuery.isNotEmpty
-//                           ? IconButton(
-//                         icon: Icon(Icons.close_rounded, color: Colors.grey.shade400, size: 18),
-//                         onPressed: () {
-//                           _searchCtrl.clear();
-//                           setState(() => _searchQuery = '');
-//                         },
-//                       )
-//                           : null,
-//                       border: InputBorder.none,
-//                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+//                     borderRadius: BorderRadius.circular(15),
+//                     border: Border.all(
+//                       color: isSearching ? _kPurple.withOpacity(0.6) : Colors.transparent,
+//                       width: 1.6,
 //                     ),
+//                     boxShadow: [
+//                       BoxShadow(
+//                         color: Colors.black.withOpacity(isSearching ? 0.12 : 0.08),
+//                         blurRadius: isSearching ? 18 : 12,
+//                         offset: const Offset(0, 4),
+//                       ),
+//                     ],
+//                   ),
+//                   child: Row(
+//                     children: [
+//                       Container(
+//                         width: 40,
+//                         height: 40,
+//                         margin: const EdgeInsets.only(left: 7),
+//                         decoration: BoxDecoration(
+//                           gradient: const LinearGradient(
+//                             colors: [_kPurple, _kPurpleDeep],
+//                             begin: Alignment.topLeft,
+//                             end: Alignment.bottomRight,
+//                           ),
+//                           borderRadius: BorderRadius.circular(11),
+//                           boxShadow: [
+//                             BoxShadow(color: _kPurple.withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 3)),
+//                           ],
+//                         ),
+//                         child: const Icon(Icons.search_rounded, color: Colors.white, size: 20),
+//                       ),
+//                       const SizedBox(width: 12),
+//                       Expanded(
+//                         child: TextField(
+//                           controller: _searchCtrl,
+//                           onChanged: (v) => setState(() => _searchQuery = v.trim()),
+//                           cursorColor: _kPurple,
+//                           style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: _kInk),
+//                           decoration: InputDecoration(
+//                             hintText: 'Family, father, phone se search...',
+//                             hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13, fontWeight: FontWeight.w500),
+//                             border: InputBorder.none,
+//                             isDense: true,
+//                             contentPadding: const EdgeInsets.symmetric(vertical: 16),
+//                           ),
+//                         ),
+//                       ),
+//                       if (isSearching)
+//                         Padding(
+//                           padding: const EdgeInsets.only(right: 8),
+//                           child: IconButton(
+//                             splashRadius: 20,
+//                             onPressed: () {
+//                               _searchCtrl.clear();
+//                               setState(() => _searchQuery = '');
+//                             },
+//                             icon: Container(
+//                               width: 30,
+//                               height: 30,
+//                               decoration: BoxDecoration(color: _kPurpleTint, shape: BoxShape.circle),
+//                               child: const Icon(Icons.close_rounded, color: _kPurple, size: 16),
+//                             ),
+//                           ),
+//                         ),
+//                     ],
 //                   ),
 //                 ),
 //               ],
@@ -358,6 +603,95 @@
 //       ],
 //     );
 //   }
+//
+//   // Widget _buildMobile(
+//   //     Map<String, List<AdmissionModel>> grouped,
+//   //     List<String> filteredKeys,
+//   //     List<AdmissionModel> admissions,
+//   //     bool isLoading,
+//   //     )
+//   // {
+//   //   final totalStudents = admissions.fold<int>(0, (sum, a) => sum + a.students.length);
+//   //
+//   //   return CustomScrollView(
+//   //     slivers: [
+//   //       SliverToBoxAdapter(
+//   //         child: Container(
+//   //           decoration: const BoxDecoration(
+//   //             gradient: LinearGradient(
+//   //               colors: [_kPurple, _kPurpleDeep],
+//   //               begin: Alignment.topLeft,
+//   //               end: Alignment.bottomRight,
+//   //             ),
+//   //           ),
+//   //           padding: const EdgeInsets.fromLTRB(16, 4, 16, 22),
+//   //           child: Column(
+//   //             children: [
+//   //               Row(
+//   //                 children: [
+//   //                   _mobileStat(icon: Icons.family_restroom_rounded, label: 'Families', value: grouped.length.toString()),
+//   //                   const SizedBox(width: 10),
+//   //                   _mobileStat(icon: Icons.people_alt_rounded, label: 'Students', value: totalStudents.toString()),
+//   //                   const SizedBox(width: 10),
+//   //                   _mobileStat(icon: Icons.how_to_reg_rounded, label: 'Admissions', value: admissions.length.toString()),
+//   //                 ],
+//   //               ),
+//   //               const SizedBox(height: 16),
+//   //               Container(
+//   //                 decoration: BoxDecoration(
+//   //                   color: Colors.white,
+//   //                   borderRadius: BorderRadius.circular(14),
+//   //                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))],
+//   //                 ),
+//   //                 child: TextField(
+//   //                   controller: _searchCtrl,
+//   //                   onChanged: (v) => setState(() => _searchQuery = v.trim()),
+//   //                   decoration: InputDecoration(
+//   //                     hintText: 'Family, father, phone se search...',
+//   //                     hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.5),
+//   //                     prefixIcon: const Icon(Icons.search_rounded, color: _kPurple, size: 21),
+//   //                     suffixIcon: _searchQuery.isNotEmpty
+//   //                         ? IconButton(
+//   //                       icon: Icon(Icons.close_rounded, color: Colors.grey.shade400, size: 18),
+//   //                       onPressed: () {
+//   //                         _searchCtrl.clear();
+//   //                         setState(() => _searchQuery = '');
+//   //                       },
+//   //                     )
+//   //                         : null,
+//   //                     border: InputBorder.none,
+//   //                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+//   //                   ),
+//   //                 ),
+//   //               ),
+//   //             ],
+//   //           ),
+//   //         ),
+//   //       ),
+//   //       if (isLoading)
+//   //         const SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: _kPurple)))
+//   //       else if (filteredKeys.isEmpty)
+//   //         SliverFillRemaining(child: _buildEmpty())
+//   //       else
+//   //         SliverPadding(
+//   //           padding: const EdgeInsets.fromLTRB(14, 16, 14, 20),
+//   //           sliver: SliverList(
+//   //             delegate: SliverChildBuilderDelegate(
+//   //                   (context, i) {
+//   //                 final key = filteredKeys[i];
+//   //                 final reps = grouped[key]!;
+//   //                 return _MobileFamilyCard(
+//   //                   admissions: reps,
+//   //                   onLedgerTap: () => _openLedger(context, reps.first),
+//   //                 );
+//   //               },
+//   //               childCount: filteredKeys.length,
+//   //             ),
+//   //           ),
+//   //         ),
+//   //     ],
+//   //   );
+//   // }
 //
 //   Widget _mobileStat({required IconData icon, required String label, required String value}) {
 //     return Expanded(
@@ -471,8 +805,15 @@
 //   final String familyKey;
 //   final List<AdmissionModel> admissions;
 //   final VoidCallback onLedgerTap;
+//   final VoidCallback onReportTap;
 //
-//   const _DesktopFamilyDetail({super.key, required this.familyKey, required this.admissions, required this.onLedgerTap});
+//   const _DesktopFamilyDetail({
+//     super.key,
+//     required this.familyKey,
+//     required this.admissions,
+//     required this.onLedgerTap,
+//     required this.onReportTap,
+//   });
 //
 //   @override
 //   Widget build(BuildContext context) {
@@ -533,6 +874,19 @@
 //                       ],
 //                     ),
 //                   ),
+//                   OutlinedButton.icon(
+//                     onPressed: onReportTap,
+//                     icon: const Icon(Icons.summarize_outlined, size: 16),
+//                     label: const Text('Report'),
+//                     style: OutlinedButton.styleFrom(
+//                       foregroundColor: _kPurple,
+//                       side: const BorderSide(color: _kBorder),
+//                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+//                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+//                       textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+//                     ),
+//                   ),
+//                   const SizedBox(width: 10),
 //                   FilledButton.icon(
 //                     onPressed: onLedgerTap,
 //                     icon: const Icon(Icons.receipt_long_rounded, size: 17),
@@ -975,6 +1329,13 @@
 //
 //   const FamilyDetailScreen({super.key, required this.familyKey, required this.admissions});
 //
+//   void _openReport(BuildContext context) {
+//     Navigator.push(
+//       context,
+//       MaterialPageRoute(builder: (_) => const FamilyReportScreen()),
+//     );
+//   }
+//
 //   @override
 //   Widget build(BuildContext context) {
 //     final rep = admissions.first;
@@ -995,6 +1356,14 @@
 //             backgroundColor: _kPurple,
 //             foregroundColor: Colors.white,
 //             actions: [
+//               Padding(
+//                 padding: const EdgeInsets.only(right: 4),
+//                 child: TextButton.icon(
+//                   onPressed: () => _openReport(context),
+//                   icon: const Icon(Icons.summarize_outlined, color: Colors.white, size: 18),
+//                   label: const Text('Report', style: TextStyle(color: Colors.white)),
+//                 ),
+//               ),
 //               Padding(
 //                 padding: const EdgeInsets.only(right: 12),
 //                 child: TextButton.icon(
@@ -1452,6 +1821,7 @@
 // }
 
 
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -1476,6 +1846,7 @@ const _kGreen = Color(0xFF16A34A);
 const _kOrange = Color(0xFFD97706);
 const _kBlue = Color(0xFF2563EB);
 const _kAcademyColor = Color(0xFF8B5CF6); // purple‑ish for Academy
+const _kRed = Color(0xFFB91C1C); // deactivated indicator
 
 // ─────────────────────────────────────────────
 //  Family Management Screen
@@ -1561,13 +1932,7 @@ class _FamilyManagementScreenState extends State<FamilyManagementScreen> {
         backgroundColor: _kPurple,
         foregroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          // IconButton(
-          //   icon: const Icon(Icons.summarize_outlined),
-          //   tooltip: 'Families Report',
-          //   onPressed: () => _openReport(context),
-          // ),
-        ],
+        actions: const [],
       ),
       body: isDesktop
           ? _buildDesktop(grouped, filteredKeys, admissions, isLoading)
@@ -1649,18 +2014,6 @@ class _FamilyManagementScreenState extends State<FamilyManagementScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Row(
-          //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          //   children: [
-          //     const Text('Families',
-          //         style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _kInk, letterSpacing: -0.3)),
-          //     IconButton(
-          //       icon: const Icon(Icons.summarize_outlined, color: _kPurple),
-          //       tooltip: 'Families Report',
-          //       onPressed: () => _openReport(context),
-          //     ),
-          //   ],
-          // ),
           const SizedBox(height: 4),
           Text(
             '${grouped.length} families  •  $totalStudents students',
@@ -1839,43 +2192,6 @@ class _FamilyManagementScreenState extends State<FamilyManagementScreen> {
       ),
     );
   }
-
-  // Widget _desktopSearchBar() {
-  //   return Padding(
-  //     padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-  //     child: Container(
-  //       height: 42,
-  //       decoration: BoxDecoration(
-  //         color: _kSurface,
-  //         borderRadius: BorderRadius.circular(10),
-  //         border: Border.all(color: _kBorder),
-  //       ),
-  //       child:
-  //       TextField(
-  //         controller: _searchCtrl,
-  //         onChanged: (v) => setState(() => _searchQuery = v.trim()),
-  //         style: const TextStyle(fontSize: 13.5),
-  //         decoration: InputDecoration(
-  //           hintText: 'Search families...',
-  //           hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.5),
-  //           prefixIcon: Icon(Icons.search_rounded, color: Colors.grey.shade400, size: 20),
-  //           suffixIcon: _searchQuery.isNotEmpty
-  //               ? IconButton(
-  //             icon: Icon(Icons.close_rounded, color: Colors.grey.shade400, size: 16),
-  //             onPressed: () {
-  //               _searchCtrl.clear();
-  //               setState(() => _searchQuery = '');
-  //             },
-  //           )
-  //               : null,
-  //           border: InputBorder.none,
-  //           isDense: true,
-  //           contentPadding: const EdgeInsets.symmetric(vertical: 11),
-  //         ),
-  //       ),
-  //     ),
-  //   );
-  // }
 
   Widget _desktopEmptyDetail() {
     return Container(
@@ -2056,95 +2372,6 @@ class _FamilyManagementScreenState extends State<FamilyManagementScreen> {
     );
   }
 
-  // Widget _buildMobile(
-  //     Map<String, List<AdmissionModel>> grouped,
-  //     List<String> filteredKeys,
-  //     List<AdmissionModel> admissions,
-  //     bool isLoading,
-  //     )
-  // {
-  //   final totalStudents = admissions.fold<int>(0, (sum, a) => sum + a.students.length);
-  //
-  //   return CustomScrollView(
-  //     slivers: [
-  //       SliverToBoxAdapter(
-  //         child: Container(
-  //           decoration: const BoxDecoration(
-  //             gradient: LinearGradient(
-  //               colors: [_kPurple, _kPurpleDeep],
-  //               begin: Alignment.topLeft,
-  //               end: Alignment.bottomRight,
-  //             ),
-  //           ),
-  //           padding: const EdgeInsets.fromLTRB(16, 4, 16, 22),
-  //           child: Column(
-  //             children: [
-  //               Row(
-  //                 children: [
-  //                   _mobileStat(icon: Icons.family_restroom_rounded, label: 'Families', value: grouped.length.toString()),
-  //                   const SizedBox(width: 10),
-  //                   _mobileStat(icon: Icons.people_alt_rounded, label: 'Students', value: totalStudents.toString()),
-  //                   const SizedBox(width: 10),
-  //                   _mobileStat(icon: Icons.how_to_reg_rounded, label: 'Admissions', value: admissions.length.toString()),
-  //                 ],
-  //               ),
-  //               const SizedBox(height: 16),
-  //               Container(
-  //                 decoration: BoxDecoration(
-  //                   color: Colors.white,
-  //                   borderRadius: BorderRadius.circular(14),
-  //                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))],
-  //                 ),
-  //                 child: TextField(
-  //                   controller: _searchCtrl,
-  //                   onChanged: (v) => setState(() => _searchQuery = v.trim()),
-  //                   decoration: InputDecoration(
-  //                     hintText: 'Family, father, phone se search...',
-  //                     hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13.5),
-  //                     prefixIcon: const Icon(Icons.search_rounded, color: _kPurple, size: 21),
-  //                     suffixIcon: _searchQuery.isNotEmpty
-  //                         ? IconButton(
-  //                       icon: Icon(Icons.close_rounded, color: Colors.grey.shade400, size: 18),
-  //                       onPressed: () {
-  //                         _searchCtrl.clear();
-  //                         setState(() => _searchQuery = '');
-  //                       },
-  //                     )
-  //                         : null,
-  //                     border: InputBorder.none,
-  //                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-  //                   ),
-  //                 ),
-  //               ),
-  //             ],
-  //           ),
-  //         ),
-  //       ),
-  //       if (isLoading)
-  //         const SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: _kPurple)))
-  //       else if (filteredKeys.isEmpty)
-  //         SliverFillRemaining(child: _buildEmpty())
-  //       else
-  //         SliverPadding(
-  //           padding: const EdgeInsets.fromLTRB(14, 16, 14, 20),
-  //           sliver: SliverList(
-  //             delegate: SliverChildBuilderDelegate(
-  //                   (context, i) {
-  //                 final key = filteredKeys[i];
-  //                 final reps = grouped[key]!;
-  //                 return _MobileFamilyCard(
-  //                   admissions: reps,
-  //                   onLedgerTap: () => _openLedger(context, reps.first),
-  //                 );
-  //               },
-  //               childCount: filteredKeys.length,
-  //             ),
-  //           ),
-  //         ),
-  //     ],
-  //   );
-  // }
-
   Widget _mobileStat({required IconData icon, required String label, required String value}) {
     return Expanded(
       child: Container(
@@ -2181,7 +2408,9 @@ class _RosterRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rep = admissions.first;
-    final studentCount = admissions.expand((a) => a.students).length;
+    final allStudents = admissions.expand((a) => a.students).toList();
+    final studentCount = allStudents.length;
+    final deactivatedCount = allStudents.where((s) => !s.isActive).length;
 
     return Material(
       color: isSelected ? _kPurpleSoft : Colors.transparent,
@@ -2232,11 +2461,31 @@ class _RosterRow extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '$studentCount student${studentCount != 1 ? 's' : ''}  •  ${rep.familyId.isNotEmpty ? rep.familyId : "—"}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 11.5, color: Colors.grey.shade500),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            '$studentCount student${studentCount != 1 ? 's' : ''}  •  ${rep.familyId.isNotEmpty ? rep.familyId : "—"}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 11.5, color: Colors.grey.shade500),
+                          ),
+                        ),
+                        if (deactivatedCount > 0) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: _kRed.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '$deactivatedCount inactive',
+                              style: const TextStyle(fontSize: 9.5, color: _kRed, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
@@ -2275,6 +2524,7 @@ class _DesktopFamilyDetail extends StatelessWidget {
     final totalAnnual = allStudents.fold<double>(0, (s, st) => s + (st.annualFee ?? 0));
     final totalRegistration = allStudents.fold<double>(0, (s, st) => s + (st.registrationFee ?? 0));
     final totalAcademy = allStudents.fold<double>(0, (s, st) => s + (st.academyFee ?? 0));
+    final deactivatedCount = allStudents.where((s) => !s.isActive).length;
 
     return Container(
       color: _kSurface,
@@ -2320,6 +2570,10 @@ class _DesktopFamilyDetail extends StatelessWidget {
                             if (admissions.length > 1) ...[
                               const SizedBox(width: 8),
                               _pillTag(icon: Icons.receipt_long_rounded, label: '${admissions.length} admissions', color: _kOrange),
+                            ],
+                            if (deactivatedCount > 0) ...[
+                              const SizedBox(width: 8),
+                              _pillTag(icon: Icons.person_off_rounded, label: '$deactivatedCount deactivated', color: _kRed),
                             ],
                           ],
                         ),
@@ -2534,25 +2788,29 @@ class _DesktopFamilyDetail extends StatelessWidget {
     final monthly = s.monthlyFee ?? 0;
     final academy = s.academyFee ?? 0;
     final totalMonthly = monthly + academy;
+    final bool isActive = s.isActive;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _kSurface,
+        color: isActive ? _kSurface : _kRed.withOpacity(0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kBorder),
+        border: Border.all(color: isActive ? _kBorder : _kRed.withOpacity(0.25)),
       ),
       child: Row(
         children: [
-          s.picBase64 != null
-              ? CircleAvatar(radius: 20, backgroundImage: MemoryImage(base64Decode(s.picBase64!)))
-              : CircleAvatar(
-            radius: 20,
-            backgroundColor: _kPurpleTint,
-            child: Text(
-              s.name.isNotEmpty ? s.name[0].toUpperCase() : 'S',
-              style: const TextStyle(color: _kPurple, fontWeight: FontWeight.w700, fontSize: 14),
+          Opacity(
+            opacity: isActive ? 1 : 0.5,
+            child: s.picBase64 != null
+                ? CircleAvatar(radius: 20, backgroundImage: MemoryImage(base64Decode(s.picBase64!)))
+                : CircleAvatar(
+              radius: 20,
+              backgroundColor: _kPurpleTint,
+              child: Text(
+                s.name.isNotEmpty ? s.name[0].toUpperCase() : 'S',
+                style: const TextStyle(color: _kPurple, fontWeight: FontWeight.w700, fontSize: 14),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -2560,8 +2818,34 @@ class _DesktopFamilyDetail extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(s.name.isNotEmpty ? s.name : 'Unnamed',
-                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _kInk)),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        s.name.isNotEmpty ? s.name : 'Unnamed',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: isActive ? _kInk : Colors.grey.shade500,
+                          decoration: isActive ? null : TextDecoration.lineThrough,
+                          decorationColor: Colors.grey.shade500,
+                        ),
+                      ),
+                    ),
+                    if (!isActive) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: _kRed.withOpacity(0.12), borderRadius: BorderRadius.circular(6)),
+                        child: Text(
+                          s.deactivationReason == 'terminated' ? 'Terminated' : 'Deactivated',
+                          style: const TextStyle(fontSize: 9.5, color: _kRed, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 if (s.className != null)
                   Text(
                     s.sectionName != null ? '${s.className} - ${s.sectionName}' : s.className!,
@@ -2575,7 +2859,7 @@ class _DesktopFamilyDetail extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text('Rs $totalMonthly/mo',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _kPurple)),
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: isActive ? _kPurple : Colors.grey.shade400)),
                 if (academy > 0)
                   Text('(incl. Academy Rs ${academy.toStringAsFixed(0)})',
                       style: TextStyle(fontSize: 9.5, color: Colors.grey.shade500)),
@@ -2602,6 +2886,7 @@ class _MobileFamilyCard extends StatelessWidget {
     final allStudents = admissions.expand((a) => a.students).toList();
     final totalMonthlyFee = allStudents.fold<double>(0, (sum, s) => sum + (s.monthlyFee ?? 0) + (s.academyFee ?? 0));
     final hasMultipleAdmissions = admissions.length > 1;
+    final deactivatedCount = allStudents.where((s) => !s.isActive).length;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -2708,6 +2993,15 @@ class _MobileFamilyCard extends StatelessWidget {
                         fg: _kOrange,
                       ),
                     ],
+                    if (deactivatedCount > 0) ...[
+                      const SizedBox(width: 8),
+                      _tag(
+                        icon: Icons.person_off_rounded,
+                        label: '$deactivatedCount Inactive',
+                        bg: _kRed.withOpacity(0.1),
+                        fg: _kRed,
+                      ),
+                    ],
                     const Spacer(),
                     if (totalMonthlyFee > 0)
                       Text('Rs ${totalMonthlyFee.toStringAsFixed(0)}/mo',
@@ -2722,9 +3016,30 @@ class _MobileFamilyCard extends StatelessWidget {
                     children: [
                       ...allStudents.take(3).map((s) => Container(
                         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                        decoration: BoxDecoration(color: _kSurface, borderRadius: BorderRadius.circular(8)),
-                        child: Text(s.name.isNotEmpty ? s.name : 'Unnamed',
-                            style: TextStyle(fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
+                        decoration: BoxDecoration(
+                          color: s.isActive ? _kSurface : _kRed.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(8),
+                          border: s.isActive ? null : Border.all(color: _kRed.withOpacity(0.2)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              s.name.isNotEmpty ? s.name : 'Unnamed',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: s.isActive ? Colors.grey.shade700 : Colors.grey.shade500,
+                                fontWeight: FontWeight.w500,
+                                decoration: s.isActive ? null : TextDecoration.lineThrough,
+                                decorationColor: Colors.grey.shade500,
+                              ),
+                            ),
+                            if (!s.isActive) ...[
+                              const SizedBox(width: 4),
+                              const Icon(Icons.person_off_rounded, size: 10, color: _kRed),
+                            ],
+                          ],
+                        ),
                       )),
                       if (allStudents.length > 3)
                         Container(
@@ -3095,12 +3410,17 @@ class _StudentDetailCardState extends State<_StudentDetailCard> {
     final isRegular = admission.type == AdmissionType.regular;
     final monthly = s.monthlyFee ?? 0;
     final academy = s.academyFee ?? 0;
+    final bool isActive = s.isActive;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       elevation: 1,
       shadowColor: Colors.black.withOpacity(0.08),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: isActive ? BorderSide.none : BorderSide(color: _kRed.withOpacity(0.25)),
+      ),
+      color: isActive ? null : _kRed.withOpacity(0.03),
       child: Column(
         children: [
           InkWell(
@@ -3110,14 +3430,17 @@ class _StudentDetailCardState extends State<_StudentDetailCard> {
               padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
-                  s.picBase64 != null
-                      ? CircleAvatar(radius: 26, backgroundImage: MemoryImage(base64Decode(s.picBase64!)))
-                      : CircleAvatar(
-                    radius: 26,
-                    backgroundColor: _kPurpleTint,
-                    child: Text(
-                      s.name.isNotEmpty ? s.name[0].toUpperCase() : 'S',
-                      style: const TextStyle(color: _kPurple, fontWeight: FontWeight.bold, fontSize: 18),
+                  Opacity(
+                    opacity: isActive ? 1 : 0.5,
+                    child: s.picBase64 != null
+                        ? CircleAvatar(radius: 26, backgroundImage: MemoryImage(base64Decode(s.picBase64!)))
+                        : CircleAvatar(
+                      radius: 26,
+                      backgroundColor: _kPurpleTint,
+                      child: Text(
+                        s.name.isNotEmpty ? s.name[0].toUpperCase() : 'S',
+                        style: const TextStyle(color: _kPurple, fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -3125,10 +3448,21 @@ class _StudentDetailCardState extends State<_StudentDetailCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(s.name.isNotEmpty ? s.name : 'Unnamed',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
+                        Text(
+                          s.name.isNotEmpty ? s.name : 'Unnamed',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: isActive ? Colors.black87 : Colors.grey.shade500,
+                            decoration: isActive ? null : TextDecoration.lineThrough,
+                            decorationColor: Colors.grey.shade500,
+                          ),
+                        ),
                         const SizedBox(height: 3),
-                        Row(
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             if (s.className != null)
                               _smallChip(
@@ -3137,13 +3471,19 @@ class _StudentDetailCardState extends State<_StudentDetailCard> {
                                 Colors.grey.shade100,
                                 Colors.grey.shade600,
                               ),
-                            const SizedBox(width: 6),
                             _smallChip(
                               isRegular ? Icons.verified : Icons.pending_outlined,
                               isRegular ? 'Regular' : 'Pre',
                               isRegular ? Colors.green.shade50 : Colors.blue.shade50,
                               isRegular ? Colors.green.shade700 : Colors.blue.shade700,
                             ),
+                            if (!isActive)
+                              _smallChip(
+                                Icons.person_off_rounded,
+                                s.deactivationReason == 'terminated' ? 'Terminated' : 'Left School',
+                                _kRed.withOpacity(0.1),
+                                _kRed,
+                              ),
                           ],
                         ),
                       ],
@@ -3155,7 +3495,7 @@ class _StudentDetailCardState extends State<_StudentDetailCard> {
                       if (monthly > 0 || academy > 0)
                         Text(
                           'Rs ${(monthly + academy).toStringAsFixed(0)}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: _kPurple, fontSize: 14),
+                          style: TextStyle(fontWeight: FontWeight.bold, color: isActive ? _kPurple : Colors.grey.shade400, fontSize: 14),
                         ),
                       const SizedBox(height: 4),
                       Icon(_expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: Colors.grey.shade400, size: 20),
@@ -3173,6 +3513,41 @@ class _StudentDetailCardState extends State<_StudentDetailCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Divider(height: 16),
+                  if (!isActive) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: _kRed.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: _kRed.withOpacity(0.2)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.info_outline_rounded, size: 13, color: _kRed),
+                              const SizedBox(width: 6),
+                              Text(
+                                s.deactivationReason == 'terminated' ? 'Terminated' : 'Left School',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _kRed),
+                              ),
+                              if (s.deactivationDate != null && s.deactivationDate!.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                Text('• ${s.deactivationDate}', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                              ],
+                            ],
+                          ),
+                          if (s.deactivationNote != null && s.deactivationNote!.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(s.deactivationNote!, style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700)),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                   _expandRow(Icons.fingerprint, 'Student ID', s.studentId.isNotEmpty ? s.studentId : '—'),
                   if (s.classRollNo != null && s.classRollNo!.isNotEmpty) _expandRow(Icons.format_list_numbered, 'Roll No', s.classRollNo!),
                   if (s.bFormCnic != null && s.bFormCnic!.isNotEmpty) _expandRow(Icons.credit_card_outlined, 'B-Form/CNIC', s.bFormCnic!),
