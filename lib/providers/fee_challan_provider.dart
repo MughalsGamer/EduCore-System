@@ -279,7 +279,8 @@ class FeeChallanProvider extends ChangeNotifier {
         double currentMonthTotal = 0;
 
         for (final s in eligible) {
-          final isFirst = !everHad.contains(s.studentId);
+          final isFirst =               !everHad.contains(s.studentId) || s.rebillAnnualFeeOnce;
+
           final line = ChallanStudentLine(
             studentId: s.studentId,
             name: s.name,
@@ -358,6 +359,19 @@ class FeeChallanProvider extends ChangeNotifier {
         await batch.commit();
       }
 
+      // Clear rebillAnnualFeeOnce for any student who just got
+      // annual fee re-billed via that flag, so it doesn't repeat
+      // on their next challan.
+      final rebilledStudentIds = <String>{};
+      for (final c in generated) {
+        for (final line in c.students) {
+          if (line.isFirstChallan) rebilledStudentIds.add(line.studentId);
+        }
+      }
+      if (rebilledStudentIds.isNotEmpty) {
+        await _clearRebillFlags(rebilledStudentIds);
+      }
+
       _lastGeneratedChallans = generated;
       _lastGenerationSkippedCount = skipped;
 
@@ -434,6 +448,43 @@ class FeeChallanProvider extends ChangeNotifier {
       _listError = 'Failed to delete challan: $e';
       notifyListeners();
       return false;
+    }
+  }
+
+  /// After annual fee has been re-billed for these students (due to
+  /// a recent promotion/demotion), clear their rebillAnnualFeeOnce
+  /// flag inside the parent admission doc's students array so it
+  /// doesn't fire again on the next challan.
+  Future<void> _clearRebillFlags(Set<String> studentIds) async {
+    try {
+      final admissionsSnap = await _db.collection('admissions').get();
+      final batch = _db.batch();
+      var touched = false;
+
+      for (final doc in admissionsSnap.docs) {
+        final data = doc.data();
+        final students = (data['students'] as List<dynamic>?) ?? [];
+        var changed = false;
+
+        final updated = students.map((raw) {
+          final s = Map<String, dynamic>.from(raw as Map);
+          if (studentIds.contains(s['studentId']) &&
+              s['rebillAnnualFeeOnce'] == true) {
+            s['rebillAnnualFeeOnce'] = false;
+            changed = true;
+          }
+          return s;
+        }).toList();
+
+        if (changed) {
+          batch.update(doc.reference, {'students': updated});
+          touched = true;
+        }
+      }
+
+      if (touched) await batch.commit();
+    } catch (_) {
+      // Non-critical — worst case the flag clears on next admission edit.
     }
   }
 }

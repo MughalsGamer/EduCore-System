@@ -158,6 +158,8 @@ class AdmissionStudent {
   String? deactivationReason; // 'left_school' | 'terminated'
   String? deactivationNote;
   List<StudentStatusEvent> statusHistory;
+  bool rebillAnnualFeeOnce;
+
 
   AdmissionStudent({
     this.studentId = '',
@@ -183,6 +185,8 @@ class AdmissionStudent {
     this.deactivationReason,
     this.deactivationNote,
     List<StudentStatusEvent>? statusHistory,
+    this.rebillAnnualFeeOnce = false,
+
   }) : statusHistory = statusHistory ?? [];
 
   Map<String, dynamic> toMap() => {
@@ -209,6 +213,7 @@ class AdmissionStudent {
     'deactivationReason': deactivationReason,
     'deactivationNote': deactivationNote,
     'statusHistory': statusHistory.map((e) => e.toMap()).toList(),
+    'rebillAnnualFeeOnce': rebillAnnualFeeOnce,
   };
 
   factory AdmissionStudent.fromMap(Map<String, dynamic> m) => AdmissionStudent(
@@ -238,6 +243,8 @@ class AdmissionStudent {
         ?.map((e) => StudentStatusEvent.fromMap(Map<String, dynamic>.from(e as Map)))
         .toList() ??
         [],
+    rebillAnnualFeeOnce: m['rebillAnnualFeeOnce'] ?? false,
+
   );
 
   AdmissionStudent copyWith({
@@ -264,6 +271,8 @@ class AdmissionStudent {
     String? deactivationReason,
     String? deactivationNote,
     List<StudentStatusEvent>? statusHistory,
+    bool? rebillAnnualFeeOnce,
+
   }) =>
       AdmissionStudent(
         studentId: studentId ?? this.studentId,
@@ -289,6 +298,8 @@ class AdmissionStudent {
         deactivationReason: deactivationReason ?? this.deactivationReason,
         deactivationNote: deactivationNote ?? this.deactivationNote,
         statusHistory: statusHistory ?? this.statusHistory,
+        rebillAnnualFeeOnce: rebillAnnualFeeOnce ?? this.rebillAnnualFeeOnce,
+
       );
 }
 

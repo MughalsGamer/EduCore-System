@@ -741,15 +741,14 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
           Expanded(
             flex: 15,
             child: Text(
-              '${NumberFormat('#,##0').format(bal.abs())} ${bal >= 0 ? 'Dr' : 'Cr'}',
+              '${bal < 0 ? '-' : ''}${NumberFormat('#,##0').format(bal.abs())} ${bal >= 0 ? 'Dr' : 'Cr'}',
               textAlign: TextAlign.right,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
-                  color: _kRed),
+                  color: bal >= 0 ? _kRed : _kGreen),
             ),
-          ),
-          Expanded(
+          ),          Expanded(
             flex: 9,
             child: Center(
               child: Container(
@@ -1001,15 +1000,14 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
           Expanded(
             flex: 15,
             child: Text(
-              '${NumberFormat('#,##0').format(netBalance.abs())} ${netBalance >= 0 ? 'Dr' : 'Cr'}',
+              '${netBalance < 0 ? '-' : ''}${NumberFormat('#,##0').format(netBalance.abs())} ${netBalance >= 0 ? 'Dr' : 'Cr'}',
               textAlign: TextAlign.right,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
-                  color: _kInk),
+                  color: netBalance >= 0 ? _kInk : _kGreen),
             ),
-          ),
-          const Expanded(flex: 9, child: SizedBox()),
+          ),          const Expanded(flex: 9, child: SizedBox()),
         ],
       ),
     );
@@ -1127,11 +1125,11 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${NumberFormat('#,##0').format(bal.abs())} ${bal >= 0 ? 'Dr' : 'Cr'}',
-                style: const TextStyle(
+                '${bal < 0 ? '-' : ''}${NumberFormat('#,##0').format(bal.abs())} ${bal >= 0 ? 'Dr' : 'Cr'}',
+                style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: _kRed),
+                    color: bal >= 0 ? _kRed : _kGreen),
               ),
               const SizedBox(height: 6),
               Text('Rs ${NumberFormat('#,##0').format(e.amount)}',
@@ -1208,11 +1206,11 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
                       fontWeight: FontWeight.w700,
                       color: _kPurple)),
               Text(
-                '${NumberFormat('#,##0').format(netBalance.abs())} ${netBalance >= 0 ? 'Dr' : 'Cr'}',
-                style: const TextStyle(
+                '${netBalance < 0 ? '-' : ''}${NumberFormat('#,##0').format(netBalance.abs())} ${netBalance >= 0 ? 'Dr' : 'Cr'}',
+                style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
-                    color: _kInk),
+                    color: netBalance >= 0 ? _kInk : _kGreen),
               ),
             ],
           ),
