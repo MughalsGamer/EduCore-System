@@ -812,8 +812,15 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
   }
 
   Widget _buildChallanBreakdown(FeeChallanModel challan) {
-    final showAcademy = challan.students.any((s) => s.academyFee > 0);
     final hasExtraCharges = challan.extraCharges.isNotEmpty;
+
+    // Ab 4 columns hain: Student, Class, Fee Heads, Amount
+    final columnWidths = {
+      0: const FlexColumnWidth(2.0),
+      1: const FlexColumnWidth(1.5),
+      2: const FlexColumnWidth(3.0),
+      3: const FlexColumnWidth(1.5),
+    };
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -841,39 +848,35 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
           const SizedBox(height: 8),
           Table(
             border: TableBorder.all(color: _kBorder, width: 0.5),
-            columnWidths: {
-              0: const FlexColumnWidth(2.0),
-              1: const FlexColumnWidth(1.5),
-              2: const FlexColumnWidth(3.0),
-              3: const FlexColumnWidth(1.5),
-            },
+            columnWidths: columnWidths,
             children: [
               TableRow(
                 decoration: const BoxDecoration(color: _kPurpleLight),
-                children: [
-                  const _SubTh('Student'),
-                  const _SubTh('Class'),
-                  if (showAcademy) const _SubTh('Academy'),
-                  const _SubTh('Fee Heads'),
-                  const _SubTh('Amount', align: TextAlign.right),
+                children: const [
+                  _SubTh('Student'),
+                  _SubTh('Class'),
+                  _SubTh('Fee Heads'),
+                  _SubTh('Amount', align: TextAlign.right),
                 ],
               ),
               ...challan.students.map((s) {
                 final heads = <String>[];
-                if (s.isFirstChallan) {
-                  if (s.registrationFee > 0)
-                    heads.add(
-                        'Admission: ${NumberFormat('#,##0').format(s.registrationFee)}');
-                  if (s.annualFee > 0)
-                    heads.add(
-                        'Annual: ${NumberFormat('#,##0').format(s.annualFee)}');
+                if (s.registrationFee > 0) {
+                  heads.add(
+                      'Admission: ${NumberFormat('#,##0').format(s.registrationFee)}');
                 }
-                if (s.monthlyFee > 0)
+                if (s.annualFee > 0) {
+                  heads.add(
+                      'Annual: ${NumberFormat('#,##0').format(s.annualFee)}');
+                }
+                if (s.monthlyFee > 0) {
                   heads.add(
                       'Monthly: ${NumberFormat('#,##0').format(s.monthlyFee)}');
-                if (s.academyFee > 0)
+                }
+                if (s.academyFee > 0) {
                   heads.add(
                       'Academy: ${NumberFormat('#,##0').format(s.academyFee)}');
+                }
 
                 final classLabel = [
                   s.className,
@@ -884,13 +887,6 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
                   children: [
                     _SubData(s.name, bold: true),
                     _SubData(classLabel),
-                    if (showAcademy)
-                      _SubData(
-                        s.academyFee > 0
-                            ? NumberFormat('#,##0').format(s.academyFee)
-                            : '—',
-                        align: TextAlign.right,
-                      ),
                     _SubData(heads.isEmpty ? '—' : heads.join('  •  ')),
                     _SubData(
                       'Rs ${NumberFormat('#,##0').format(s.lineTotal)}',
@@ -904,7 +900,7 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          // Extra charges section
+          // Extra charges section (unchanged)
           if (hasExtraCharges) ...[
             const Divider(height: 8, color: _kBorder),
             Row(
@@ -953,7 +949,6 @@ class _FamilyLedgerScreenState extends State<FamilyLedgerScreen> {
     );
   }
 
-  // ── Desktop totals footer ──
   Widget _desktopTotalsRow(
       double totalDebit, double totalCredit, double netBalance) {
     return Container(

@@ -339,63 +339,85 @@ Future<Uint8List> generateFamilyLedgerPdf({
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text('STUDENT-WISE BREAKDOWN',
-                    style: pw.TextStyle(fontSize: 6.8, font: boldFont, color: _grey600, letterSpacing: 0.4)),
-                pw.SizedBox(height: 5),
-                pw.Table(
-                  columnWidths: const {
-                    0: pw.FlexColumnWidth(2.6),
-                    1: pw.FlexColumnWidth(1.6),
-                    2: pw.FlexColumnWidth(3.6),
-                    3: pw.FlexColumnWidth(1.4),
-                  },
-                  children: [
-                    pw.TableRow(
-                      children: [
-                        _subHeaderCell('Student', boldFont),
-                        _subHeaderCell('Class', boldFont),
-                        _subHeaderCell('Fee Heads', boldFont),
-                        _subHeaderCell('Amount', boldFont, align: pw.Alignment.centerRight),
-                      ],
-                    ),
-                    ...challan.students.map((s) {
-                      final heads = <String>[];
-                      if (s.isFirstChallan) {
-                        if (s.registrationFee > 0) heads.add('Admission: Rs ${_fmtMoney(s.registrationFee)}');
-                        if (s.annualFee > 0) heads.add('Annual: Rs ${_fmtMoney(s.annualFee)}');
-                      }
-                      if (s.monthlyFee > 0) heads.add('Monthly: Rs ${_fmtMoney(s.monthlyFee)}');
-                      if (s.academyFee > 0) heads.add('Academy: Rs ${_fmtMoney(s.academyFee)}');
-
-                      final classLabel = (s.className != null && s.className!.isNotEmpty)
-                          ? (s.sectionName != null && s.sectionName!.isNotEmpty ? '${s.className} - ${s.sectionName}' : s.className!)
-                          : '';
-
-                      return pw.TableRow(
+                summaryLine,
+                pw.Container(
+                  margin: const pw.EdgeInsets.fromLTRB(30, 0, 8, 8),
+                  padding: const pw.EdgeInsets.all(8),
+                  decoration: pw.BoxDecoration(
+                    color: _white,
+                    border: pw.Border.all(color: _grey200, width: 0.6),
+                    borderRadius: pw.BorderRadius.circular(6),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('STUDENT-WISE BREAKDOWN',
+                          style: pw.TextStyle(fontSize: 6.8, font: boldFont, color: _grey600, letterSpacing: 0.4)),
+                      pw.SizedBox(height: 5),
+                      pw.Table(
+                        columnWidths: const {
+                          0: pw.FlexColumnWidth(2.6),
+                          1: pw.FlexColumnWidth(1.6),
+                          2: pw.FlexColumnWidth(3.6),
+                          3: pw.FlexColumnWidth(1.4),
+                        },
                         children: [
-                          _subDataCell(s.name, regularFont, bold: true),
-                          _subDataCell(classLabel, regularFont),
-                          _subDataCell(heads.isEmpty ? '' : heads.join('    '), regularFont),
-                          _subDataCell('Rs ${_fmtMoney(s.lineTotal)}', regularFont,
-                              align: pw.Alignment.centerRight, bold: true, color: _purple),
+                          pw.TableRow(
+                            children: [
+                              _subHeaderCell('Student', boldFont),
+                              _subHeaderCell('Class', boldFont),
+                              _subHeaderCell('Fee Heads', boldFont),
+                              _subHeaderCell('Amount', boldFont, align: pw.Alignment.centerRight),
+                            ],
+                          ),
+                          ...challan.students.map((s) {
+                            final heads = <String>[];
+                            if (s.registrationFee > 0 && s.isFirstChallan) {
+                              heads.add('Admission: Rs ${_fmtMoney(s.registrationFee)}');
+                            }
+                            if (s.annualFee > 0) {
+                              heads.add('Annual: Rs ${_fmtMoney(s.annualFee)}');
+                            }
+                            if (s.monthlyFee > 0) {
+                              heads.add('Monthly: Rs ${_fmtMoney(s.monthlyFee)}');
+                            }
+                            if (s.academyFee > 0) {
+                              heads.add('Academy: Rs ${_fmtMoney(s.academyFee)}');
+                            }
+
+                            final classLabel = (s.className != null && s.className!.isNotEmpty)
+                                ? (s.sectionName != null && s.sectionName!.isNotEmpty
+                                ? '${s.className} - ${s.sectionName}'
+                                : s.className!)
+                                : '';
+
+                            return pw.TableRow(
+                              children: [
+                                _subDataCell(s.name, regularFont, bold: true),
+                                _subDataCell(classLabel, regularFont),
+                                _subDataCell(heads.isEmpty ? '' : heads.join('    '), regularFont),
+                                _subDataCell('Rs ${_fmtMoney(s.lineTotal)}', regularFont,
+                                    align: pw.Alignment.centerRight, bold: true, color: _purple),
+                              ],
+                            );
+                          }),
                         ],
-                      );
-                    }),
-                  ],
-                ),
-                pw.SizedBox(height: 4),
-                pw.Align(
-                  alignment: pw.Alignment.centerRight,
-                  child: pw.Text('Challan Total: Rs ${_fmtMoney(challan.currentMonthTotal)}',
-                      style: pw.TextStyle(fontSize: 8, font: boldFont, color: _red)),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Align(
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Text('Challan Total: Rs ${_fmtMoney(challan.currentMonthTotal)}',
+                            style: pw.TextStyle(fontSize: 8, font: boldFont, color: _red)),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
+          )
+     ] )
     );
-  }
+      }
 
   pdf.addPage(
     pw.MultiPage(
