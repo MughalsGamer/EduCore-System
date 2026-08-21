@@ -1,3 +1,4 @@
+//
 // import 'dart:convert';
 // import 'package:flutter/material.dart';
 // import 'package:intl/intl.dart';
@@ -145,6 +146,10 @@
 // // ============================================================
 // // ROOT SCREEN — Attendance Report (Student-wise)
 // // Flow: Student picker -> Report view (month/year, summary, table)
+// //
+// // FIX: every time a student is selected (fresh open), the month/year
+// // resets to "now" and a fresh load is triggered — so the report never
+// // shows stale data left over from a previous student/session.
 // // ============================================================
 // class StudentAttendanceReportScreen extends StatefulWidget {
 //   const StudentAttendanceReportScreen({super.key});
@@ -168,6 +173,24 @@
 //       year: _selectedYear,
 //       month: _selectedMonth,
 //     );
+//   }
+//
+//   // Selecting a student always resets to the current month/year and
+//   // triggers a fresh load, so no stale data from a previous view lingers.
+//   void _selectStudent(StudentRecord student) {
+//     setState(() {
+//       _selectedStudent = student;
+//       _selectedYear = DateTime.now().year;
+//       _selectedMonth = DateTime.now().month;
+//     });
+//     _load();
+//   }
+//
+//   // Clears everything (including provider state) when leaving the report,
+//   // so the next student selected starts from a guaranteed-clean state.
+//   void _backToPicker() {
+//     setState(() => _selectedStudent = null);
+//     context.read<ClassAttendanceReportProvider>().clear();
 //   }
 //
 //   Future<void> _openMonthYearPicker() async {
@@ -197,7 +220,7 @@
 //         shape: const Border(bottom: BorderSide(color: _kBorder, width: 1)),
 //         leading: _selectedStudent == null
 //             ? null
-//             : IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => setState(() => _selectedStudent = null)),
+//             : IconButton(icon: const Icon(Icons.arrow_back), onPressed: _backToPicker),
 //       ),
 //       body: _selectedStudent == null ? _buildStudentPicker() : _buildReportBody(),
 //     );
@@ -318,14 +341,7 @@
 //   Widget _buildStudentTile(StudentRecord student) {
 //     return InkWell(
 //       borderRadius: BorderRadius.circular(10),
-//       onTap: () {
-//         setState(() {
-//           _selectedStudent = student;
-//           _selectedYear = DateTime.now().year;
-//           _selectedMonth = DateTime.now().month;
-//         });
-//         _load();
-//       },
+//       onTap: () => _selectStudent(student),
 //       child: Container(
 //         padding: const EdgeInsets.all(12),
 //         decoration: BoxDecoration(color: _kCard, borderRadius: BorderRadius.circular(10), border: Border.all(color: _kBorder)),
@@ -388,7 +404,7 @@
 //             ),
 //           ),
 //           TextButton.icon(
-//             onPressed: () => setState(() => _selectedStudent = null),
+//             onPressed: _backToPicker,
 //             icon: const Icon(Icons.swap_horiz, size: 16, color: Colors.white),
 //             label: const Text('Change', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white)),
 //             style: TextButton.styleFrom(
@@ -411,6 +427,8 @@
 //   }
 //
 //   // ---- Filter row + PDF (coming soon) ----
+//   // The month/year chip opens the calendar dropdown immediately on tap —
+//   // no intermediate step.
 //   Widget _buildFilterRow(bool isDesktop) {
 //     final monthYearChip = InkWell(
 //       borderRadius: BorderRadius.circular(8),
@@ -697,7 +715,8 @@ import '../../models/class_attendance_model.dart';
 import '../../providers/student_provider.dart';
 import '../../providers/class_attendance_report_provider.dart';
 import '../../providers/class_provider.dart';
-import '../class_management/class_attendance_report_screen.dart';
+import '../../pdf_files/student_attendance_pdf_service.dart';
+import '../class_management/class_attendance_report_screen.dart'; // <-- new import
 
 // ============================================================
 // DESIGN TOKENS — identical to employee AttendanceReportScreen
@@ -797,22 +816,6 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-void _showComingSoon(BuildContext context) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Row(
-        children: [
-          Icon(Icons.hourglass_top_rounded, size: 16, color: Colors.white),
-          SizedBox(width: 10),
-          Text('PDF export — coming soon', style: TextStyle(fontWeight: FontWeight.w600)),
-        ],
-      ),
-      backgroundColor: _kPrimaryDark,
-      behavior: SnackBarBehavior.floating,
-    ),
-  );
-}
-
 Widget _buildAvatar(String? base64, String name, {double size = 32}) {
   ImageProvider? image;
   if (base64 != null && base64.isNotEmpty) {
@@ -835,11 +838,6 @@ Widget _buildAvatar(String? base64, String name, {double size = 32}) {
 
 // ============================================================
 // ROOT SCREEN — Attendance Report (Student-wise)
-// Flow: Student picker -> Report view (month/year, summary, table)
-//
-// FIX: every time a student is selected (fresh open), the month/year
-// resets to "now" and a fresh load is triggered — so the report never
-// shows stale data left over from a previous student/session.
 // ============================================================
 class StudentAttendanceReportScreen extends StatefulWidget {
   const StudentAttendanceReportScreen({super.key});
@@ -853,6 +851,7 @@ class _StudentAttendanceReportScreenState extends State<StudentAttendanceReportS
   int _selectedYear = DateTime.now().year;
   int _selectedMonth = DateTime.now().month;
   String _search = '';
+  bool _isExportingPdf = false;
 
   void _load() {
     final s = _selectedStudent;
@@ -865,8 +864,6 @@ class _StudentAttendanceReportScreenState extends State<StudentAttendanceReportS
     );
   }
 
-  // Selecting a student always resets to the current month/year and
-  // triggers a fresh load, so no stale data from a previous view lingers.
   void _selectStudent(StudentRecord student) {
     setState(() {
       _selectedStudent = student;
@@ -876,8 +873,6 @@ class _StudentAttendanceReportScreenState extends State<StudentAttendanceReportS
     _load();
   }
 
-  // Clears everything (including provider state) when leaving the report,
-  // so the next student selected starts from a guaranteed-clean state.
   void _backToPicker() {
     setState(() => _selectedStudent = null);
     context.read<ClassAttendanceReportProvider>().clear();
@@ -891,6 +886,40 @@ class _StudentAttendanceReportScreenState extends State<StudentAttendanceReportS
       _selectedMonth = result.month;
     });
     _load();
+  }
+
+  // Export PDF handler
+  Future<void> _exportPdf() async {
+    if (_selectedStudent == null || _isExportingPdf) return;
+    final provider = context.read<ClassAttendanceReportProvider>();
+    final stat = provider.statFor(_selectedStudent!.studentId);
+    final entries = provider.dayEntriesForStudent(_selectedStudent!.studentId);
+
+    if (entries.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No attendance data available for export.'), backgroundColor: _kRed),
+      );
+      return;
+    }
+
+    setState(() => _isExportingPdf = true);
+    try {
+      await StudentAttendancePdfService.generatePdf(
+        student: _selectedStudent!,
+        stat: stat,
+        entries: entries,
+        month: _selectedMonth,
+        year: _selectedYear,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to generate PDF: $e'), backgroundColor: _kRed),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExportingPdf = false);
+    }
   }
 
   @override
@@ -954,24 +983,15 @@ class _StudentAttendanceReportScreenState extends State<StudentAttendanceReportS
     });
   }
 
-  // ---- Student picker ----
-  // Student model has: id (String?), name, className, section — no
-  // studentId/classId/sectionName fields. We build a StudentRecord view-model
-  // here: id! for studentId (after filtering out unsaved students), and we
-  // resolve classId by matching className against ClassProvider's classes
-  // (also filtering out any class that hasn't been saved yet, i.e. id == null).
+  // ---- Student picker (with actual image) ----
   Widget _buildStudentPicker() {
     final classProvider = context.watch<ClassProvider>();
-
-    // students getter already returns only active students,
-    // so no extra isActive filter is needed here.
     final allStudentModels = context.watch<StudentProvider>().students;
 
     final allStudents = allStudentModels
         .map((s) {
       final className = s.student.className ?? '';
       final sectionName = s.student.sectionName ?? '';
-
       final matchedClass = classProvider.classes
           .where((c) => c.id != null && c.name == className)
           .toList();
@@ -984,7 +1004,9 @@ class _StudentAttendanceReportScreenState extends State<StudentAttendanceReportS
         sectionId: sectionName,
         sectionName: sectionName,
         classId: matchedClass.first.id!,
-        imageBase64: null,
+        imageBase64: s.student.picBase64, // <-- actual image
+        familyId: s.familyId, // optional if you want family ID in PDF
+        familyName: s.familyName,
       );
     })
         .whereType<StudentRecord>()
@@ -1088,6 +1110,7 @@ class _StudentAttendanceReportScreenState extends State<StudentAttendanceReportS
                   children: [
                     _headerChip(student.className),
                     _headerChip('Section ${student.sectionName}'),
+                    if (student.familyId.isNotEmpty) _headerChip('Family ID: ${student.familyId}'),
                   ],
                 ),
               ],
@@ -1116,9 +1139,7 @@ class _StudentAttendanceReportScreenState extends State<StudentAttendanceReportS
     );
   }
 
-  // ---- Filter row + PDF (coming soon) ----
-  // The month/year chip opens the calendar dropdown immediately on tap —
-  // no intermediate step.
+  // ---- Filter row + working Export PDF ----
   Widget _buildFilterRow(bool isDesktop) {
     final monthYearChip = InkWell(
       borderRadius: BorderRadius.circular(8),
@@ -1141,9 +1162,14 @@ class _StudentAttendanceReportScreenState extends State<StudentAttendanceReportS
     );
 
     final exportButton = ElevatedButton.icon(
-      onPressed: () => _showComingSoon(context),
-      icon: const Icon(Icons.file_download_outlined, size: 16),
-      label: const Text('Export PDF', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      onPressed: _isExportingPdf ? null : _exportPdf,
+      icon: _isExportingPdf
+          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+          : const Icon(Icons.file_download_outlined, size: 16),
+      label: Text(
+        _isExportingPdf ? 'Preparing...' : 'Export PDF',
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      ),
       style: ElevatedButton.styleFrom(
         backgroundColor: _kPrimary,
         foregroundColor: Colors.white,
@@ -1273,7 +1299,6 @@ class _StudentAttendanceReportScreenState extends State<StudentAttendanceReportS
     );
   }
 
-  // ---- Mobile: stacked row-cards ----
   Widget _buildMobileList(List<DayStatusEntry> rows) {
     return Column(
       children: List.generate(rows.length, (i) {
@@ -1313,9 +1338,7 @@ class _StudentAttendanceReportScreenState extends State<StudentAttendanceReportS
   }
 }
 
-// A light view-model so this screen doesn't depend on the exact Student
-// model shape everywhere. Built in _buildStudentPicker() above by resolving
-// classId via ClassProvider (Student itself has no classId field).
+// Updated StudentRecord to include family info for PDF
 class StudentRecord {
   final String studentId;
   final String name;
@@ -1324,6 +1347,8 @@ class StudentRecord {
   final String sectionId;
   final String sectionName;
   final String? imageBase64;
+  final String familyId;
+  final String familyName;
 
   StudentRecord({
     required this.studentId,
@@ -1333,6 +1358,8 @@ class StudentRecord {
     required this.sectionId,
     required this.sectionName,
     this.imageBase64,
+    this.familyId = '',
+    this.familyName = '',
   });
 }
 

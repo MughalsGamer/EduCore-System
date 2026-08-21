@@ -63,6 +63,8 @@ class StudentProvider extends ChangeNotifier {
   String? _selectedFamilyId;
   String? _selectedClassName;
   String? _selectedSectionName;
+  List<StudentWithContext> get allActiveStudents => _activeStudents;
+
 
   StreamSubscription<List<AdmissionModel>>? _subscription;
 

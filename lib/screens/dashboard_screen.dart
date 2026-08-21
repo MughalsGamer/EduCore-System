@@ -1,11 +1,13 @@
 
 import 'dart:convert';
 import 'package:educoresystem/screens/register_user.dart';
+import 'package:educoresystem/screens/result_card_management/exam_result_card_form_screen.dart';
+import 'package:educoresystem/screens/result_card_management/result_card_management.dart';
 import 'package:educoresystem/screens/salary_managemnet/generate_salary_screen.dart';
 import 'package:educoresystem/screens/salary_managemnet/salary_list_screen.dart';
 import 'package:educoresystem/screens/salary_managemnet/salary_management_screen.dart';
 import 'package:educoresystem/screens/school%20setting/school_setting.dart';
-import 'package:educoresystem/screens/subject_management/student_attendance_report_screen.dart';
+import 'package:educoresystem/screens/student_management/student_attendance_report_screen.dart';
 import 'package:educoresystem/screens/subject_management/subject%20list.dart';
 import 'package:educoresystem/screens/teacher_management/Staff%20Profile.dart';
 import 'package:educoresystem/screens/teacher_management/add_teacher.dart';
@@ -132,6 +134,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       'Fee Collection': () => const FeeCollectionHistoryScreen(),      // ← NEW
       'Fee Receipts': () => const FeeReceiptsScreen(),
       'Student Ledger': () => StudentLedgerScreen(studentId: 'studentId'),
+      'Exam Result Cards': () => const StudentWiseResultCardsScreen (),
+      'New Exam Result Card': () => ExamResultCardFormScreen(),  // if you want quick action
       'Add Expense': () => const AddExpenseScreen(),
       'Expenses': () => const ExpenseListScreen(),
       'Fee Report': () => const FeeReportScreen(),
@@ -226,7 +230,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       _NavItem('Class Attendance', Icons.fact_check_rounded, go('Class Attendance')),   // ★ NEW
       _NavItem('Class Attendance Report', Icons.summarize_rounded, go('Class Attendance Report')), // ★ NEW
       _NavItem('Student Attendance Report', Icons.assignment_ind_rounded, go('Student Attendance Report')),   // ★ NEW
+      _NavItem('Exam Result Cards', Icons.assignment_turned_in_rounded, go('Exam Result Cards')),
       _NavItem('Teachers', Icons.person_rounded, go('Teachers')),
+
       _NavItem('School Staff', Icons.badge_rounded, go('School Staff')), // ★ RENAMED (was 'Staff')
       _NavItem('Academy Staff', Icons.groups_rounded, go('Academy Staff')), // ★ NEW
       _NavItem('ID Cards', Icons.credit_card_rounded, go('ID Cards')),
@@ -521,12 +527,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                     .map((e) => _sbTile(e, isDrawer)),
               ],
               if (items.any((n) => [
-                'Admissions','Generate Challan','Fee Collection', 'Students', 'Class Attendance','Class Attendance Report', 'Student Attendance Report', 'Family'
+                'Admissions','Generate Challan','Fee Collection', 'Students', 'Class Attendance','Class Attendance Report', 'Student Attendance Report', 'Family','Exam Result Cards'
               ].contains(n.label))) ...[
                 _sbLabel('Enrollment'),
                 ...items
                     .where((n) => [
-                  'Admissions','Generate Challan','Fee Collection', 'Students', 'Class Attendance','Class Attendance Report', 'Student Attendance Report', 'Family'
+                  'Admissions','Generate Challan','Fee Collection', 'Students', 'Class Attendance','Class Attendance Report', 'Student Attendance Report', 'Family','Exam Result Cards'
                 ].contains(n.label))
                     .map((e) => _sbTile(e, isDrawer)),
               ],
