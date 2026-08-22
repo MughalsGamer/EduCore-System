@@ -571,10 +571,10 @@ class ResultCardPdfGenerator {
     if (original == null) return null;
 
     // Resize to max height 100 (keep aspect ratio)
-    final resized = img.copyResize(original, height: 50);
+    final resized = img.copyResize(original, height: 100);
 
     // Encode as JPEG with quality 40
-    final compressedBytes = img.encodeJpg(resized, quality: 10);
+    final compressedBytes = img.encodeJpg(resized, quality: 50);
 
     return pw.MemoryImage(compressedBytes);
   }
