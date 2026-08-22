@@ -2004,7 +2004,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       _NavItem('Salary List', Icons.format_list_bulleted_rounded, go('Salary List')),
       _NavItem('Salary Adjustment', Icons.tune_rounded, go('Salary Adjustment')),
       _NavItem('Transaction History', Icons.history_rounded, go('Transaction History')),
-      _NavItem('Employee Ledger', Icons.account_balance_wallet_rounded, go('Employee Ledger')),
 
       _NavItem('Events', Icons.celebration_rounded, go('Events')),
 
@@ -2034,7 +2033,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       'Generate Challan', 'Fee Collection',
     ]),
     _NavGroup('Payroll', Icons.account_balance_wallet_rounded, [
-      'Generate Salary', 'Salary List', 'Salary Adjustment', 'Transaction History', 'Employee Ledger',
+      'Generate Salary', 'Salary List', 'Salary Adjustment', 'Transaction History',
     ]),
     _NavGroup('Events', Icons.celebration_rounded, ['Events']),
     _NavGroup('Settings', Icons.settings_rounded, ['School Settings']),
