@@ -574,7 +574,7 @@ class ResultCardPdfGenerator {
     final resized = img.copyResize(original, height: 100);
 
     // Encode as JPEG with quality 40
-    final compressedBytes = img.encodeJpg(resized, quality: 50);
+    final compressedBytes = img.encodeJpg(resized, quality: 65);
 
     return pw.MemoryImage(compressedBytes);
   }
