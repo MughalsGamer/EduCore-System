@@ -529,24 +529,24 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
             const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text("Don't have an account?",
-                    style: TextStyle(fontSize: 13, color: _T.inkFaint)),
-                TextButton(
-                  onPressed: _isLoading ? null : _goToRegister,
-                  style: TextButton.styleFrom(
-                    foregroundColor: _T.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text('Create one',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                ),
-              ],
-            ),
+            // Row(
+            //   mainAxisAlignment: MainAxisAlignment.center,
+            //   children: [
+            //     const Text("Don't have an account?",
+            //         style: TextStyle(fontSize: 13, color: _T.inkFaint)),
+            //     TextButton(
+            //       onPressed: _isLoading ? null : _goToRegister,
+            //       style: TextButton.styleFrom(
+            //         foregroundColor: _T.primary,
+            //         padding: const EdgeInsets.symmetric(horizontal: 6),
+            //         minimumSize: Size.zero,
+            //         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            //       ),
+            //       child: const Text('Create one',
+            //           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            //     ),
+            //   ],
+            // ),
           ],
         ),
       ),
