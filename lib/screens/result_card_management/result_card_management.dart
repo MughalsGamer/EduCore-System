@@ -2009,7 +2009,9 @@ class _StudentWiseResultCardsScreenState
           _selectedResultKeys.clear();
         });
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('PDF GENERATION ERROR: $e');
+      debugPrint('STACK TRACE:\n$stack');
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(_snack('PDF generation failed: $e', isError: true));
