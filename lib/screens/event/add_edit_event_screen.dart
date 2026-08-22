@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/event.dart';
-import '../providers/event_provider.dart';
+
+import '../../models/event.dart';
+import '../../providers/event_provider.dart';
+
 
 const _purple = Color(0xFF534AB7);
 

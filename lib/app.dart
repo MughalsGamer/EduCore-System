@@ -5,6 +5,7 @@ import 'package:educoresystem/providers/attendance_provider.dart';
 import 'package:educoresystem/providers/class_attendance_provider.dart';
 import 'package:educoresystem/providers/class_attendance_report_provider.dart';
 import 'package:educoresystem/providers/employee_transaction_provider.dart';
+import 'package:educoresystem/providers/event_provider.dart';
 import 'package:educoresystem/providers/exam_result_card_provider.dart';
 import 'package:educoresystem/providers/fee_collection_provider.dart';
 import 'package:educoresystem/providers/salary_adjustment_history_provider.dart';
@@ -59,6 +60,8 @@ class SchoolApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ClassAttendanceProvider()),
         ChangeNotifierProvider(create: (_) => ClassAttendanceReportProvider()),
         ChangeNotifierProvider(create: (_) => ExamResultCardProvider()),
+        ChangeNotifierProvider(create: (_) => EventProvider()), // ★ ADD THIS
+
 
       ],
       child: MaterialApp(
