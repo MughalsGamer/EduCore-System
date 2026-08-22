@@ -1,3 +1,4 @@
+//
 // import 'dart:typed_data';
 // import 'package:flutter/services.dart' show rootBundle;
 // import 'package:intl/intl.dart';
@@ -5,12 +6,16 @@
 // import 'package:pdf/widgets.dart' as pw;
 //
 // import '../../models/exam_result_card_model.dart';
-// import '../../providers/student_provider.dart'; // for StudentWithContext
+// import '../../providers/student_provider.dart';
 //
 // /// Generates one A4 page per student, styled after the school's printed
 // /// "Student's Result Card" template (double border frame, school header
 // /// with logo, marks table, auto-calculated percentage/position, and a
 // /// developer credit line at the bottom).
+// ///
+// /// OPTIMIZED for speed: uses a separate `pw.Page` per student instead of
+// /// a `MultiPage` with pagination, and uses a lighter layout (smaller
+// /// fonts, fewer nested containers).
 // class ResultCardPdfGenerator {
 //   static const String schoolName = 'JS GRAMMER SCHOOL';
 //   static const String schoolAddress =
@@ -19,15 +24,11 @@
 //   static const String developerCredit = 'Developed by Ali Haider — 0300-7465064';
 //   static const String logoAssetPath = 'assets/images/Logo.png';
 //
-//   /// Builds a multi-page PDF, one page per (student, exam-card) result.
+//   /// Builds a multi-page PDF, one page per student.
 //   ///
-//   /// Each entry gets its own dedicated page. We use [pw.MultiPage] with a
-//   /// forced page break BETWEEN entries (not after the last one) instead of
-//   /// stacking many [pw.Page]s — this makes the layout resilient to content
-//   /// that's slightly taller than one page (it will spill onto a
-//   /// continuation page instead of throwing a layout exception), while
-//   /// still guaranteeing "student 1 -> page(s) 1..", "student 2 -> next
-//   /// page", etc.
+//   /// Each student gets its own dedicated [pw.Page]. This avoids the
+//   /// pagination overhead of [pw.MultiPage] and is much faster when many
+//   /// cards are generated.
 //   static Future<Uint8List> generate({
 //     required List<ResultCardPdfEntry> results,
 //   }) async {
@@ -42,81 +43,69 @@
 //       logoImage = null; // Fall back gracefully if the asset is missing.
 //     }
 //
-//     doc.addPage(
-//       pw.MultiPage(
-//         pageFormat: PdfPageFormat.a4,
-//         margin: const pw.EdgeInsets.all(24),
-//         build: (context) {
-//           final widgets = <pw.Widget>[];
-//           for (var i = 0; i < results.length; i++) {
-//             widgets.add(_buildCard(results[i], logoImage));
-//             // Force every entry after this one onto a fresh page.
-//             if (i != results.length - 1) {
-//               widgets.add(pw.NewPage());
-//             }
-//           }
-//           return widgets;
-//         },
-//       ),
-//     );
+//     // Add each student as a separate page.
+//     for (var i = 0; i < results.length; i++) {
+//       doc.addPage(
+//         pw.Page(
+//           pageFormat: PdfPageFormat.a4,
+//           margin: const pw.EdgeInsets.all(24),
+//           build: (context) => _buildCard(results[i], logoImage),
+//         ),
+//       );
+//     }
 //
 //     return doc.save();
 //   }
 //
+//   /// Simplified card layout – fewer nested containers, less decoration.
 //   static pw.Widget _buildCard(
 //       ResultCardPdfEntry entry, pw.ImageProvider? logoImage) {
-//     final borderColor = PdfColor.fromInt(0xFF1A237E); // deep navy blue
+//     final borderColor = PdfColor.fromInt(0xFF1A237E); // deep navy
 //
 //     return pw.Container(
 //       decoration: pw.BoxDecoration(
-//         border: pw.Border.all(color: borderColor, width: 2.4),
+//         border: pw.Border.all(color: borderColor, width: 1.5),
 //       ),
-//       padding: const pw.EdgeInsets.all(10),
-//       child: pw.Container(
-//         decoration: pw.BoxDecoration(
-//           border: pw.Border.all(color: borderColor, width: 0.8),
-//         ),
-//         padding: const pw.EdgeInsets.all(16),
-//         child: pw.Column(
-//           crossAxisAlignment: pw.CrossAxisAlignment.start,
-//           mainAxisSize: pw.MainAxisSize.min,
-//           children: [
-//             _buildHeader(entry, logoImage, borderColor),
-//             pw.SizedBox(height: 14),
-//             _buildExamLine(entry),
-//             pw.SizedBox(height: 10),
-//             _buildInfoLines(entry),
-//             pw.SizedBox(height: 16),
-//             pw.Center(
-//               child: pw.Text(
-//                 'Marks Detail',
-//                 style: pw.TextStyle(
-//                   fontSize: 15,
-//                   fontWeight: pw.FontWeight.bold,
-//                   color: PdfColor.fromInt(0xFF7B1FA2),
-//                 ),
+//       padding: const pw.EdgeInsets.all(12),
+//       child: pw.Column(
+//         crossAxisAlignment: pw.CrossAxisAlignment.start,
+//         mainAxisSize: pw.MainAxisSize.min,
+//         children: [
+//           _buildHeader(entry, logoImage, borderColor),
+//           pw.SizedBox(height: 12),
+//           _buildExamLine(entry),
+//           pw.SizedBox(height: 8),
+//           _buildInfoLines(entry),
+//           pw.SizedBox(height: 12),
+//           pw.Center(
+//             child: pw.Text(
+//               'Marks Detail',
+//               style: pw.TextStyle(
+//                 fontSize: 14,
+//                 fontWeight: pw.FontWeight.bold,
+//                 color: PdfColor.fromInt(0xFF7B1FA2),
 //               ),
 //             ),
-//             pw.SizedBox(height: 8),
-//             _buildMarksTable(entry, borderColor),
-//             pw.SizedBox(height: 16),
-//             _buildSummaryRow(entry),
-//             pw.SizedBox(height: 24),
-//             _buildSignatureRow(entry),
-//             pw.SizedBox(height: 10),
-//             pw.Divider(color: PdfColors.grey400, thickness: 0.5),
-//             pw.Center(
-//               child: pw.Text(
-//                 developerCredit,
-//                 style: pw.TextStyle(
-//                   fontSize: 8,
-//                   color: PdfColors.grey600,
-//                   fontStyle: pw.FontStyle.italic,
-//                 ),
+//           ),
+//           pw.SizedBox(height: 6),
+//           _buildMarksTable(entry, borderColor),
+//           pw.SizedBox(height: 12),
+//           _buildSummaryRow(entry),
+//           pw.SizedBox(height: 18),
+//           _buildSignatureRow(entry),
+//           pw.SizedBox(height: 8),
+//           pw.Divider(color: PdfColors.grey400, thickness: 0.5),
+//           pw.Center(
+//             child: pw.Text(
+//               developerCredit,
+//               style: pw.TextStyle(
+//                 fontSize: 7,
+//                 color: PdfColors.grey600,
+//                 fontStyle: pw.FontStyle.italic,
 //               ),
 //             ),
-//           ],
-//         ),
+//           ),
+//         ],
 //       ),
 //     );
 //   }
@@ -128,54 +117,45 @@
 //       children: [
 //         if (logoImage != null)
 //           pw.Container(
-//             width: 62,
-//             height: 62,
+//             width: 55,
+//             height: 55,
 //             child: pw.Image(logoImage, fit: pw.BoxFit.contain),
 //           )
 //         else
-//           pw.Container(width: 62, height: 62),
-//         pw.SizedBox(width: 12),
+//           pw.SizedBox(width: 55, height: 55),
+//         pw.SizedBox(width: 10),
 //         pw.Expanded(
 //           child: pw.Column(
 //             crossAxisAlignment: pw.CrossAxisAlignment.start,
 //             mainAxisSize: pw.MainAxisSize.min,
 //             children: [
-//               pw.Container(
-//                 padding:
-//                 const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-//                 decoration: pw.BoxDecoration(
-//                   border: pw.Border.all(color: borderColor, width: 1),
-//                 ),
-//                 child: pw.Text(
-//                   "Student's Result Card",
-//                   style: pw.TextStyle(
-//                       fontSize: 11, fontWeight: pw.FontWeight.bold),
-//                 ),
+//               pw.Text(
+//                 "Student's Result Card",
+//                 style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
 //               ),
-//               pw.SizedBox(height: 5),
+//               pw.SizedBox(height: 2),
 //               pw.Container(
 //                 width: double.infinity,
-//                 padding:
-//                 const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+//                 padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
 //                 color: PdfColors.black,
 //                 child: pw.Text(
 //                   schoolName,
 //                   textAlign: pw.TextAlign.center,
 //                   style: pw.TextStyle(
-//                     fontSize: 18,
+//                     fontSize: 15,
 //                     fontWeight: pw.FontWeight.bold,
 //                     color: PdfColors.white,
 //                   ),
 //                 ),
 //               ),
-//               pw.SizedBox(height: 4),
+//               pw.SizedBox(height: 2),
 //               pw.Text(
 //                 schoolAddress,
-//                 style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+//                 style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
 //               ),
 //               pw.Text(
 //                 'Contact # $schoolContact',
-//                 style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+//                 style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
 //               ),
 //             ],
 //           ),
@@ -190,7 +170,7 @@
 //         pw.Text(
 //           'Exam ',
 //           style: pw.TextStyle(
-//             fontSize: 12,
+//             fontSize: 11,
 //             fontWeight: pw.FontWeight.bold,
 //             color: PdfColor.fromInt(0xFF2E7D32),
 //           ),
@@ -202,10 +182,10 @@
 //                 bottom: pw.BorderSide(color: PdfColor.fromInt(0xFF2E7D32), width: 1),
 //               ),
 //             ),
-//             padding: const pw.EdgeInsets.only(bottom: 2),
+//             padding: const pw.EdgeInsets.only(bottom: 1),
 //             child: pw.Text(
 //               entry.card.examName,
-//               style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+//               style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
 //             ),
 //           ),
 //         ),
@@ -214,28 +194,33 @@
 //   }
 //
 //   static pw.Widget _buildInfoLines(ResultCardPdfEntry entry) {
-//     pw.Widget line(String label, String value, {double flex = 1}) {
-//       return pw.Expanded(
-//         flex: flex.round(),
-//         child: pw.Row(
-//           crossAxisAlignment: pw.CrossAxisAlignment.end,
-//           children: [
-//             pw.Text(label,
-//                 style: pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold)),
-//             pw.SizedBox(width: 4),
-//             pw.Expanded(
-//               child: pw.Container(
-//                 decoration: const pw.BoxDecoration(
-//                   border: pw.Border(
-//                     bottom: pw.BorderSide(color: PdfColors.black, width: 0.7),
-//                   ),
+//     const double contentWidth = 460;
+//     const double thirdWidth = (contentWidth - 20) / 3; // minus 2x 10pt gaps
+//
+//     pw.Widget underlinedField(String label, String value, double totalWidth) {
+//       final labelWidth = totalWidth * 0.30;
+//       final valueWidth = totalWidth - labelWidth;
+//       return pw.Row(
+//         crossAxisAlignment: pw.CrossAxisAlignment.end,
+//         children: [
+//           pw.SizedBox(
+//             width: labelWidth,
+//             child: pw.Text(label,
+//                 style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+//           ),
+//           pw.SizedBox(
+//             width: valueWidth,
+//             child: pw.Container(
+//               decoration: const pw.BoxDecoration(
+//                 border: pw.Border(
+//                   bottom: pw.BorderSide(color: PdfColors.black, width: 0.7),
 //                 ),
-//                 padding: const pw.EdgeInsets.only(bottom: 1),
-//                 child: pw.Text(value, style: const pw.TextStyle(fontSize: 10.5)),
 //               ),
+//               padding: const pw.EdgeInsets.only(bottom: 1),
+//               child: pw.Text(value, style: const pw.TextStyle(fontSize: 10)),
 //             ),
-//           ],
-//         ),
+//           ),
+//         ],
 //       );
 //     }
 //
@@ -243,17 +228,17 @@
 //       crossAxisAlignment: pw.CrossAxisAlignment.start,
 //       mainAxisSize: pw.MainAxisSize.min,
 //       children: [
-//         line("Student's Name: ", entry.studentName),
-//         pw.SizedBox(height: 8),
-//         line('Father Name ', entry.fatherName),
-//         pw.SizedBox(height: 8),
+//         underlinedField("Student's Name: ", entry.studentName, contentWidth),
+//         pw.SizedBox(height: 6),
+//         underlinedField('Father Name ', entry.fatherName, contentWidth),
+//         pw.SizedBox(height: 6),
 //         pw.Row(
 //           children: [
-//             line('Class: ', entry.className, flex: 1),
+//             underlinedField('Class: ', entry.className, thirdWidth),
 //             pw.SizedBox(width: 10),
-//             line('Section ', entry.sectionName, flex: 1),
+//             underlinedField('Section ', entry.sectionName, thirdWidth),
 //             pw.SizedBox(width: 10),
-//             line('Roll No. ', entry.rollNo, flex: 1),
+//             underlinedField('Roll No. ', entry.rollNo, thirdWidth),
 //           ],
 //         ),
 //       ],
@@ -271,17 +256,17 @@
 //       totalObtained += obtained[s.name] ?? 0;
 //     }
 //
-//     final headerStyle = pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold);
-//     final cellStyle = const pw.TextStyle(fontSize: 10);
-//     final border = pw.TableBorder.all(color: borderColor, width: 0.7);
+//     final headerStyle = pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold);
+//     final cellStyle = const pw.TextStyle(fontSize: 9);
+//     final border = pw.TableBorder.all(color: borderColor, width: 0.6);
 //
 //     return pw.Table(
 //       border: border,
 //       columnWidths: {
-//         0: const pw.FixedColumnWidth(28),
+//         0: const pw.FixedColumnWidth(25),
 //         1: const pw.FlexColumnWidth(3.4),
-//         2: const pw.FlexColumnWidth(1.3),
-//         3: const pw.FlexColumnWidth(1.3),
+//         2: const pw.FlexColumnWidth(1.2),
+//         3: const pw.FlexColumnWidth(1.2),
 //       },
 //       children: [
 //         pw.TableRow(
@@ -289,7 +274,7 @@
 //           children: [
 //             _cell('Sr.#', headerStyle, center: true),
 //             _cell('Subjects', headerStyle),
-//             _cell('Maximum', headerStyle, center: true),
+//             _cell('Max', headerStyle, center: true),
 //             _cell('Obtained', headerStyle, center: true),
 //           ],
 //         ),
@@ -299,8 +284,7 @@
 //               _cell('${i + 1}.', cellStyle, center: true),
 //               _cell(subjects[i].name, cellStyle),
 //               _cell('${subjects[i].totalMarks}', cellStyle, center: true),
-//               _cell(_formatMarks(obtained[subjects[i].name] ?? 0), cellStyle,
-//                   center: true),
+//               _cell(_formatMarks(obtained[subjects[i].name] ?? 0), cellStyle, center: true),
 //             ],
 //           ),
 //         pw.TableRow(
@@ -318,7 +302,7 @@
 //
 //   static pw.Widget _cell(String text, pw.TextStyle style, {bool center = false}) {
 //     return pw.Padding(
-//       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+//       padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
 //       child: pw.Text(
 //         text,
 //         style: style,
@@ -336,10 +320,9 @@
 //       return pw.Row(
 //         mainAxisSize: pw.MainAxisSize.min,
 //         children: [
-//           pw.Text(label,
-//               style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+//           pw.Text(label, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
 //           pw.SizedBox(width: 4),
-//           pw.Text(value, style: const pw.TextStyle(fontSize: 10)),
+//           pw.Text(value, style: const pw.TextStyle(fontSize: 9)),
 //         ],
 //       );
 //     }
@@ -347,15 +330,19 @@
 //     return pw.Row(
 //       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
 //       children: [
-//         item('Marks Percentage ', '${entry.percentage.toStringAsFixed(1)}%'),
-//         item('Position in Class ', entry.positionLabel),
+//         item('Percentage: ', '${entry.percentage.toStringAsFixed(1)}%'),
+//         item('Position: ', entry.positionLabel),
 //       ],
 //     );
 //   }
 //
 //   static pw.Widget _buildSignatureRow(ResultCardPdfEntry entry) {
+//     const double contentWidth = 460;
+//     const double blockWidth = (contentWidth - 40) / 3; // minus 2x 20pt gaps
+//
 //     pw.Widget sigBlock(String label) {
-//       return pw.Expanded(
+//       return pw.SizedBox(
+//         width: blockWidth,
 //         child: pw.Column(
 //           mainAxisSize: pw.MainAxisSize.min,
 //           children: [
@@ -366,11 +353,11 @@
 //                   top: pw.BorderSide(color: PdfColors.black, width: 0.7),
 //                 ),
 //               ),
-//               padding: const pw.EdgeInsets.only(top: 3),
+//               padding: const pw.EdgeInsets.only(top: 2),
 //               child: pw.Text(
 //                 label,
 //                 textAlign: pw.TextAlign.center,
-//                 style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+//                 style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
 //               ),
 //             ),
 //           ],
@@ -383,20 +370,19 @@
 //       children: [
 //         pw.Row(
 //           children: [
-//             sigBlock('Sign of Class Incharge'),
+//             sigBlock('Class Incharge'),
 //             pw.SizedBox(width: 20),
-//             sigBlock('Sign of Principal'),
+//             sigBlock('Principal'),
 //             pw.SizedBox(width: 20),
-//             sigBlock(
-//                 'Result Declaration Date\n${DateFormat('dd MMM yyyy').format(entry.card.date)}'),
+//             sigBlock('Date: ${DateFormat('dd MMM yyyy').format(entry.card.date)}'),
 //           ],
 //         ),
-//         pw.SizedBox(height: 6),
+//         pw.SizedBox(height: 4),
 //         pw.Align(
 //           alignment: pw.Alignment.centerRight,
 //           child: pw.Text(
-//             'PDF generated on ${DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now())}',
-//             style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey600),
+//             'Generated on ${DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now())}',
+//             style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey600),
 //           ),
 //         ),
 //       ],
@@ -521,19 +507,23 @@
 // }
 
 
+
 import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:image/image.dart' as img;
 
 import '../../models/exam_result_card_model.dart';
-import '../../providers/student_provider.dart'; // for StudentWithContext
+import '../../providers/student_provider.dart';
 
 /// Generates one A4 page per student, styled after the school's printed
-/// "Student's Result Card" template (double border frame, school header
-/// with logo, marks table, auto-calculated percentage/position, and a
-/// developer credit line at the bottom).
+/// "Student's Result Card" template.
+///
+/// OPTIMIZED for speed & file size:
+/// - Uses `pw.Page` for each student (no pagination overhead).
+/// - Compresses the logo to ~40% quality (smaller file, faster render).
 class ResultCardPdfGenerator {
   static const String schoolName = 'JS GRAMMER SCHOOL';
   static const String schoolAddress =
@@ -542,104 +532,102 @@ class ResultCardPdfGenerator {
   static const String developerCredit = 'Developed by Ali Haider — 0300-7465064';
   static const String logoAssetPath = 'assets/images/Logo.png';
 
-  /// Builds a multi-page PDF, one page per (student, exam-card) result.
-  ///
-  /// Each entry gets its own dedicated page. We use [pw.MultiPage] with a
-  /// forced page break BETWEEN entries (not after the last one) instead of
-  /// stacking many [pw.Page]s — this makes the layout resilient to content
-  /// that's slightly taller than one page (it will spill onto a
-  /// continuation page instead of throwing a layout exception), while
-  /// still guaranteeing "student 1 -> page(s) 1..", "student 2 -> next
-  /// page", etc.
+  /// Builds a multi-page PDF, one page per student.
   static Future<Uint8List> generate({
     required List<ResultCardPdfEntry> results,
   }) async {
     final doc = pw.Document();
 
-    // Load the school logo once and reuse across all pages.
+    // Load and compress the school logo once (low quality JPEG).
     pw.ImageProvider? logoImage;
     try {
-      final logoBytes = await rootBundle.load(logoAssetPath);
-      logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
+      logoImage = await _loadCompressedLogo();
     } catch (_) {
       logoImage = null; // Fall back gracefully if the asset is missing.
     }
 
-    doc.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(24),
-        build: (context) {
-          final widgets = <pw.Widget>[];
-          for (var i = 0; i < results.length; i++) {
-            widgets.add(_buildCard(results[i], logoImage));
-            // Force every entry after this one onto a fresh page.
-            if (i != results.length - 1) {
-              widgets.add(pw.NewPage());
-            }
-          }
-          return widgets;
-        },
-      ),
-    );
+    // Add each student as a separate page.
+    for (var i = 0; i < results.length; i++) {
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(24),
+          build: (context) => _buildCard(results[i], logoImage),
+        ),
+      );
+    }
 
     return doc.save();
   }
 
+  /// Loads the logo asset, resizes it to 100px height, and re-encodes
+  /// as JPEG with quality 40. Returns a MemoryImage for PDF embedding.
+  static Future<pw.ImageProvider?> _loadCompressedLogo() async {
+    final data = await rootBundle.load(logoAssetPath);
+    final bytes = data.buffer.asUint8List();
+
+    // Decode with the `image` package
+    final original = img.decodeImage(bytes);
+    if (original == null) return null;
+
+    // Resize to max height 100 (keep aspect ratio)
+    final resized = img.copyResize(original, height: 50);
+
+    // Encode as JPEG with quality 40
+    final compressedBytes = img.encodeJpg(resized, quality: 10);
+
+    return pw.MemoryImage(compressedBytes);
+  }
+
+  /// Simplified card layout – fewer nested containers, less decoration.
   static pw.Widget _buildCard(
       ResultCardPdfEntry entry, pw.ImageProvider? logoImage) {
-    final borderColor = PdfColor.fromInt(0xFF1A237E); // deep navy blue
+    final borderColor = PdfColor.fromInt(0xFF1A237E); // deep navy
 
     return pw.Container(
       decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: borderColor, width: 2.4),
+        border: pw.Border.all(color: borderColor, width: 1.5),
       ),
-      padding: const pw.EdgeInsets.all(10),
-      child: pw.Container(
-        decoration: pw.BoxDecoration(
-          border: pw.Border.all(color: borderColor, width: 0.8),
-        ),
-        padding: const pw.EdgeInsets.all(16),
-        child: pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          mainAxisSize: pw.MainAxisSize.min,
-          children: [
-            _buildHeader(entry, logoImage, borderColor),
-            pw.SizedBox(height: 14),
-            _buildExamLine(entry),
-            pw.SizedBox(height: 10),
-            _buildInfoLines(entry),
-            pw.SizedBox(height: 16),
-            pw.Center(
-              child: pw.Text(
-                'Marks Detail',
-                style: pw.TextStyle(
-                  fontSize: 15,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColor.fromInt(0xFF7B1FA2),
-                ),
+      padding: const pw.EdgeInsets.all(12),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        mainAxisSize: pw.MainAxisSize.min,
+        children: [
+          _buildHeader(entry, logoImage, borderColor),
+          pw.SizedBox(height: 12),
+          _buildExamLine(entry),
+          pw.SizedBox(height: 8),
+          _buildInfoLines(entry),
+          pw.SizedBox(height: 12),
+          pw.Center(
+            child: pw.Text(
+              'Marks Detail',
+              style: pw.TextStyle(
+                fontSize: 14,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColor.fromInt(0xFF7B1FA2),
               ),
             ),
-            pw.SizedBox(height: 8),
-            _buildMarksTable(entry, borderColor),
-            pw.SizedBox(height: 16),
-            _buildSummaryRow(entry),
-            pw.SizedBox(height: 24),
-            _buildSignatureRow(entry),
-            pw.SizedBox(height: 10),
-            pw.Divider(color: PdfColors.grey400, thickness: 0.5),
-            pw.Center(
-              child: pw.Text(
-                developerCredit,
-                style: pw.TextStyle(
-                  fontSize: 8,
-                  color: PdfColors.grey600,
-                  fontStyle: pw.FontStyle.italic,
-                ),
+          ),
+          pw.SizedBox(height: 6),
+          _buildMarksTable(entry, borderColor),
+          pw.SizedBox(height: 12),
+          _buildSummaryRow(entry),
+          pw.SizedBox(height: 18),
+          _buildSignatureRow(entry),
+          pw.SizedBox(height: 8),
+          pw.Divider(color: PdfColors.grey400, thickness: 0.5),
+          pw.Center(
+            child: pw.Text(
+              developerCredit,
+              style: pw.TextStyle(
+                fontSize: 7,
+                color: PdfColors.grey600,
+                fontStyle: pw.FontStyle.italic,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -651,54 +639,45 @@ class ResultCardPdfGenerator {
       children: [
         if (logoImage != null)
           pw.Container(
-            width: 62,
-            height: 62,
+            width: 50,
+            height: 50,
             child: pw.Image(logoImage, fit: pw.BoxFit.contain),
           )
         else
-          pw.Container(width: 62, height: 62),
-        pw.SizedBox(width: 12),
+          pw.SizedBox(width: 50, height: 50),
+        pw.SizedBox(width: 10),
         pw.Expanded(
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             mainAxisSize: pw.MainAxisSize.min,
             children: [
-              pw.Container(
-                padding:
-                const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: borderColor, width: 1),
-                ),
-                child: pw.Text(
-                  "Student's Result Card",
-                  style: pw.TextStyle(
-                      fontSize: 11, fontWeight: pw.FontWeight.bold),
-                ),
+              pw.Text(
+                "Student's Result Card",
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
               ),
-              pw.SizedBox(height: 5),
+              pw.SizedBox(height: 2),
               pw.Container(
                 width: double.infinity,
-                padding:
-                const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 color: PdfColors.black,
                 child: pw.Text(
                   schoolName,
                   textAlign: pw.TextAlign.center,
                   style: pw.TextStyle(
-                    fontSize: 18,
+                    fontSize: 15,
                     fontWeight: pw.FontWeight.bold,
                     color: PdfColors.white,
                   ),
                 ),
               ),
-              pw.SizedBox(height: 4),
+              pw.SizedBox(height: 2),
               pw.Text(
                 schoolAddress,
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+                style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
               ),
               pw.Text(
                 'Contact # $schoolContact',
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+                style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
               ),
             ],
           ),
@@ -713,7 +692,7 @@ class ResultCardPdfGenerator {
         pw.Text(
           'Exam ',
           style: pw.TextStyle(
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: pw.FontWeight.bold,
             color: PdfColor.fromInt(0xFF2E7D32),
           ),
@@ -725,10 +704,10 @@ class ResultCardPdfGenerator {
                 bottom: pw.BorderSide(color: PdfColor.fromInt(0xFF2E7D32), width: 1),
               ),
             ),
-            padding: const pw.EdgeInsets.only(bottom: 2),
+            padding: const pw.EdgeInsets.only(bottom: 1),
             child: pw.Text(
               entry.card.examName,
-              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+              style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
             ),
           ),
         ),
@@ -737,12 +716,9 @@ class ResultCardPdfGenerator {
   }
 
   static pw.Widget _buildInfoLines(ResultCardPdfEntry entry) {
-    // NOTE: Deliberately avoids pw.Expanded/pw.Flexible anywhere in this
-    // tree. Inside pw.MultiPage, flex widgets can receive an unbounded
-    // height constraint from the pagination engine and throw
-    // "Flex children have non-zero flex but incoming height constraints
-    // are unbounded" even when nested inside what looks like a bounded
-    // Row. Fixed-width pw.Container/pw.SizedBox sidesteps this entirely.
+    const double contentWidth = 460;
+    const double thirdWidth = (contentWidth - 20) / 3; // minus 2x 10pt gaps
+
     pw.Widget underlinedField(String label, String value, double totalWidth) {
       final labelWidth = totalWidth * 0.30;
       final valueWidth = totalWidth - labelWidth;
@@ -752,8 +728,7 @@ class ResultCardPdfGenerator {
           pw.SizedBox(
             width: labelWidth,
             child: pw.Text(label,
-                style:
-                pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold)),
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
           ),
           pw.SizedBox(
             width: valueWidth,
@@ -764,26 +739,21 @@ class ResultCardPdfGenerator {
                 ),
               ),
               padding: const pw.EdgeInsets.only(bottom: 1),
-              child: pw.Text(value, style: const pw.TextStyle(fontSize: 10.5)),
+              child: pw.Text(value, style: const pw.TextStyle(fontSize: 10)),
             ),
           ),
         ],
       );
     }
 
-    // A4 page width (595pt) minus our margins/borders/padding — 460 is a
-    // safe usable content width for this card.
-    const double contentWidth = 460;
-    const double thirdWidth = (contentWidth - 20) / 3; // minus 2x 10pt gaps
-
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       mainAxisSize: pw.MainAxisSize.min,
       children: [
         underlinedField("Student's Name: ", entry.studentName, contentWidth),
-        pw.SizedBox(height: 8),
+        pw.SizedBox(height: 6),
         underlinedField('Father Name ', entry.fatherName, contentWidth),
-        pw.SizedBox(height: 8),
+        pw.SizedBox(height: 6),
         pw.Row(
           children: [
             underlinedField('Class: ', entry.className, thirdWidth),
@@ -808,17 +778,17 @@ class ResultCardPdfGenerator {
       totalObtained += obtained[s.name] ?? 0;
     }
 
-    final headerStyle = pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold);
-    final cellStyle = const pw.TextStyle(fontSize: 10);
-    final border = pw.TableBorder.all(color: borderColor, width: 0.7);
+    final headerStyle = pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold);
+    final cellStyle = const pw.TextStyle(fontSize: 9);
+    final border = pw.TableBorder.all(color: borderColor, width: 0.6);
 
     return pw.Table(
       border: border,
       columnWidths: {
-        0: const pw.FixedColumnWidth(28),
+        0: const pw.FixedColumnWidth(25),
         1: const pw.FlexColumnWidth(3.4),
-        2: const pw.FlexColumnWidth(1.3),
-        3: const pw.FlexColumnWidth(1.3),
+        2: const pw.FlexColumnWidth(1.2),
+        3: const pw.FlexColumnWidth(1.2),
       },
       children: [
         pw.TableRow(
@@ -826,7 +796,7 @@ class ResultCardPdfGenerator {
           children: [
             _cell('Sr.#', headerStyle, center: true),
             _cell('Subjects', headerStyle),
-            _cell('Maximum', headerStyle, center: true),
+            _cell('Max', headerStyle, center: true),
             _cell('Obtained', headerStyle, center: true),
           ],
         ),
@@ -836,8 +806,7 @@ class ResultCardPdfGenerator {
               _cell('${i + 1}.', cellStyle, center: true),
               _cell(subjects[i].name, cellStyle),
               _cell('${subjects[i].totalMarks}', cellStyle, center: true),
-              _cell(_formatMarks(obtained[subjects[i].name] ?? 0), cellStyle,
-                  center: true),
+              _cell(_formatMarks(obtained[subjects[i].name] ?? 0), cellStyle, center: true),
             ],
           ),
         pw.TableRow(
@@ -855,7 +824,7 @@ class ResultCardPdfGenerator {
 
   static pw.Widget _cell(String text, pw.TextStyle style, {bool center = false}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: pw.Text(
         text,
         style: style,
@@ -873,10 +842,9 @@ class ResultCardPdfGenerator {
       return pw.Row(
         mainAxisSize: pw.MainAxisSize.min,
         children: [
-          pw.Text(label,
-              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+          pw.Text(label, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(width: 4),
-          pw.Text(value, style: const pw.TextStyle(fontSize: 10)),
+          pw.Text(value, style: const pw.TextStyle(fontSize: 9)),
         ],
       );
     }
@@ -884,14 +852,13 @@ class ResultCardPdfGenerator {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
-        item('Marks Percentage ', '${entry.percentage.toStringAsFixed(1)}%'),
-        item('Position in Class ', entry.positionLabel),
+        item('Percentage: ', '${entry.percentage.toStringAsFixed(1)}%'),
+        item('Position: ', entry.positionLabel),
       ],
     );
   }
 
   static pw.Widget _buildSignatureRow(ResultCardPdfEntry entry) {
-    // Fixed width instead of pw.Expanded — see note in _buildInfoLines.
     const double contentWidth = 460;
     const double blockWidth = (contentWidth - 40) / 3; // minus 2x 20pt gaps
 
@@ -908,11 +875,11 @@ class ResultCardPdfGenerator {
                   top: pw.BorderSide(color: PdfColors.black, width: 0.7),
                 ),
               ),
-              padding: const pw.EdgeInsets.only(top: 3),
+              padding: const pw.EdgeInsets.only(top: 2),
               child: pw.Text(
                 label,
                 textAlign: pw.TextAlign.center,
-                style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
               ),
             ),
           ],
@@ -925,20 +892,19 @@ class ResultCardPdfGenerator {
       children: [
         pw.Row(
           children: [
-            sigBlock('Sign of Class Incharge'),
+            sigBlock('Class Incharge'),
             pw.SizedBox(width: 20),
-            sigBlock('Sign of Principal'),
+            sigBlock('Principal'),
             pw.SizedBox(width: 20),
-            sigBlock(
-                'Result Declaration Date\n${DateFormat('dd MMM yyyy').format(entry.card.date)}'),
+            sigBlock('Date: ${DateFormat('dd MMM yyyy').format(entry.card.date)}'),
           ],
         ),
-        pw.SizedBox(height: 6),
+        pw.SizedBox(height: 4),
         pw.Align(
           alignment: pw.Alignment.centerRight,
           child: pw.Text(
-            'PDF generated on ${DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now())}',
-            style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey600),
+            'Generated on ${DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now())}',
+            style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey600),
           ),
         ),
       ],
