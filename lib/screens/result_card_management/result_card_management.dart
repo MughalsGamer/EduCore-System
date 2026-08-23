@@ -513,7 +513,16 @@ class _StudentWiseResultCardsScreenState
             ),
             background: Container(color: _T.bg),
           ),
-          actions: [
+          leading:
+          IconButton(
+            tooltip: 'Back', // Added for accessibility
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded, // Changed to rounded for consistency
+              color: _T.textSecondary,
+              size: 20, // Optional: fine-tune size for header alignment
+            ),
+            onPressed: () => Navigator.of(context).pop(), // Fixed typo and logic
+          ),          actions: [
             IconButton(
               icon: const Icon(Icons.picture_as_pdf_outlined,
                   color: _T.textSecondary),
@@ -548,7 +557,10 @@ class _StudentWiseResultCardsScreenState
             ),
           )
         else if (flatResults.isEmpty)
-          SliverFillRemaining(child: _buildEmptyState())
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _buildEmptyState(),
+          )
         else if (_viewMode == _ViewMode.grid)
             SliverPadding(
               padding: EdgeInsets.fromLTRB(
@@ -1419,45 +1431,49 @@ class _StudentWiseResultCardsScreenState
 
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 96,
-            height: 96,
-            decoration: BoxDecoration(
-              color: _T.primaryLight,
-              shape: BoxShape.circle,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                color: _T.primaryLight,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.assignment_outlined,
+                  size: 44, color: _T.primary.withOpacity(0.6)),
             ),
-            child: Icon(Icons.assignment_outlined,
-                size: 44, color: _T.primary.withOpacity(0.6)),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'No exam results found',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: _T.textPrimary,
+            const SizedBox(height: 20),
+            const Text(
+              'No exam results found',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: _T.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _showAllData
-                ? 'Generate a result card first to see results here.'
-                : 'No results for this month. Try "All Data" in the date filter.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 13.5,
-              color: _T.textSecondary,
-              fontWeight: FontWeight.w500,
+            const SizedBox(height: 6),
+            Text(
+              _showAllData
+                  ? 'Generate a result card first\nto see results here.'
+                  : 'No results for this month.\nTry "All Data" in the date filter.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                color: _T.textSecondary,
+                fontWeight: FontWeight.w500,
+                height: 1.4,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
-
   // ─── Grid Layout (masonry-style, no leftover empty space) ──────
 
   int _gridColumnCount(double width) {

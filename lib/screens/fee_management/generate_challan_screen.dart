@@ -54,7 +54,8 @@
 //   final Map<String, TextEditingController> _familyExtraLabelCtrls = {};
 //   final Set<String> _familyExtraExpanded = {};
 //
-//   bool _includeAnnualFund = false; // Checkbox state
+//   // ── Annual fund toggle ──
+//   bool _includeAnnualFund = false;
 //
 //   @override
 //   void initState() {
@@ -67,9 +68,8 @@
 //
 //     WidgetsBinding.instance.addPostFrameCallback((_) {
 //       if (!mounted) return;
-//       context
-//           .read<FeeChallanProvider>()
-//           .refreshAlreadyGenerated(_billingMonth, _billingYear);
+//       context.read<FeeChallanProvider>().loadAllStudentIdsWithChallans(); // ★ NEW
+//       context.read<FeeChallanProvider>().refreshAlreadyGenerated(_billingMonth, _billingYear);
 //     });
 //   }
 //
@@ -133,13 +133,67 @@
 //
 //   String _buildFeeBreakdown(ChallanStudentLine s) {
 //     final parts = <String>[];
-//     if (s.isFirstChallan) {
-//       if (s.registrationFee > 0) parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
-//       if (s.annualFee > 0) parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+//     // Admission/Registration fee sirf pehli challan mein aati hai,
+//     // lekin agar >0 hai to show karo (kyunki registrationFee tabhi >0 hota hai jab isFirstChallan true ho)
+//     if (s.registrationFee > 0) {
+//       parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
 //     }
-//     if (s.monthlyFee > 0) parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
-//     if (s.academyFee > 0) parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+//     // Annual fee ab hamesha show hogi agar >0 ho (chahe first challan ho ya includeAnnualFund se aayi ho)
+//     if (s.annualFee > 0) {
+//       parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+//     }
+//     if (s.monthlyFee > 0) {
+//       parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
+//     }
+//     if (s.academyFee > 0) {
+//       parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+//     }
 //     return parts.join('  •  ');
+//   }
+//
+//   // ─── Total preview calculation ─────────────────────────────────
+//   double? _getOverallExtraAmount() {
+//     if (!_overallExtraEnabled) return null;
+//     final amt = double.tryParse(_overallExtraAmountCtrl.text.trim());
+//     return (amt != null && amt > 0) ? amt : null;
+//   }
+//
+//   double _calculateFamilyTotal(FamilyForChallan family, FeeChallanProvider provider) {
+//     double total = 0;
+//     final eligibleStudents = provider.eligibleStudentsFor(family);
+//
+//     for (final student in eligibleStudents) {
+//       total += (student.monthlyFee ?? 0) + (student.academyFee ?? 0);
+//       bool isFirstChallan = provider.isFirstChallan(student.studentId) || student.rebillAnnualFeeOnce;
+//
+//
+//
+//       if (isFirstChallan) {
+//         total += (student.registrationFee ?? 0);
+//         if (!_includeAnnualFund) {
+//           total += (student.annualFee ?? 0);
+//         }
+//       }
+//
+//       if (_includeAnnualFund) {
+//         total += (student.annualFee ?? 0);
+//       }
+//     }
+//
+//     final overallExtra = _getOverallExtraAmount();
+//     if (overallExtra != null) {
+//       total += overallExtra;
+//     }
+//
+//     if (_familyExtraExpanded.contains(family.familyDocId)) {
+//       final amtCtrl = _familyExtraAmountCtrls[family.familyDocId];
+//       final amt = double.tryParse(amtCtrl?.text.trim() ?? '');
+//       if (amt != null && amt > 0) {
+//         total += amt;
+//       }
+//     }
+//
+//     return total;
 //   }
 //
 //   @override
@@ -185,6 +239,7 @@
 //       body: Column(
 //         children: [
 //           _buildDateHeader(),
+//           _buildAnnualFundCheckbox(),
 //           _buildOverallExtraChargeCard(),
 //           if (challanProvider.error != null) _buildErrorBanner(challanProvider),
 //           if (challanProvider.lastGeneratedChallans.isNotEmpty ||
@@ -204,6 +259,8 @@
 //                 final eligibleCount = challanProvider.eligibleStudentsFor(family).length;
 //                 final selected = _selectedFamilyDocIds.contains(family.familyDocId);
 //
+//                 final totalAmount = _calculateFamilyTotal(family, challanProvider);
+//
 //                 final extraAmountCtrl = _familyExtraAmountCtrls.putIfAbsent(
 //                     family.familyDocId, () => TextEditingController());
 //                 final extraLabelCtrl = _familyExtraLabelCtrls.putIfAbsent(
@@ -215,6 +272,7 @@
 //                   fullyGenerated: fullyDone,
 //                   partiallyGenerated: partiallyDone,
 //                   eligibleStudentCount: eligibleCount,
+//                   totalAmount: totalAmount,
 //                   onTap: fullyDone
 //                       ? null
 //                       : () {
@@ -385,6 +443,28 @@
 //     );
 //   }
 //
+//   // ─── Annual fund checkbox ──────────────────────────────────────
+//   Widget _buildAnnualFundCheckbox() {
+//     return Container(
+//       margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+//       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.circular(10),
+//         border: Border.all(color: Colors.grey.shade200),
+//       ),
+//       child: CheckboxListTile(
+//         value: _includeAnnualFund,
+//         onChanged: (v) => setState(() => _includeAnnualFund = v ?? false),
+//         title: const Text('Include Annual Fund for all students'),
+//         subtitle: const Text('Add annual fee regardless of first challan status'),
+//         controlAffinity: ListTileControlAffinity.leading,
+//         activeColor: _purple,
+//         contentPadding: EdgeInsets.zero,
+//       ),
+//     );
+//   }
+//
 //   // ─── Overall extra charge ──────────────────────────────────────
 //   Widget _buildOverallExtraChargeCard() {
 //     return Container(
@@ -462,27 +542,6 @@
 //             ),
 //           ],
 //         ],
-//       ),
-//     );
-//   }
-//
-//   Widget _buildAnnualFundCheckbox() {
-//     return Container(
-//       margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-//       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-//       decoration: BoxDecoration(
-//         color: Colors.white,
-//         borderRadius: BorderRadius.circular(10),
-//         border: Border.all(color: Colors.grey.shade200),
-//       ),
-//       child: CheckboxListTile(
-//         value: _includeAnnualFund,
-//         onChanged: (v) => setState(() => _includeAnnualFund = v ?? false),
-//         title: const Text('Include Annual Fund for all students'),
-//         subtitle: const Text('Add annual fee regardless of first challan status'),
-//         controlAffinity: ListTileControlAffinity.leading,
-//         activeColor: _purple,
-//         contentPadding: EdgeInsets.zero,
 //       ),
 //     );
 //   }
@@ -761,6 +820,7 @@
 //           : _overallExtraLabelCtrl.text.trim(),
 //       familyExtraAmounts: familyExtraAmounts,
 //       familyExtraLabels: familyExtraLabels,
+//       includeAnnualFund: _includeAnnualFund,
 //     );
 //
 //     if (!mounted) return;
@@ -784,6 +844,7 @@
 //   final VoidCallback onToggleExtra;
 //   final TextEditingController extraAmountCtrl;
 //   final TextEditingController extraLabelCtrl;
+//   final double totalAmount;
 //
 //   const _FamilySelectTile({
 //     required this.family,
@@ -796,6 +857,7 @@
 //     required this.onToggleExtra,
 //     required this.extraAmountCtrl,
 //     required this.extraLabelCtrl,
+//     required this.totalAmount,
 //   });
 //
 //   static const _purple = Color(0xFF534AB7);
@@ -803,11 +865,6 @@
 //
 //   @override
 //   Widget build(BuildContext context) {
-//     final totalMonthly = family.students.fold<double>(
-//       0,
-//           (s, st) => s + (st.monthlyFee ?? 0) + (st.academyFee ?? 0),
-//     );
-//
 //     return Opacity(
 //       opacity: fullyGenerated ? 0.55 : 1,
 //       child: Card(
@@ -874,8 +931,8 @@
 //                     Column(
 //                       crossAxisAlignment: CrossAxisAlignment.end,
 //                       children: [
-//                         if (totalMonthly > 0)
-//                           Text('Rs ${totalMonthly.toStringAsFixed(0)}',
+//                         if (!fullyGenerated)
+//                           Text('Rs ${totalAmount.toStringAsFixed(0)}',
 //                               style: const TextStyle(
 //                                   fontWeight: FontWeight.bold, color: _purple, fontSize: 13)),
 //                         if (fullyGenerated)
@@ -1011,12 +1068,21 @@
 //
 //   String _buildFeeBreakdown(ChallanStudentLine s) {
 //     final parts = <String>[];
-//     if (s.isFirstChallan) {
-//       if (s.registrationFee > 0) parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
-//       if (s.annualFee > 0) parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+//     // Admission/Registration fee sirf pehli challan mein aati hai,
+//     // lekin agar >0 hai to show karo (kyunki registrationFee tabhi >0 hota hai jab isFirstChallan true ho)
+//     if (s.registrationFee > 0) {
+//       parts.add('Admission: Rs ${s.registrationFee.toStringAsFixed(0)}');
 //     }
-//     if (s.monthlyFee > 0) parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
-//     if (s.academyFee > 0) parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+//     // Annual fee ab hamesha show hogi agar >0 ho (chahe first challan ho ya includeAnnualFund se aayi ho)
+//     if (s.annualFee > 0) {
+//       parts.add('Annual: Rs ${s.annualFee.toStringAsFixed(0)}');
+//     }
+//     if (s.monthlyFee > 0) {
+//       parts.add('Monthly: Rs ${s.monthlyFee.toStringAsFixed(0)}');
+//     }
+//     if (s.academyFee > 0) {
+//       parts.add('Academy: Rs ${s.academyFee.toStringAsFixed(0)}');
+//     }
 //     return parts.join('  •  ');
 //   }
 //
@@ -1503,13 +1569,13 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
           end: Alignment.bottomRight,
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Billing Month',
-              style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
+              style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
           Row(
             children: [
               Expanded(flex: 3, child: _monthDropdown()),
@@ -1517,7 +1583,7 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
               Expanded(flex: 2, child: _yearDropdown()),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
@@ -1603,7 +1669,7 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
         if (picked != null) onPicked(picked);
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.15),
           borderRadius: BorderRadius.circular(10),
@@ -1612,15 +1678,15 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10.5)),
+            const SizedBox(height: 3),
             Row(
               children: [
-                const Icon(Icons.calendar_today, size: 14, color: Colors.white),
+                const Icon(Icons.calendar_today, size: 13, color: Colors.white),
                 const SizedBox(width: 6),
                 Text(_fmt(value),
                     style: const TextStyle(
-                        color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                        color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
               ],
             ),
           ],
@@ -1632,21 +1698,41 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
   // ─── Annual fund checkbox ──────────────────────────────────────
   Widget _buildAnnualFundCheckbox() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.grey.shade200),
       ),
-      child: CheckboxListTile(
-        value: _includeAnnualFund,
-        onChanged: (v) => setState(() => _includeAnnualFund = v ?? false),
-        title: const Text('Include Annual Fund for all students'),
-        subtitle: const Text('Add annual fee regardless of first challan status'),
-        controlAffinity: ListTileControlAffinity.leading,
-        activeColor: _purple,
-        contentPadding: EdgeInsets.zero,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => setState(() => _includeAnnualFund = !_includeAnnualFund),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 30,
+                height: 22,
+                child: Checkbox(
+                  value: _includeAnnualFund,
+                  onChanged: (v) => setState(() => _includeAnnualFund = v ?? false),
+                  activeColor: _purple,
+                  visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Include Annual Fund for all students',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1654,32 +1740,46 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
   // ─── Overall extra charge ──────────────────────────────────────
   Widget _buildOverallExtraChargeCard() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      padding:  EdgeInsets.symmetric(horizontal: 10, vertical: _overallExtraEnabled ? 8 : 0),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Checkbox(
-                value: _overallExtraEnabled,
-                activeColor: _purple,
-                onChanged: (v) => setState(() => _overallExtraEnabled = v ?? false),
+          InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => setState(() => _overallExtraEnabled = !_overallExtraEnabled),
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: _overallExtraEnabled ? 0 : 6),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 30,
+                    height: 22,
+                    child: Checkbox(
+                      value: _overallExtraEnabled,
+                      activeColor: _purple,
+                      visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onChanged: (v) => setState(() => _overallExtraEnabled = v ?? false),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Apply extra charge to ALL selected families',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Icon(Icons.groups_outlined,
+                      size: 16, color: _overallExtraEnabled ? _purple : Colors.grey.shade400),
+                ],
               ),
-              const Expanded(
-                child: Text(
-                  'Apply extra charge to ALL selected families',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-              ),
-              Icon(Icons.groups_outlined,
-                  size: 18, color: _overallExtraEnabled ? _purple : Colors.grey.shade400),
-            ],
+            ),
           ),
           if (_overallExtraEnabled) ...[
             const SizedBox(height: 6),
@@ -1689,11 +1789,14 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
                   flex: 2,
                   child: TextField(
                     controller: _overallExtraLabelCtrl,
+                    style: const TextStyle(fontSize: 13),
                     decoration: InputDecoration(
                       labelText: 'Label / Note',
+                      labelStyle: const TextStyle(fontSize: 12),
                       isDense: true,
                       filled: true,
                       fillColor: _lightPurple,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide.none,
@@ -1706,12 +1809,15 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
                   child: TextField(
                     controller: _overallExtraAmountCtrl,
                     keyboardType: TextInputType.number,
+                    style: const TextStyle(fontSize: 13),
                     decoration: InputDecoration(
                       labelText: 'Amount',
+                      labelStyle: const TextStyle(fontSize: 12),
                       prefixText: 'Rs ',
                       isDense: true,
                       filled: true,
                       fillColor: _lightPurple,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide.none,
@@ -1724,7 +1830,7 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
             const SizedBox(height: 4),
             Text(
               'Yeh amount + note har selected family ki is generation ki challan mein add ho jayega.',
-              style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
             ),
           ],
         ],
@@ -1824,7 +1930,7 @@ class _GenerateChallanViewState extends State<_GenerateChallanView> {
     final allSelected = selectableIds.isNotEmpty && selectableIds.every(_selectedFamilyDocIds.contains);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Row(
         children: [
           Expanded(
@@ -2376,23 +2482,22 @@ class _GeneratedChallanCardState extends State<_GeneratedChallanCard> {
                     ...c.extraCharges.map((ex) => Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Icon(
-                                ex.source == 'overall'
-                                    ? Icons.groups_outlined
-                                    : Icons.person_outline,
-                                size: 12,
-                                color: Colors.grey.shade500,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(ex.label,
-                                  style:
-                                  TextStyle(fontSize: 12, color: Colors.grey.shade700)),
-                            ],
+                          Icon(
+                            ex.source == 'overall'
+                                ? Icons.groups_outlined
+                                : Icons.person_outline,
+                            size: 12,
+                            color: Colors.grey.shade500,
                           ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(ex.label,
+                                overflow: TextOverflow.ellipsis,
+                                style:
+                                TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                          ),
+                          const SizedBox(width: 6),
                           Text('Rs ${ex.amount.toStringAsFixed(0)}',
                               style: const TextStyle(
                                   fontSize: 12, fontWeight: FontWeight.w600)),
@@ -2417,13 +2522,16 @@ class _GeneratedChallanCardState extends State<_GeneratedChallanCard> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12,
-                  color: bold ? Colors.black87 : Colors.grey.shade600,
-                  fontWeight: bold ? FontWeight.w700 : FontWeight.normal)),
+          Expanded(
+            child: Text(label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 12,
+                    color: bold ? Colors.black87 : Colors.grey.shade600,
+                    fontWeight: bold ? FontWeight.w700 : FontWeight.normal)),
+          ),
+          const SizedBox(width: 6),
           Text('Rs ${value.toStringAsFixed(0)}',
               style: TextStyle(
                   fontSize: 12,

@@ -819,35 +819,36 @@ class _DashboardScreenState extends State<DashboardScreen>
         );
       },
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 15, 14, 15),
+        padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
         decoration: _T.glass(radius: 18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
               children: [
                 Container(
-                  width: 38,
-                  height: 38,
+                  width: 28,
+                  height: 28,
                   decoration: BoxDecoration(
                     color: s.colorSoft,
-                    borderRadius: BorderRadius.circular(11),
+                    borderRadius: BorderRadius.circular(9),
                   ),
-                  child: Icon(s.icon, color: s.color, size: 19),
+                  child: Icon(s.icon, color: s.color, size: 14),
                 ),
                 const Spacer(),
                 if (s.isLive)
                   Container(
-                    width: 7,
-                    height: 7,
+                    width: 6,
+                    height: 6,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: _T.teal,
                       boxShadow: [
                         BoxShadow(
                           color: _T.teal.withOpacity(0.35),
-                          blurRadius: 5,
+                          blurRadius: 4,
                           spreadRadius: 1,
                         ),
                       ],
@@ -855,33 +856,33 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
               ],
             ),
-            const SizedBox(height: 10),
             Text(s.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                    fontSize: 11, color: _T.inkFaint, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 3),
+                    fontSize: 10, color: _T.inkFaint, fontWeight: FontWeight.w600)),
             s.isLoading
                 ? const SizedBox(
-              width: 16,
-              height: 16,
+              width: 14,
+              height: 14,
               child: CircularProgressIndicator(strokeWidth: 2, color: _T.primary),
             )
-                : Text(s.value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
-                    color: _T.ink)),
+                : FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(s.value,
+                  maxLines: 1,
+                  style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                      color: _T.ink)),
+            ),
           ],
         ),
       ),
     );
   }
-
   Widget _qaChip(_QuickAction a, int index) {
     return Material(
       color: Colors.transparent,

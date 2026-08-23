@@ -600,7 +600,12 @@ class _SalaryAdjustmentScreenState extends State<SalaryAdjustmentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                // FIX: Row → Wrap so type/amount/LATEST badge/date wrap to a
+                // second line instead of overflowing on narrow screens.
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
                   children: [
                     Text(
                       isIncrement ? 'Increment' : 'Decrement',
@@ -609,7 +614,6 @@ class _SalaryAdjustmentScreenState extends State<SalaryAdjustmentScreen> {
                           fontWeight: FontWeight.w700,
                           color: color),
                     ),
-                    const SizedBox(width: 8),
                     Text(
                       '${isIncrement ? '+' : '-'} Rs ${_formatMoney(h.amount)}',
                       style: TextStyle(
@@ -617,8 +621,7 @@ class _SalaryAdjustmentScreenState extends State<SalaryAdjustmentScreen> {
                           fontWeight: FontWeight.w600,
                           color: color),
                     ),
-                    if (isLatest) ...[
-                      const SizedBox(width: 6),
+                    if (isLatest)
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
@@ -634,8 +637,6 @@ class _SalaryAdjustmentScreenState extends State<SalaryAdjustmentScreen> {
                               color: _kPurple),
                         ),
                       ),
-                    ],
-                    const Spacer(),
                     Text(h.date,
                         style: TextStyle(
                             fontSize: 11, color: Colors.grey.shade500)),
@@ -644,17 +645,23 @@ class _SalaryAdjustmentScreenState extends State<SalaryAdjustmentScreen> {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    Text('Rs ${_formatMoney(h.oldSalary)}',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey.shade600)),
+                    Flexible(
+                      child: Text('Rs ${_formatMoney(h.oldSalary)}',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade600)),
+                    ),
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 6),
                       child: Icon(Icons.arrow_forward_rounded,
                           size: 12, color: Colors.grey),
                     ),
-                    Text('Rs ${_formatMoney(h.newSalary)}',
-                        style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600)),
+                    Flexible(
+                      child: Text('Rs ${_formatMoney(h.newSalary)}',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600)),
+                    ),
                   ],
                 ),
                 if (h.reason.trim().isNotEmpty) ...[
@@ -688,7 +695,6 @@ class _SalaryAdjustmentScreenState extends State<SalaryAdjustmentScreen> {
       ),
     );
   }
-
   InputDecoration _inputDeco(String label,
       {String? hint, String? prefixText}) {
     return InputDecoration(

@@ -3,8 +3,8 @@
 // import 'package:provider/provider.dart';
 // import '../../models/subject_model.dart';
 // import '../../providers/subject_provider.dart';
-// import '../../providers/class_provider.dart';   // ← ADD
-// import '../../providers/teacher_provider.dart'; // ← ADD
+// import '../../providers/class_provider.dart';
+// import '../../providers/teacher_provider.dart';
 // import 'add_edit_subject.dart';
 //
 // const List<_SC> _colors = [
@@ -24,7 +24,14 @@
 // }
 //
 // class MuddulListScreen extends StatefulWidget {
-//   const MuddulListScreen({super.key});
+//   final bool showAppBar;
+//   final bool showFAB;
+//
+//   const MuddulListScreen({
+//     super.key,
+//     this.showAppBar = true,
+//     this.showFAB = true,
+//   });
 //
 //   @override
 //   State<MuddulListScreen> createState() => _MuddulListScreenState();
@@ -72,20 +79,16 @@
 //         .toList();
 //   }
 //
-//   // ── Check karo kya subject assign hai ──
 //   Map<String, List<String>> _getAssignedPlaces(String subjectName) {
 //     final List<String> assignedClasses = [];
 //     final List<String> assignedStaff = [];
 //
-//     // Classes check
 //     final classes = context.read<ClassProvider>().classes;
 //     for (final cls in classes) {
-//       // Class level subjects
 //       if (cls.subjects != null && cls.subjects!.contains(subjectName)) {
 //         assignedClasses.add(cls.name);
 //         continue;
 //       }
-//       // Section level subjects
 //       for (final section in cls.sections) {
 //         if (section.subjects != null &&
 //             section.subjects!.contains(subjectName)) {
@@ -95,7 +98,6 @@
 //       }
 //     }
 //
-//     // Teachers & Staff check
 //     final staffProvider = context.read<StaffProvider>();
 //     final allStaff = [...staffProvider.teachers, ...staffProvider.staffOnly];
 //     for (final s in allStaff) {
@@ -107,7 +109,6 @@
 //     return {'classes': assignedClasses, 'staff': assignedStaff};
 //   }
 //
-//   // ── Warning dialog ──
 //   void _showAssignedWarning(
 //       String subjectName, Map<String, List<String>> places, String action) {
 //     final classes = places['classes']!;
@@ -216,9 +217,7 @@
 //     );
 //   }
 //
-//   // ── Delete (check + confirm) ──
 //   Future<void> _confirmDelete(Muddul m) async {
-//     // Pehle check karo
 //     final places = _getAssignedPlaces(m.subjectName);
 //     final isAssigned =
 //         places['classes']!.isNotEmpty || places['staff']!.isNotEmpty;
@@ -228,7 +227,6 @@
 //       return;
 //     }
 //
-//     // Assigned nahi hai → normal delete flow
 //     final ok = await showDialog<bool>(
 //       context: context,
 //       builder: (_) => AlertDialog(
@@ -268,7 +266,6 @@
 //     }
 //   }
 //
-//   // ── Edit check ──
 //   void _tryEdit(Muddul m) {
 //     final places = _getAssignedPlaces(m.subjectName);
 //     final isAssigned =
@@ -285,7 +282,6 @@
 //     );
 //   }
 //
-//   // ── Stats ──
 //   Widget _buildStats(List<Muddul> all) {
 //     final now = DateTime.now();
 //     final thisMonth = all
@@ -329,11 +325,9 @@
 //     ),
 //   );
 //
-//   // ── Subject card ──
 //   Widget _buildCard(Muddul m) {
 //     final c = _colorFor(m.subjectName);
 //
-//     // Check if assigned (for lock icon)
 //     final places = _getAssignedPlaces(m.subjectName);
 //     final isAssigned =
 //         places['classes']!.isNotEmpty || places['staff']!.isNotEmpty;
@@ -347,12 +341,11 @@
 //       ),
 //       child: InkWell(
 //         borderRadius: BorderRadius.circular(14),
-//         onTap: () => _tryEdit(m), // ← edit check here too
+//         onTap: () => _tryEdit(m),
 //         child: Padding(
 //           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
 //           child: Row(
 //             children: [
-//               // Code badge
 //               Container(
 //                 width: 76,
 //                 padding: const EdgeInsets.symmetric(vertical: 7),
@@ -367,7 +360,6 @@
 //                         letterSpacing: 0.8)),
 //               ),
 //               const SizedBox(width: 12),
-//               // Name + description
 //               Expanded(
 //                 child: Column(
 //                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -379,7 +371,6 @@
 //                               style: const TextStyle(
 //                                   fontSize: 14, fontWeight: FontWeight.w600)),
 //                         ),
-//                         // Lock badge if assigned
 //                         if (isAssigned)
 //                           Container(
 //                             padding: const EdgeInsets.symmetric(
@@ -418,7 +409,6 @@
 //                   ],
 //                 ),
 //               ),
-//               // Edit / Delete buttons
 //               _iconBtn(
 //                 isAssigned ? Icons.lock_outline : Icons.edit_outlined,
 //                 isAssigned ? Colors.orange.shade400 : c.text,
@@ -452,7 +442,6 @@
 //         ),
 //       );
 //
-//   // ── Empty state ──
 //   Widget _buildEmpty() => Center(
 //     child: Column(
 //       mainAxisSize: MainAxisSize.min,
@@ -477,7 +466,8 @@
 //
 //     return Scaffold(
 //       backgroundColor: Colors.grey.shade50,
-//       appBar: AppBar(
+//       appBar: widget.showAppBar
+//           ? AppBar(
 //         title: const Text('Subjects'),
 //         centerTitle: true,
 //         elevation: 0,
@@ -503,7 +493,8 @@
 //             ),
 //           ),
 //         ],
-//       ),
+//       )
+//           : null,
 //       body: provider.loading
 //           ? const Center(child: CircularProgressIndicator())
 //           : provider.error != null
@@ -549,17 +540,20 @@
 //           ),
 //         ],
 //       ),
-//       floatingActionButton: FloatingActionButton.extended(
+//       floatingActionButton: widget.showFAB
+//           ? FloatingActionButton.extended(
 //         onPressed: () => Navigator.push(
 //           context,
-//           MaterialPageRoute(builder: (_) => const AddEditMuddulScreen()),
+//           MaterialPageRoute(
+//               builder: (_) => const AddEditMuddulScreen()),
 //         ),
 //         backgroundColor: _purple,
 //         foregroundColor: Colors.white,
 //         icon: const Icon(Icons.add),
 //         label: const Text('Add subject',
 //             style: TextStyle(fontWeight: FontWeight.w600)),
-//       ),
+//       )
+//           : null,
 //     );
 //   }
 // }
@@ -1025,6 +1019,23 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
     ),
   );
 
+  // ★ Row shown only when there's no AppBar (which would otherwise
+  // supply its own back button). Kept minimal so it doesn't disturb
+  // the rest of the layout below it.
+  Widget _buildManualBackRow() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 16, 0),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<MuddulProvider>();
@@ -1061,50 +1072,56 @@ class _MuddulListScreenState extends State<MuddulListScreen> {
         ],
       )
           : null,
-      body: provider.loading
-          ? const Center(child: CircularProgressIndicator())
-          : provider.error != null
-          ? Center(
-          child: Text(provider.error!,
-              style: const TextStyle(color: Colors.red)))
-          : Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search subjects…',
-                prefixIcon: const Icon(Icons.search, size: 20),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                  icon: const Icon(Icons.clear, size: 18),
-                  onPressed: _searchController.clear,
-                )
-                    : null,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none),
-                filled: true,
-                fillColor: Colors.white,
-                isDense: true,
-                contentPadding:
-                const EdgeInsets.symmetric(vertical: 10),
+      // ★ SafeArea so content (and the manual back arrow below) never
+      // sit under the notch, status bar, or home-indicator on mobile
+      // when no AppBar is shown.
+      body: SafeArea(
+        child: provider.loading
+            ? const Center(child: CircularProgressIndicator())
+            : provider.error != null
+            ? Center(
+            child: Text(provider.error!,
+                style: const TextStyle(color: Colors.red)))
+            : Column(
+          children: [
+            if (!widget.showAppBar) _buildManualBackRow(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search subjects…',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                    icon: const Icon(Icons.clear, size: 18),
+                    onPressed: _searchController.clear,
+                  )
+                      : null,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none),
+                  filled: true,
+                  fillColor: Colors.white,
+                  isDense: true,
+                  contentPadding:
+                  const EdgeInsets.symmetric(vertical: 10),
+                ),
               ),
             ),
-          ),
-          _buildStats(provider.mudduls),
-          const SizedBox(height: 6),
-          Expanded(
-            child: filtered.isEmpty
-                ? _buildEmpty()
-                : ListView.builder(
-              padding: const EdgeInsets.only(bottom: 110),
-              itemCount: filtered.length,
-              itemBuilder: (_, i) => _buildCard(filtered[i]),
+            _buildStats(provider.mudduls),
+            const SizedBox(height: 6),
+            Expanded(
+              child: filtered.isEmpty
+                  ? _buildEmpty()
+                  : ListView.builder(
+                padding: const EdgeInsets.only(bottom: 110),
+                itemCount: filtered.length,
+                itemBuilder: (_, i) => _buildCard(filtered[i]),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       floatingActionButton: widget.showFAB
           ? FloatingActionButton.extended(

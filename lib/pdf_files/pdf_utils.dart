@@ -1,22 +1,21 @@
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
-import 'dart:html' as html; // صرف ویب کے لیے
+import 'package:printing/printing.dart';
 
 class PdfUtils {
   static Future<void> saveAndOpenPdf(Uint8List pdfBytes, String fileName) async {
     try {
       if (kIsWeb) {
-        // ✅ ویب: PDF براہ راست نئے ٹیب میں کھلے گی (Auto-Open)
-        final blob = html.Blob([pdfBytes], 'application/pdf');
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        html.window.open(url, '_blank'); // نیا ٹیب کھلے گا
-        // صارف براؤزر سے خود بھی ڈاؤن لوڈ کر سکتا ہے۔
+        // ✅ WEB: PDF naye tab mein seedha khulta hai (print/preview dialog).
+        await Printing.layoutPdf(
+          onLayout: (format) async => pdfBytes,
+          name: fileName,
+        );
       } else {
-        // ✅ موبائل: فائل سیو کریں اور خودکار اوپن کریں
+        // ✅ MOBILE/DESKTOP: file save + auto-open (jaisa pehle tha).
         final directory = await getTemporaryDirectory();
         final filePath = '${directory.path}/$fileName';
         final file = File(filePath);

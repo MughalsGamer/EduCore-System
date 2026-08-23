@@ -703,27 +703,55 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
           Text('${provider.teachers.length} teachers',
               style: const TextStyle(fontSize: 11, color: Colors.white70)),
         ]),
+        // actions: [
+        //   // --- BULK OPTIONS (PopupMenu) for mobile ---
+        //   PopupMenuButton<String>(
+        //     icon: const Icon(Icons.more_vert, color: Colors.white),
+        //     onSelected: (value) {
+        //       if (value == 'bulk_add') {
+        //         Navigator.push(context,
+        //             MaterialPageRoute(builder: (_) => const BulkAddStaffScreen()));
+        //       } else if (value == 'bulk_edit') {
+        //         Navigator.push(context,
+        //             MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'teacher')));
+        //       } else if (value == 'deactivated_list') {
+        //         _openDeactivatedList(context);
+        //       }
+        //     },
+        //     itemBuilder: (context) => [
+        //       const PopupMenuItem(value: 'bulk_add', child: Text('Bulk Add')),
+        //       const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
+        //       const PopupMenuItem(
+        //           value: 'deactivated_list',
+        //           child: Text('Deactivated List')), // ★ NEW
+        //     ],
+        //   ),
+        //   IconButton(
+        //       icon: const Icon(Icons.add),
+        //       tooltip: 'Add Teacher',
+        //       onPressed: () async {
+        //         final result = await Navigator.push(
+        //             context,
+        //             MaterialPageRoute(
+        //                 builder: (_) => const AddEditStaffScreen(initialType: 'teacher')));
+        //         if (result == true && mounted) provider.fetchTeachers();
+        //       })
+        // ],
         actions: [
-          // --- BULK OPTIONS (PopupMenu) for mobile ---
+          // Mobile: 3-dot menu now only has "Deactivated List". Bulk Add / Bulk
+          // Edit are desktop-only actions (already handled in the desktop
+          // PopupMenuButton above) so they're removed from the mobile menu.
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (value) {
-              if (value == 'bulk_add') {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const BulkAddStaffScreen()));
-              } else if (value == 'bulk_edit') {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const BulkEditStaffScreen(initialTypeFilter: 'teacher')));
-              } else if (value == 'deactivated_list') {
+              if (value == 'deactivated_list') {
                 _openDeactivatedList(context);
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 'bulk_add', child: Text('Bulk Add')),
-              const PopupMenuItem(value: 'bulk_edit', child: Text('Bulk Edit')),
               const PopupMenuItem(
                   value: 'deactivated_list',
-                  child: Text('Deactivated List')), // ★ NEW
+                  child: Text('Deactivated List')),
             ],
           ),
           IconButton(
@@ -738,6 +766,7 @@ class _TeacherListScreenState extends State<TeacherListScreen> {
               })
         ],
       ),
+
       body: Column(children: [
         Container(
             color: _kPurple,

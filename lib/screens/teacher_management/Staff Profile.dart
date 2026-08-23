@@ -7,8 +7,6 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:provider/provider.dart';
-import 'dart:html' as html; // صرف ویب کے لیے
-
 
 import '../../models/teacher.dart';
 import '../../pdf_files/pdf_utils.dart';

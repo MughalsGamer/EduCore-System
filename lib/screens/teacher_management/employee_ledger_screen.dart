@@ -600,7 +600,7 @@ class _EmployeeLedgerScreenState extends State<EmployeeLedgerScreen> {
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 10,
       mainAxisSpacing: 10,
-      childAspectRatio: 1.5,
+      childAspectRatio: 1.15,
       children: cards,
     );
   }
@@ -625,6 +625,7 @@ class _EmployeeLedgerScreenState extends State<EmployeeLedgerScreen> {
         border: Border.all(color: _kBorder),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,   // ← added: Column apni natural height se zyada demand nahi karega
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
@@ -633,13 +634,17 @@ class _EmployeeLedgerScreenState extends State<EmployeeLedgerScreen> {
             decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(9)),
             child: Icon(icon, color: iconColor, size: 18),
           ),
-          const SizedBox(height: 10),
-          Text(label, style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600)),
+          const SizedBox(height: 8),   // 10 se 8
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600)),
           const SizedBox(height: 4),
           Text(value,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: valueColor)),
-          const SizedBox(height: 4),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: valueColor)),
+          const SizedBox(height: 3),
           if (badge != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -648,11 +653,15 @@ class _EmployeeLedgerScreenState extends State<EmployeeLedgerScreen> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(badge,
-                  style: TextStyle(
-                      fontSize: 10.5, fontWeight: FontWeight.w700, color: badgeColor ?? _kSlate)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: badgeColor ?? _kSlate)),
             )
           else if (sub != null)
-            Text(sub, style: TextStyle(fontSize: 11, color: subColor ?? Colors.grey.shade500)),
+            Text(sub,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, color: subColor ?? Colors.grey.shade500)),
         ],
       ),
     );
@@ -965,18 +974,13 @@ class _EmployeeLedgerScreenState extends State<EmployeeLedgerScreen> {
 
   // Mobile: scrollable card list
   Widget _mobileCardsList(List<StaffTransaction> rows) {
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 460),
-      child: Scrollbar(
-        thumbVisibility: true,
-        child: ListView.separated(
-          shrinkWrap: true,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          itemCount: rows.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
-          itemBuilder: (context, i) => _mobileRow(rows[i]),
-        ),
-      ),
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      itemCount: rows.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, i) => _mobileRow(rows[i]),
     );
   }
 
