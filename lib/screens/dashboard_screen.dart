@@ -535,7 +535,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ? ClipRRect(
                   borderRadius: BorderRadius.circular(14),
                   child: Image.asset(
-                    'assets/images/EduCoreSystem.png',
+                    'assets/images/EducoreLogo.png',
                     fit: BoxFit.cover,
                   ),
                 )

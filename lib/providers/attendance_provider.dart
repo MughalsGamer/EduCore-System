@@ -1,3 +1,648 @@
+//
+//
+// import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:flutter/material.dart';
+// import '../models/attendance_model.dart';
+// import '../models/teacher.dart';
+// import '../providers/teacher_provider.dart';
+// import '../services/attendance_firestore_service.dart';
+//
+// class AttendanceProvider extends ChangeNotifier {
+//   final StaffProvider _staffProvider;
+//   final AttendanceFirestoreService _service = AttendanceFirestoreService();
+//
+//   List<AttendanceRecord> _records = [];
+//   bool _loading = false;
+//   String _selectedDate = DateTime.now().toIso8601String().split('T')[0];
+//   String _filterType = 'all'; // 'all', 'teacher', 'staff', 'academy_staff'
+//
+//   List<AttendanceRecord> get records => _records;
+//   bool get loading => _loading;
+//   String get selectedDate => _selectedDate;
+//   String get filterType => _filterType;
+//
+//   // History
+//   List<AttendanceRecord> _historyRecords = [];
+//   bool _historyLoading = false;
+//   String? _historyError;
+//
+//   List<AttendanceRecord> get historyRecords => _historyRecords;
+//   bool get historyLoading => _historyLoading;
+//   String? get historyError => _historyError;
+//   bool _staffLoaded = false;
+//
+//   Map<String, int> get monthSummary {
+//     Map<String, int> counts = {
+//       'total': _historyRecords.length,
+//       'present': 0,
+//       'absent': 0,
+//       'leave': 0,
+//       'late': 0,
+//       'half_day': 0,
+//       'holiday': 0,
+//     };
+//     for (final r in _historyRecords) {
+//       if (counts.containsKey(r.status)) {
+//         counts[r.status] = counts[r.status]! + 1;
+//       }
+//     }
+//     return counts;
+//   }
+//
+//   AttendanceProvider(this._staffProvider);
+//
+//   String _fmt(DateTime d) =>
+//       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+//
+//   // Loads attendance for the current selected date, with optional type filter
+//   Future<void> loadData({String? typeFilter}) async {
+//     _loading = true;
+//     _filterType = typeFilter ?? _filterType;
+//     notifyListeners();
+//
+//     await _ensureStaffLoaded();
+//
+//     final existingRecords = await _service.getAttendanceForDate(_selectedDate);
+//
+//     List<StaffMember> activeStaff = [];
+//     if (_filterType == 'teacher') {
+//       activeStaff = _staffProvider.teachers;
+//     } else if (_filterType == 'staff') {
+//       activeStaff = _staffProvider.schoolStaff;
+//     } else if (_filterType == 'academy_staff') {
+//       activeStaff = _staffProvider.academyStaff;
+//     } else {
+//       activeStaff = [
+//         ..._staffProvider.teachers,
+//         ..._staffProvider.schoolStaff,
+//         ..._staffProvider.academyStaff,
+//       ];
+//     }
+//
+//     final isSunday = DateTime.parse(_selectedDate).weekday == DateTime.sunday;
+//
+//     _records = activeStaff.map((staff) {
+//       final matchingRecords =
+//       existingRecords.where((r) => r.staffId == staff.id).toList();
+//       final existing = matchingRecords.isNotEmpty ? matchingRecords.first : null;
+//
+//       return AttendanceRecord(
+//         id: existing?.id ?? '${staff.id}_${_selectedDate}',
+//         staffId: staff.id!,
+//         staffName: staff.name,
+//         photoBase64: staff.imageBase64,
+//         type: staff.type,
+//         date: _selectedDate,
+//         status: existing?.status ?? (isSunday ? 'holiday' : 'present'),
+//         remarks: existing?.remarks ?? '',
+//         designation: staff.designation,
+//         isSaved: existing != null,
+//       );
+//     }).toList();
+//
+//     _loading = false;
+//     notifyListeners();
+//   }
+//
+//   // ─── NEW: Load a single staff member's attendance for a given month ──
+//   Future<void> loadStaffMonthAttendance({
+//     required String staffId,
+//     required int year,
+//     required int month,
+//   }) async {
+//     _bulkLoading = true;
+//     _bulkError = null;
+//     notifyListeners();
+//
+//     try {
+//       await _ensureStaffLoaded();
+//
+//       // Find the staff member (for name, photo, etc.)
+//       final allStaff = [
+//         ..._staffProvider.teachers,
+//         ..._staffProvider.schoolStaff,
+//         ..._staffProvider.academyStaff,
+//       ];
+//       final staff = allStaff.firstWhere((s) => s.id == staffId);
+//
+//       final now = DateTime.now();
+//       final today = DateTime(now.year, now.month, now.day);
+//       final monthStart = DateTime(year, month, 1);
+//       final monthEnd = DateTime(year, month + 1, 0);
+//       final startStr = _fmt(monthStart);
+//       final endStr = _fmt(monthEnd);
+//
+//       // Fetch existing records for this staff in this month
+//       final fetched = await _service.getAttendanceForStaffInRange(
+//         staffId: staffId,
+//         startDate: startStr,
+//         endDate: endStr,
+//       );
+//
+//       // Build a map for quick lookup
+//       final existingByDate = <String, AttendanceRecord>{};
+//       for (final rec in fetched) {
+//         existingByDate[rec.date] = rec;
+//       }
+//
+//       // Build one record per day in the month
+//       final results = <AttendanceRecord>[];
+//       var cursor = monthStart;
+//       while (!cursor.isAfter(monthEnd)) {
+//         final dateStr = _fmt(cursor);
+//         final existing = existingByDate[dateStr];
+//         final isSunday = cursor.weekday == DateTime.sunday;
+//         final isFuture = cursor.isAfter(today);
+//         bool isBeforeJoin = false;
+//         if (staff.joiningDate != null && staff.joiningDate!.isNotEmpty) {
+//           try {
+//             final joinDate = DateTime.parse(staff.joiningDate!);
+//             if (joinDate.isAfter(cursor)) isBeforeJoin = true;
+//           } catch (_) {}
+//         }
+//
+//         if (existing != null) {
+//           results.add(existing);
+//         } else {
+//           String defaultStatus;
+//           String defaultRemarks;
+//           bool defaultIsSaved;
+//           if (isFuture) {
+//             defaultStatus = '';
+//             defaultRemarks = 'Future date';
+//             defaultIsSaved = true;
+//           } else if (isBeforeJoin) {
+//             defaultStatus = 'holiday';
+//             defaultRemarks = 'Before joining';
+//             defaultIsSaved = true;
+//           } else {
+//             defaultStatus = isSunday ? 'holiday' : 'present';
+//             defaultRemarks = '';
+//             defaultIsSaved = false;
+//           }
+//           results.add(AttendanceRecord(
+//             id: '${staff.id}_$dateStr',
+//             staffId: staff.id!,
+//             staffName: staff.name,
+//             photoBase64: staff.imageBase64,
+//             type: staff.type,
+//             date: dateStr,
+//             status: defaultStatus,
+//             remarks: defaultRemarks,
+//             designation: staff.designation,
+//             isSaved: defaultIsSaved,
+//             isSaving: false,
+//           ));
+//         }
+//         cursor = cursor.add(const Duration(days: 1));
+//       }
+//
+//       // Sort by date
+//       results.sort((a, b) => a.date.compareTo(b.date));
+//
+//       // Store in _bulkRecords (replacing any previous bulk data)
+//       _bulkRecords = results;
+//       _bulkYear = year;
+//       _bulkMonth = month;
+//       // We don't use _bulkFilter for single staff
+//     } catch (e) {
+//       _bulkError = 'Failed to load attendance: $e';
+//       _bulkRecords = [];
+//     } finally {
+//       _bulkLoading = false;
+//       notifyListeners();
+//     }
+//   }
+//
+//   void changeDate(DateTime newDate) {
+//     _selectedDate = newDate.toIso8601String().split('T')[0];
+//     loadData();
+//   }
+//
+//   void changeFilter(String newFilter) {
+//     _filterType = newFilter;
+//     loadData();
+//   }
+//
+//   bool updateStatus(String staffId, String status, {bool isAdmin = false}) {
+//     final index = _records.indexWhere((r) => r.staffId == staffId);
+//     if (index == -1) return false;
+//     if (_records[index].isSaved && !isAdmin) return false;
+//     _records[index].status = status;
+//     notifyListeners();
+//     return true;
+//   }
+//
+//   bool updateRemarks(String staffId, String remark, {bool isAdmin = false}) {
+//     final index = _records.indexWhere((r) => r.staffId == staffId);
+//     if (index == -1) return false;
+//     if (_records[index].isSaved && !isAdmin) return false;
+//     _records[index].remarks = remark;
+//     notifyListeners();
+//     return true;
+//   }
+//
+//   int markAll(String status) {
+//     int skipped = 0;
+//     for (final record in _records) {
+//       if (record.isSaved) {
+//         skipped++;
+//         continue;
+//       }
+//       record.status = status;
+//     }
+//     notifyListeners();
+//     return skipped;
+//   }
+//
+//   Future<void> saveAttendance() async {
+//     await _service.saveAttendance(_records);
+//     await loadData();
+//   }
+//
+//   // ─── History ──────────────────────────────────────────────
+//   Future<void> loadHistoryForDate(String date, {String typeFilter = 'all'}) async {
+//     _historyLoading = true;
+//     _historyError = null;
+//     notifyListeners();
+//
+//     try {
+//       await _ensureStaffLoaded();
+//       final existingRecords = await _service.getAttendanceForDate(date);
+//
+//       final teachers = _staffProvider.teachers;
+//       final schoolStaff = _staffProvider.schoolStaff;
+//       final academyStaff = _staffProvider.academyStaff;
+//
+//       final existingMap = <String, AttendanceRecord>{};
+//       for (final rec in existingRecords) {
+//         existingMap[rec.staffId] = rec;
+//       }
+//
+//       List<StaffMember> activeStaff = [];
+//       if (typeFilter == 'teacher') {
+//         activeStaff = teachers;
+//       } else if (typeFilter == 'staff') {
+//         activeStaff = schoolStaff;
+//       } else if (typeFilter == 'academy_staff') {
+//         activeStaff = academyStaff;
+//       } else {
+//         activeStaff = [...teachers, ...schoolStaff, ...academyStaff];
+//       }
+//
+//       bool isSunday = false;
+//       try {
+//         isSunday = DateTime.parse(date).weekday == DateTime.sunday;
+//       } catch (_) {}
+//
+//       _historyRecords = activeStaff.map((staff) {
+//         final existing = existingMap[staff.id];
+//         return AttendanceRecord(
+//           id: existing?.id ?? '${staff.id}_$date',
+//           staffId: staff.id!,
+//           staffName: staff.name,
+//           photoBase64: staff.imageBase64,
+//           type: staff.type,
+//           date: date,
+//           status: existing?.status ?? (isSunday ? 'holiday' : 'absent'),
+//           remarks: existing?.remarks ?? '',
+//           designation: staff.designation,
+//           isSaved: existing != null,
+//         );
+//       }).toList();
+//     } catch (e) {
+//       _historyError = 'Failed to load attendance: $e';
+//       _historyRecords = [];
+//     } finally {
+//       _historyLoading = false;
+//       notifyListeners();
+//     }
+//   }
+//
+//   // By Person (monthly view)
+//   Future<void> loadHistoryForPerson({
+//     required String staffId,
+//     required int year,
+//     required int month,
+//   }) async {
+//     _historyLoading = true;
+//     _historyError = null;
+//     notifyListeners();
+//
+//     try {
+//       await _ensureStaffLoaded();
+//
+//       final now = DateTime.now();
+//       final monthStart = DateTime(year, month, 1);
+//       final monthEnd = DateTime(year, month + 1, 0);
+//       final isCurrentMonth = year == now.year && month == now.month;
+//       final today = DateTime(now.year, now.month, now.day);
+//
+//       if (monthStart.isAfter(today)) {
+//         _historyRecords = [];
+//         _historyLoading = false;
+//         notifyListeners();
+//         return;
+//       }
+//
+//       final effectiveEnd = isCurrentMonth
+//           ? (monthEnd.isBefore(today) ? monthEnd : today)
+//           : monthEnd;
+//
+//       final startStr = _fmt(monthStart);
+//       final endStr = _fmt(effectiveEnd);
+//
+//       final fetched = await _service.getAttendanceForStaffInRange(
+//         staffId: staffId,
+//         startDate: startStr,
+//         endDate: endStr,
+//       );
+//
+//       // Find staff meta from all three lists
+//       final allStaff = [
+//         ..._staffProvider.teachers,
+//         ..._staffProvider.schoolStaff,
+//         ..._staffProvider.academyStaff,
+//       ];
+//       StaffMember? staffMeta;
+//       final metaMatches = allStaff.where((s) => s.id == staffId);
+//       if (metaMatches.isNotEmpty) staffMeta = metaMatches.first;
+//
+//       final existingByDate = <String, AttendanceRecord>{};
+//       for (final rec in fetched) {
+//         existingByDate[rec.date] = rec;
+//       }
+//
+//       final results = <AttendanceRecord>[];
+//       var cursor = monthStart;
+//       while (!cursor.isAfter(effectiveEnd)) {
+//         final dateStr = _fmt(cursor);
+//         final existing = existingByDate[dateStr];
+//         final isSunday = cursor.weekday == DateTime.sunday;
+//
+//         if (existing != null) {
+//           results.add(existing);
+//         } else {
+//           results.add(AttendanceRecord(
+//             id: '${staffId}_$dateStr',
+//             staffId: staffId,
+//             staffName: staffMeta?.name ?? '',
+//             photoBase64: staffMeta?.imageBase64,
+//             type: staffMeta?.type ?? 'staff',
+//             date: dateStr,
+//             status: isSunday ? 'holiday' : 'absent',
+//             remarks: '',
+//             designation: staffMeta?.designation,
+//             isSaved: false,
+//           ));
+//         }
+//         cursor = cursor.add(const Duration(days: 1));
+//       }
+//
+//       _historyRecords = results;
+//     } catch (e) {
+//       _historyError = 'Failed to load history: $e';
+//       _historyRecords = [];
+//     } finally {
+//       _historyLoading = false;
+//       notifyListeners();
+//     }
+//   }
+//
+//   Future<void> adminUpdateHistoryRecord(
+//       AttendanceRecord record, {
+//         String? newStatus,
+//         String? newRemarks,
+//       }) async {
+//     final index = _historyRecords.indexWhere((r) => r.id == record.id);
+//     if (index == -1) return;
+//
+//     if (newStatus != null) _historyRecords[index].status = newStatus;
+//     if (newRemarks != null) _historyRecords[index].remarks = newRemarks;
+//     _historyRecords[index].isSaving = true;
+//     notifyListeners();
+//
+//     try {
+//       await _service.saveSingleRecord(_historyRecords[index]);
+//       _historyRecords[index].isSaved = true;
+//     } finally {
+//       _historyRecords[index].isSaving = false;
+//       notifyListeners();
+//     }
+//   }
+//
+//   // ─── Bulk Attendance ──────────────────────────────────────
+//   List<AttendanceRecord> _bulkRecords = [];
+//   bool _bulkLoading = false;
+//   String? _bulkError;
+//   int _bulkYear = DateTime.now().year;
+//   int _bulkMonth = DateTime.now().month;
+//   String _bulkFilter = 'all';
+//
+//   List<AttendanceRecord> get bulkRecords => _bulkRecords;
+//   bool get bulkLoading => _bulkLoading;
+//   String? get bulkError => _bulkError;
+//
+//   Future<void> loadBulkAttendance({
+//     required int year,
+//     required int month,
+//     String typeFilter = 'all',
+//   }) async {
+//     _bulkYear = year;
+//     _bulkMonth = month;
+//     _bulkFilter = typeFilter;
+//     _bulkLoading = true;
+//     _bulkError = null;
+//     notifyListeners();
+//
+//     try {
+//       await _ensureStaffLoaded();
+//
+//       List<StaffMember> activeStaff;
+//       switch (typeFilter) {
+//         case 'teacher':
+//           activeStaff = _staffProvider.teachers;
+//           break;
+//         case 'staff':
+//           activeStaff = _staffProvider.schoolStaff;
+//           break;
+//         case 'academy_staff':
+//           activeStaff = _staffProvider.academyStaff;
+//           break;
+//         default:
+//           activeStaff = [
+//             ..._staffProvider.teachers,
+//             ..._staffProvider.schoolStaff,
+//             ..._staffProvider.academyStaff,
+//           ];
+//       }
+//
+//       final now = DateTime.now();
+//       final today = DateTime(now.year, now.month, now.day);
+//       final monthStart = DateTime(year, month, 1);
+//       final monthEnd = DateTime(year, month + 1, 0);
+//       final startStr = _fmt(monthStart);
+//       final endStr = _fmt(monthEnd);
+//
+//       // Parallel fetch for all staff
+//       final fetchFutures = activeStaff.map((s) =>
+//           _service.getAttendanceForStaffInRange(
+//             staffId: s.id!,
+//             startDate: startStr,
+//             endDate: endStr,
+//           ));
+//       final allResults = await Future.wait(fetchFutures);
+//
+//       final existingMap = <String, Map<String, AttendanceRecord>>{};
+//       for (int i = 0; i < activeStaff.length; i++) {
+//         final staff = activeStaff[i];
+//         final fetched = allResults[i];
+//         final dateMap = <String, AttendanceRecord>{};
+//         for (final rec in fetched) {
+//           dateMap[rec.date] = rec;
+//         }
+//         existingMap[staff.id!] = dateMap;
+//       }
+//
+//       final result = <AttendanceRecord>[];
+//       var cursor = monthStart;
+//       while (!cursor.isAfter(monthEnd)) {
+//         final dateStr = _fmt(cursor);
+//         final isSunday = cursor.weekday == DateTime.sunday;
+//         final isFuture = cursor.isAfter(today);
+//
+//         for (final staff in activeStaff) {
+//           bool isBeforeJoin = false;
+//           if (staff.joiningDate != null && staff.joiningDate!.isNotEmpty) {
+//             try {
+//               final joinDate = DateTime.parse(staff.joiningDate!);
+//               if (joinDate.isAfter(cursor)) isBeforeJoin = true;
+//             } catch (_) {}
+//           }
+//
+//           final existing = existingMap[staff.id]?[dateStr];
+//           if (existing != null) {
+//             result.add(existing);
+//           } else {
+//             String defaultStatus;
+//             String defaultRemarks;
+//             bool defaultIsSaved;
+//             if (isFuture) {
+//               defaultStatus = '';
+//               defaultRemarks = 'Future date';
+//               defaultIsSaved = true;
+//             } else if (isBeforeJoin) {
+//               defaultStatus = 'holiday';
+//               defaultRemarks = 'Before joining';
+//               defaultIsSaved = true;
+//             } else {
+//               defaultStatus = isSunday ? 'holiday' : 'present';
+//               defaultRemarks = '';
+//               defaultIsSaved = false;
+//             }
+//             result.add(AttendanceRecord(
+//               id: '${staff.id}_$dateStr',
+//               staffId: staff.id!,
+//               staffName: staff.name,
+//               photoBase64: staff.imageBase64,
+//               type: staff.type,
+//               date: dateStr,
+//               status: defaultStatus,
+//               remarks: defaultRemarks,
+//               designation: staff.designation,
+//               isSaved: defaultIsSaved,
+//               isSaving: false,
+//             ));
+//           }
+//         }
+//         cursor = cursor.add(const Duration(days: 1));
+//       }
+//
+//       result.sort((a, b) {
+//         final nameComp = a.staffName.compareTo(b.staffName);
+//         return nameComp != 0 ? nameComp : a.date.compareTo(b.date);
+//       });
+//
+//       _bulkRecords = result;
+//     } catch (e) {
+//       _bulkError = 'Failed to load bulk attendance: $e';
+//       _bulkRecords = [];
+//     } finally {
+//       _bulkLoading = false;
+//       notifyListeners();
+//     }
+//   }
+//
+//   Future<void> saveBulkAttendanceForStaff(String staffId) async {
+//     final toSave = _bulkRecords.where(
+//           (r) => r.staffId == staffId && !r.isSaved && r.status != 'holiday',
+//     ).toList();
+//
+//     if (toSave.isEmpty) return;
+//
+//     await _service.saveAttendanceBatch(toSave);
+//
+//     for (final rec in toSave) {
+//       final idx = _bulkRecords.indexWhere(
+//             (r) => r.staffId == rec.staffId && r.date == rec.date,
+//       );
+//       if (idx != -1) _bulkRecords[idx].isSaved = true;
+//     }
+//     notifyListeners();
+//   }
+//
+//   Future<void> reloadBulk() =>
+//       loadBulkAttendance(year: _bulkYear, month: _bulkMonth, typeFilter: _bulkFilter);
+//
+//   void updateBulkStatus(String staffId, String date, String newStatus) {
+//     final index = _bulkRecords.indexWhere(
+//           (r) => r.staffId == staffId && r.date == date,
+//     );
+//     if (index == -1) return;
+//     if (_bulkRecords[index].isSaved &&
+//         (_bulkRecords[index].remarks == 'Before joining' ||
+//             _bulkRecords[index].remarks == 'Future date')) {
+//       return;
+//     }
+//     _bulkRecords[index].status = newStatus;
+//     _bulkRecords[index].isSaved = false;
+//     notifyListeners();
+//   }
+//
+//   Future<void> saveBulkAttendance() async {
+//     final toSave = _bulkRecords.where(
+//           (r) => !r.isSaved && r.status != 'holiday',
+//     ).toList();
+//
+//     if (toSave.isEmpty) return;
+//
+//     for (final record in toSave) {
+//       await _service.saveSingleRecord(record);
+//       final idx = _bulkRecords.indexWhere(
+//             (r) => r.staffId == record.staffId && r.date == record.date,
+//       );
+//       if (idx != -1) {
+//         _bulkRecords[idx].isSaved = true;
+//       }
+//     }
+//     notifyListeners();
+//   }
+//
+//   Future<void> _ensureStaffLoaded() async {
+//     if (_staffLoaded) return;
+//     await Future.wait([
+//       _staffProvider.fetchTeachers(),
+//       _staffProvider.fetchSchoolStaff(),
+//       _staffProvider.fetchAcademyStaff(),
+//     ]);
+//     _staffLoaded = true;
+//   }
+//
+//   Future<void> refreshStaff() async {
+//     _staffLoaded = false;
+//     await _ensureStaffLoaded();
+//   }
+// }
 
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,6 +665,18 @@ class AttendanceProvider extends ChangeNotifier {
   bool get loading => _loading;
   String get selectedDate => _selectedDate;
   String get filterType => _filterType;
+
+  // ★ NEW — true whenever the currently selected date is a Sunday.
+  // Screens use this to lock the whole day (no marking, no saving),
+  // mirroring how class/student attendance never gets a Firestore
+  // doc for Sundays in the first place.
+  bool get isSelectedDateSunday {
+    try {
+      return DateTime.parse(_selectedDate).weekday == DateTime.sunday;
+    } catch (_) {
+      return false;
+    }
+  }
 
   // History
   List<AttendanceRecord> _historyRecords = [];
@@ -86,6 +743,26 @@ class AttendanceProvider extends ChangeNotifier {
       existingRecords.where((r) => r.staffId == staff.id).toList();
       final existing = matchingRecords.isNotEmpty ? matchingRecords.first : null;
 
+      // ★ CHANGED — on a Sunday the record is always forced to
+      // 'holiday' and treated as already-saved (locked), even if a
+      // stray record exists in Firestore from before this rule
+      // existed. This matches class/student attendance, where Sunday
+      // is never an editable, savable day at all.
+      if (isSunday) {
+        return AttendanceRecord(
+          id: existing?.id ?? '${staff.id}_${_selectedDate}',
+          staffId: staff.id!,
+          staffName: staff.name,
+          photoBase64: staff.imageBase64,
+          type: staff.type,
+          date: _selectedDate,
+          status: 'holiday',
+          remarks: existing?.remarks ?? 'Sunday — Holiday',
+          designation: staff.designation,
+          isSaved: true,
+        );
+      }
+
       return AttendanceRecord(
         id: existing?.id ?? '${staff.id}_${_selectedDate}',
         staffId: staff.id!,
@@ -93,7 +770,7 @@ class AttendanceProvider extends ChangeNotifier {
         photoBase64: staff.imageBase64,
         type: staff.type,
         date: _selectedDate,
-        status: existing?.status ?? (isSunday ? 'holiday' : 'present'),
+        status: existing?.status ?? 'present',
         remarks: existing?.remarks ?? '',
         designation: staff.designation,
         isSaved: existing != null,
@@ -161,7 +838,23 @@ class AttendanceProvider extends ChangeNotifier {
           } catch (_) {}
         }
 
-        if (existing != null) {
+        // ★ CHANGED — Sunday always wins and is always locked/saved,
+        // regardless of any stray existing record.
+        if (isSunday) {
+          results.add(AttendanceRecord(
+            id: existing?.id ?? '${staff.id}_$dateStr',
+            staffId: staff.id!,
+            staffName: staff.name,
+            photoBase64: staff.imageBase64,
+            type: staff.type,
+            date: dateStr,
+            status: 'holiday',
+            remarks: 'Sunday — Holiday',
+            designation: staff.designation,
+            isSaved: true,
+            isSaving: false,
+          ));
+        } else if (existing != null) {
           results.add(existing);
         } else {
           String defaultStatus;
@@ -176,7 +869,7 @@ class AttendanceProvider extends ChangeNotifier {
             defaultRemarks = 'Before joining';
             defaultIsSaved = true;
           } else {
-            defaultStatus = isSunday ? 'holiday' : 'present';
+            defaultStatus = 'present';
             defaultRemarks = '';
             defaultIsSaved = false;
           }
@@ -227,6 +920,9 @@ class AttendanceProvider extends ChangeNotifier {
   bool updateStatus(String staffId, String status, {bool isAdmin = false}) {
     final index = _records.indexWhere((r) => r.staffId == staffId);
     if (index == -1) return false;
+    // ★ NEW — Sunday records are permanently locked, exactly like
+    // already-saved records, regardless of the isAdmin override.
+    if (isSelectedDateSunday) return false;
     if (_records[index].isSaved && !isAdmin) return false;
     _records[index].status = status;
     notifyListeners();
@@ -236,6 +932,8 @@ class AttendanceProvider extends ChangeNotifier {
   bool updateRemarks(String staffId, String remark, {bool isAdmin = false}) {
     final index = _records.indexWhere((r) => r.staffId == staffId);
     if (index == -1) return false;
+    // ★ NEW — same lock applies to remarks on a Sunday.
+    if (isSelectedDateSunday) return false;
     if (_records[index].isSaved && !isAdmin) return false;
     _records[index].remarks = remark;
     notifyListeners();
@@ -243,6 +941,8 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   int markAll(String status) {
+    // ★ NEW — bulk quick actions are a no-op on Sunday; nothing to mark.
+    if (isSelectedDateSunday) return _records.length;
     int skipped = 0;
     for (final record in _records) {
       if (record.isSaved) {
@@ -256,6 +956,12 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   Future<void> saveAttendance() async {
+    // ★ NEW — Sunday is never written to Firestore, matching class
+    // attendance where a Sunday document simply never gets created.
+    if (isSelectedDateSunday) {
+      await loadData();
+      return;
+    }
     await _service.saveAttendance(_records);
     await loadData();
   }
@@ -297,6 +1003,22 @@ class AttendanceProvider extends ChangeNotifier {
 
       _historyRecords = activeStaff.map((staff) {
         final existing = existingMap[staff.id];
+        // ★ CHANGED — Sunday always shows as holiday/locked here too,
+        // regardless of any stray saved record.
+        if (isSunday) {
+          return AttendanceRecord(
+            id: existing?.id ?? '${staff.id}_$date',
+            staffId: staff.id!,
+            staffName: staff.name,
+            photoBase64: staff.imageBase64,
+            type: staff.type,
+            date: date,
+            status: 'holiday',
+            remarks: existing?.remarks ?? 'Sunday — Holiday',
+            designation: staff.designation,
+            isSaved: true,
+          );
+        }
         return AttendanceRecord(
           id: existing?.id ?? '${staff.id}_$date',
           staffId: staff.id!,
@@ -304,7 +1026,7 @@ class AttendanceProvider extends ChangeNotifier {
           photoBase64: staff.imageBase64,
           type: staff.type,
           date: date,
-          status: existing?.status ?? (isSunday ? 'holiday' : 'absent'),
+          status: existing?.status ?? 'absent',
           remarks: existing?.remarks ?? '',
           designation: staff.designation,
           isSaved: existing != null,
@@ -380,7 +1102,21 @@ class AttendanceProvider extends ChangeNotifier {
         final existing = existingByDate[dateStr];
         final isSunday = cursor.weekday == DateTime.sunday;
 
-        if (existing != null) {
+        // ★ CHANGED — Sunday always wins over any stray saved record.
+        if (isSunday) {
+          results.add(AttendanceRecord(
+            id: existing?.id ?? '${staffId}_$dateStr',
+            staffId: staffId,
+            staffName: staffMeta?.name ?? '',
+            photoBase64: staffMeta?.imageBase64,
+            type: staffMeta?.type ?? 'staff',
+            date: dateStr,
+            status: 'holiday',
+            remarks: 'Sunday — Holiday',
+            designation: staffMeta?.designation,
+            isSaved: true,
+          ));
+        } else if (existing != null) {
           results.add(existing);
         } else {
           results.add(AttendanceRecord(
@@ -390,7 +1126,7 @@ class AttendanceProvider extends ChangeNotifier {
             photoBase64: staffMeta?.imageBase64,
             type: staffMeta?.type ?? 'staff',
             date: dateStr,
-            status: isSunday ? 'holiday' : 'absent',
+            status: 'absent',
             remarks: '',
             designation: staffMeta?.designation,
             isSaved: false,
@@ -414,6 +1150,14 @@ class AttendanceProvider extends ChangeNotifier {
         String? newStatus,
         String? newRemarks,
       }) async {
+    // ★ NEW — Sunday history rows are never editable, even by admin,
+    // matching class attendance where Sunday has no editable doc.
+    bool isSunday = false;
+    try {
+      isSunday = DateTime.parse(record.date).weekday == DateTime.sunday;
+    } catch (_) {}
+    if (isSunday) return;
+
     final index = _historyRecords.indexWhere((r) => r.id == record.id);
     if (index == -1) return;
 
@@ -521,7 +1265,24 @@ class AttendanceProvider extends ChangeNotifier {
           }
 
           final existing = existingMap[staff.id]?[dateStr];
-          if (existing != null) {
+
+          // ★ CHANGED — Sunday always wins over any stray existing
+          // record and is always locked/saved.
+          if (isSunday) {
+            result.add(AttendanceRecord(
+              id: existing?.id ?? '${staff.id}_$dateStr',
+              staffId: staff.id!,
+              staffName: staff.name,
+              photoBase64: staff.imageBase64,
+              type: staff.type,
+              date: dateStr,
+              status: 'holiday',
+              remarks: 'Sunday — Holiday',
+              designation: staff.designation,
+              isSaved: true,
+              isSaving: false,
+            ));
+          } else if (existing != null) {
             result.add(existing);
           } else {
             String defaultStatus;
@@ -536,7 +1297,7 @@ class AttendanceProvider extends ChangeNotifier {
               defaultRemarks = 'Before joining';
               defaultIsSaved = true;
             } else {
-              defaultStatus = isSunday ? 'holiday' : 'present';
+              defaultStatus = 'present';
               defaultRemarks = '';
               defaultIsSaved = false;
             }
@@ -574,6 +1335,8 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   Future<void> saveBulkAttendanceForStaff(String staffId) async {
+    // ★ NEW — Sunday rows are excluded from saving (status == 'holiday'
+    // already covers this, kept explicit for clarity/safety).
     final toSave = _bulkRecords.where(
           (r) => r.staffId == staffId && !r.isSaved && r.status != 'holiday',
     ).toList();
@@ -599,6 +1362,13 @@ class AttendanceProvider extends ChangeNotifier {
           (r) => r.staffId == staffId && r.date == date,
     );
     if (index == -1) return;
+    // ★ NEW — Sunday cells are never editable via the calendar picker,
+    // regardless of any other lock condition below.
+    bool isSunday = false;
+    try {
+      isSunday = DateTime.parse(date).weekday == DateTime.sunday;
+    } catch (_) {}
+    if (isSunday) return;
     if (_bulkRecords[index].isSaved &&
         (_bulkRecords[index].remarks == 'Before joining' ||
             _bulkRecords[index].remarks == 'Future date')) {

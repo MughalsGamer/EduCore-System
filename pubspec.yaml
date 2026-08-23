@@ -41,6 +41,26 @@ dev_dependencies:
   flutter_lints: ^3.0.0
 
 
+flutter_launcher_icons:
+flutter_native_splash:
+
+
+  flutter_launcher_icons:
+    android: true
+    ios: true
+    image_path: "assets/images/EduCoreSystem.png"
+    adaptive_icon_background: "#FFFFFF"
+    adaptive_icon_foreground: "assets/images/EduCoreSystem.png"
+
+
+  flutter_native_splash:
+    color: "#FFFFFF"
+    image: "assets/images/EduCoreSystem.png"
+    android: true
+    ios: true
+    web: true
+
+
 flutter:
   uses-material-design: true
   # assets add kar sakte ho agar koi image chahiye
