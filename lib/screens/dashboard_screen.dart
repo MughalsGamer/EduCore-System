@@ -3316,7 +3316,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           )
               : Center(
             child: SizedBox(
-              height: 40,
+              height:70,
               child: Image.asset(
                 'assets/images/EduCoreSystem.png',
                 fit: BoxFit.contain,
