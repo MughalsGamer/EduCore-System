@@ -171,6 +171,8 @@ class _AddStaffTransactionScreenState
       _employeeType = type;
       _selectedEmployee = null;
       _searchCtrl.clear();
+      _showSuggestions = false;   // <-- added
+
     });
   }
 
@@ -256,6 +258,8 @@ class _AddStaffTransactionScreenState
       }
 
       if (mounted) {
+        final isDesktop = MediaQuery.of(context).size.width >= 720;
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_isEditMode
@@ -264,13 +268,35 @@ class _AddStaffTransactionScreenState
             backgroundColor: Colors.green,
           ),
         );
+
+        // Call parent callback if provided (parent may handle navigation)
         if (widget.onSaved != null) {
           widget.onSaved!();
-        } else if (!_isEditMode) {
-          _resetForm();
         }
-      }
-    } catch (e) {
+
+        if (!_isEditMode) {
+          // New entry
+          if (!isDesktop) {
+            // Mobile: always reset to initial state
+            _resetForm();
+          } else if (widget.onSaved == null) {
+            // Desktop with no callback: auto‑navigate back (dashboard)
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+          }
+          // If desktop and onSaved != null, parent decides navigation
+        } else {
+          // Edit mode
+          if (isDesktop && widget.onSaved == null) {
+            // Desktop edit without callback: go back after update
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+          }
+          // Mobile edit: remain on screen (or handle as before)
+        }
+      }    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
@@ -283,6 +309,7 @@ class _AddStaffTransactionScreenState
 
   void _resetForm() {
     setState(() {
+      _employeeType = 'teacher';           // <-- added
       _selectedEmployee = null;
       _searchCtrl.clear();
       _amountCtrl.clear();
@@ -290,9 +317,9 @@ class _AddStaffTransactionScreenState
       _customCategoryCtrl.clear();
       _category = 'Advance';
       _selectedDate = DateTime.now();
+      _showSuggestions = false;            // optional but clean
     });
   }
-
   String get _initials {
     final name = _selectedEmployee?.name.trim() ?? '';
     if (name.isEmpty) return '?';
@@ -804,7 +831,7 @@ class _AddStaffTransactionScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(12, 12, 16, 16),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [_kPurple, _kPurpleMid],
@@ -815,6 +842,18 @@ class _AddStaffTransactionScreenState
               ),
               child: Row(
                 children: [
+                  if (!_isEditMode && Navigator.of(context).canPop())
+
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      splashRadius: 20,
+                    )
+                  else
+                    const SizedBox(width: 4),
+                  const SizedBox(width: 8),
                   Container(
                     width: 42,
                     height: 42,
@@ -843,8 +882,7 @@ class _AddStaffTransactionScreenState
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
+            ),            const SizedBox(height: 16),
             _sectionCard([
               Text('Employee',
                   style: TextStyle(
@@ -879,10 +917,16 @@ class _AddStaffTransactionScreenState
       ),
     );
 
-    if (!widget.showAppBar) return body;
-
+    if (!widget.showAppBar) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF5F6FA),
+        resizeToAvoidBottomInset: true,
+        body: SafeArea(child: body),
+      );
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: _kPurple,
         foregroundColor: Colors.white,
@@ -890,7 +934,7 @@ class _AddStaffTransactionScreenState
         title: Text(_isEditMode ? 'Edit Transaction' : 'Add Transaction',
             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 17)),
       ),
-      body: body,
+      body: SafeArea(child: body),
     );
   }
 

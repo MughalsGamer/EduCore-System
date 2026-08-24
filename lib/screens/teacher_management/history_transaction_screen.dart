@@ -745,7 +745,7 @@ class _StaffTransactionHistoryScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(12, 12, 16, 16),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [_kPurple, _kPurpleMid],
@@ -756,6 +756,17 @@ class _StaffTransactionHistoryScreenState
               ),
               child: Row(
                 children: [
+                  if (Navigator.of(context).canPop())
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      splashRadius: 20,
+                    )
+                  else
+                    const SizedBox(width: 4),
+                  const SizedBox(width: 8),
                   Container(
                     width: 42,
                     height: 42,
@@ -787,8 +798,7 @@ class _StaffTransactionHistoryScreenState
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
+            ),            const SizedBox(height: 16),
             _searchAndFilters(isDesktop: isDesktop),
             const SizedBox(height: 14),
             if (provider.loading && provider.allTransactions.isEmpty)
@@ -815,9 +825,11 @@ class _StaffTransactionHistoryScreenState
         ),
       ),
     );
-
     if (!widget.showAppBar) {
-      return Container(color: const Color(0xFFF5F6FA), child: body);
+      return Material(
+        color: const Color(0xFFF5F6FA),
+        child: SafeArea(child: body),
+      );
     }
 
     return Scaffold(
@@ -847,7 +859,36 @@ class _StaffTransactionHistoryScreenState
         icon: const Icon(Icons.add_rounded),
         label: const Text('Add Transaction'),
       ),
-      body: body,
+      body: SafeArea(child: body),
     );
+    // return Scaffold(
+    //   backgroundColor: const Color(0xFFF5F6FA),
+    //   appBar: AppBar(
+    //     backgroundColor: _kPurple,
+    //     foregroundColor: Colors.white,
+    //     elevation: 0,
+    //     title: const Text('Transaction History',
+    //         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 17)),
+    //   ),
+    //   floatingActionButton: FloatingActionButton.extended(
+    //     backgroundColor: _kPurple,
+    //     onPressed: () {
+    //       Navigator.push(
+    //         context,
+    //         MaterialPageRoute(
+    //           builder: (_) => AddStaffTransactionScreen(
+    //             onSaved: () {
+    //               Navigator.pop(context);
+    //               _refresh();
+    //             },
+    //           ),
+    //         ),
+    //       );
+    //     },
+    //     icon: const Icon(Icons.add_rounded),
+    //     label: const Text('Add Transaction'),
+    //   ),
+    //   body: SafeArea(child: body),
+    // );
   }
 }

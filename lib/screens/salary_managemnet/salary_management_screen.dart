@@ -353,6 +353,7 @@
   //
   // /// Bottom sheet used to pick any Staff or Teacher (regardless of whether
   // /// they have salary history yet) so the first-ever adjustment can be made.
+  // /// Unified view – no teacher/staff filter, just all active employees.
   // class _EmployeePickerSheet extends StatefulWidget {
   //   const _EmployeePickerSheet();
   //
@@ -372,7 +373,6 @@
   //
   //   List<StaffMember> _filtered(List<StaffMember> all) {
   //     var list = all.where((s) => s.isActive).toList();
-  //     // Remove type filter
   //     if (_query.isNotEmpty) {
   //       list = list
   //           .where((s) =>
@@ -383,6 +383,7 @@
   //     list.sort((a, b) => a.name.compareTo(b.name));
   //     return list;
   //   }
+  //
   //   @override
   //   Widget build(BuildContext context) {
   //     final staffProvider = context.watch<StaffProvider>();
@@ -457,18 +458,7 @@
   //                 ),
   //               ),
   //               const SizedBox(height: 10),
-  //               Padding(
-  //                 padding: const EdgeInsets.symmetric(horizontal: 16),
-  //                 child: Row(
-  //                   children: [
-  //                     _filterChip('All', 'all'),
-  //                     const SizedBox(width: 8),
-  //                     _filterChip('Teachers', 'teacher'),
-  //                     const SizedBox(width: 8),
-  //                     _filterChip('Staff', 'staff'),
-  //                   ],
-  //                 ),
-  //               ),
+  //               // Removed filter chips – all employees shown together.
   //               const SizedBox(height: 8),
   //               const Divider(height: 1),
   //               Expanded(
@@ -511,7 +501,8 @@
   //                               fontWeight: FontWeight.w600)),
   //                       subtitle: Text(
   //                         [
-  //                           s.type == 'teacher' ? 'Teacher' : 'Staff',
+  //                           // Always show "Staff" because we've unified all employees.
+  //                           'Staff',
   //                           if (s.designation?.isNotEmpty == true)
   //                             s.designation!,
   //                         ].join(' • '),
@@ -536,39 +527,11 @@
   //       },
   //     );
   //   }
-  //
-  //   Widget _filterChip(String label, String value) {
-  //     final selected = _typeFilter == value;
-  //     return GestureDetector(
-  //       onTap: () => setState(() => _typeFilter = value),
-  //       child: AnimatedContainer(
-  //         duration: const Duration(milliseconds: 150),
-  //         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-  //         decoration: BoxDecoration(
-  //           color: selected ? _kPurple : Colors.grey.shade100,
-  //           borderRadius: BorderRadius.circular(20),
-  //           border: Border.all(
-  //             color: selected ? _kPurple : Colors.grey.shade300,
-  //             width: selected ? 1.5 : 0.8,
-  //           ),
-  //         ),
-  //         child: Text(
-  //           label,
-  //           style: TextStyle(
-  //             fontSize: 12,
-  //             fontWeight: FontWeight.w600,
-  //             color: selected ? Colors.white : Colors.grey.shade700,
-  //           ),
-  //         ),
-  //       ),
-  //     );
-  //   }
   // }
   //
   // String _formatMoney(double value) {
   //   return NumberFormat('#,##0').format(value);
   // }
-  //
 
 
   import 'package:flutter/material.dart';
@@ -587,15 +550,22 @@
   const _kRed = Color(0xFFB91C1C);
   const _kRedBg = Color(0xFFFEE2E2);
 
+  const double _kMobileBreakpoint = 700;
+
+  const List<String> _kMonthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
   /// Shows ONLY employees who already have at least one salary_history
   /// record. Each row shows current salary and the most recent change;
   /// tapping opens the full increment/decrement + history screen.
   ///
-  /// A "+ Add Adjustment" button is the entry point for picking ANY
-  /// employee (staff or teacher) — including ones with zero history —
-  /// so the very first salary adjustment for someone can always be made
-  /// from here. Once an employee has at least one record, they also show
-  /// up in the list below automatically.
+  /// A "+ Add Adjustment" entry point lets you pick ANY employee (staff or
+  /// teacher) — including ones with zero history — so the very first salary
+  /// adjustment for someone can always be made from here. Once an employee
+  /// has at least one record, they also show up in the list below
+  /// automatically.
   class SalaryManagementScreen extends StatefulWidget {
     final bool showAppBar;
 
@@ -608,7 +578,15 @@
 
   class _SalaryManagementScreenState extends State<SalaryManagementScreen> {
     final _searchCtrl = TextEditingController();
+    final _searchFocus = FocusNode();
     String _searchQuery = '';
+
+    // Mobile-only: whether the search field is expanded (tapped open).
+    bool _searchExpanded = false;
+
+    // Month/Year filter — null means "All".
+    int? _filterMonth;
+    int? _filterYear;
 
     @override
     void initState() {
@@ -623,17 +601,47 @@
     @override
     void dispose() {
       _searchCtrl.dispose();
+      _searchFocus.dispose();
       super.dispose();
     }
 
     List<EmployeeSalarySummary> _filtered(List<EmployeeSalarySummary> all) {
-      if (_searchQuery.isEmpty) return all;
-      return all
-          .where((e) =>
-      e.staff.name.toLowerCase().contains(_searchQuery) ||
-          (e.staff.designation ?? '').toLowerCase().contains(_searchQuery))
-          .toList();
+      Iterable<EmployeeSalarySummary> list = all;
+
+      if (_searchQuery.isNotEmpty) {
+        list = list.where((e) =>
+        e.staff.name.toLowerCase().contains(_searchQuery) ||
+            (e.staff.designation ?? '').toLowerCase().contains(_searchQuery));
+      }
+
+      if (_filterMonth != null || _filterYear != null) {
+        list = list.where((e) {
+          final d = _tryParseDate(e.latestChange.date);
+          if (d == null) return false;
+          if (_filterMonth != null && d.month != _filterMonth) return false;
+          if (_filterYear != null && d.year != _filterYear) return false;
+          return true;
+        });
+      }
+
+      return list.toList();
     }
+
+    DateTime? _tryParseDate(String raw) {
+      // Tries a few common formats defensively since `latest.date` is a
+      // display string rather than a structured value.
+      try {
+        return DateTime.parse(raw);
+      } catch (_) {}
+      for (final fmt in ['dd MMM yyyy', 'd MMM yyyy', 'MMM dd, yyyy', 'MMMM d, yyyy']) {
+        try {
+          return DateFormat(fmt).parse(raw);
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    bool get _hasActiveFilter => _filterMonth != null || _filterYear != null;
 
     Future<void> _openEmployee(StaffMember staff) async {
       await Navigator.push(
@@ -668,6 +676,21 @@
       }
     }
 
+    void _toggleSearch() {
+      setState(() {
+        _searchExpanded = !_searchExpanded;
+        if (_searchExpanded) {
+          // Wait a frame so the field is laid out before requesting focus.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _searchFocus.requestFocus();
+          });
+        } else {
+          _searchCtrl.clear();
+          _searchFocus.unfocus();
+        }
+      });
+    }
+
     @override
     Widget build(BuildContext context) {
       final body = _buildBody();
@@ -682,13 +705,7 @@
           title: const Text('Salary Management',
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 17)),
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: _kPurple,
-          foregroundColor: Colors.white,
-          onPressed: _openEmployeePicker,
-          icon: const Icon(Icons.add),
-          label: const Text('Add Adjustment'),
-        ),
+        floatingActionButton: _SmallAddFab(onPressed: _openEmployeePicker),
         body: body,
       );
     }
@@ -697,63 +714,15 @@
       return Consumer<SalaryHistoryProvider>(
         builder: (context, provider, _) {
           final filtered = _filtered(provider.summaries);
+          final isMobile = MediaQuery.of(context).size.width < _kMobileBreakpoint;
 
           return Column(
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchCtrl,
-                        decoration: InputDecoration(
-                          hintText: 'Search by name or designation…',
-                          hintStyle: TextStyle(
-                              fontSize: 13, color: Colors.grey.shade400),
-                          prefixIcon: const Icon(Icons.search,
-                              size: 18, color: Colors.grey),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 0),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: Colors.grey.shade300),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: Colors.grey.shade300),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: _kPurple),
-                          ),
-                        ),
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                    // Also offer the button here for wide/desktop layouts
-                    // where a FAB may be less discoverable.
-                    const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: _openEmployeePicker,
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Add Adjustment'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _kPurple,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                        textStyle: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
+                child: isMobile
+                    ? _buildMobileToolbar()
+                    : _buildDesktopToolbar(),
               ),
               Expanded(
                 child: provider.loading
@@ -762,7 +731,7 @@
                     : filtered.isEmpty
                     ? _buildEmpty()
                     : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
                   itemCount: filtered.length,
                   itemBuilder: (ctx, i) =>
                       _employeeCard(filtered[i]),
@@ -771,6 +740,100 @@
             ],
           );
         },
+      );
+    }
+
+    // ─────────────────────────────────────────
+    //  Desktop / wide layout toolbar
+    // ─────────────────────────────────────────
+    Widget _buildDesktopToolbar() {
+      return Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: _searchField(),
+          ),
+          const SizedBox(width: 10),
+          _MonthYearDropdown(
+            month: _filterMonth,
+            year: _filterYear,
+            onChanged: (m, y) => setState(() {
+              _filterMonth = m;
+              _filterYear = y;
+            }),
+          ),
+        ],
+      );
+    }
+
+    // ─────────────────────────────────────────
+    //  Mobile layout toolbar: icon-triggered expandable search
+    //  + month/year filter dropdown, no Add Adjustment button
+    //  (that lives in the small FAB instead).
+    // ─────────────────────────────────────────
+    Widget _buildMobileToolbar() {
+      if (_searchExpanded) {
+        return Row(
+          children: [
+            Expanded(child: _searchField(autofocusField: true)),
+            const SizedBox(width: 6),
+            IconButton(
+              icon: const Icon(Icons.close, size: 20, color: Colors.grey),
+              onPressed: _toggleSearch,
+              tooltip: 'Close search',
+            ),
+          ],
+        );
+      }
+
+      return Row(
+        children: [
+          _RoundIconButton(
+            icon: Icons.search,
+            onTap: _toggleSearch,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _MonthYearDropdown(
+              month: _filterMonth,
+              year: _filterYear,
+              expand: true,
+              onChanged: (m, y) => setState(() {
+                _filterMonth = m;
+                _filterYear = y;
+              }),
+            ),
+          ),
+        ],
+      );
+    }
+
+    Widget _searchField({bool autofocusField = false}) {
+      return TextField(
+        controller: _searchCtrl,
+        focusNode: autofocusField ? _searchFocus : null,
+        decoration: InputDecoration(
+          hintText: 'Search by name or designation…',
+          hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+          prefixIcon: const Icon(Icons.search, size: 18, color: Colors.grey),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: _kPurple),
+          ),
+        ),
+        style: const TextStyle(fontSize: 13),
       );
     }
 
@@ -785,16 +848,18 @@
                   size: 48, color: Colors.grey.shade300),
               const SizedBox(height: 12),
               Text(
-                _searchQuery.isEmpty
-                    ? 'No salary changes recorded yet.'
-                    : 'No results for "$_searchQuery"',
+                _searchQuery.isNotEmpty
+                    ? 'No results for "$_searchQuery"'
+                    : _hasActiveFilter
+                    ? 'No changes found for the selected month/year.'
+                    : 'No salary changes recorded yet.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
               ),
-              if (_searchQuery.isEmpty) ...[
+              if (_searchQuery.isEmpty && !_hasActiveFilter) ...[
                 const SizedBox(height: 4),
                 Text(
-                  'Tap "Add Adjustment" above to give someone their first increment or decrement.',
+                  'Tap the + button below to give someone their first increment or decrement.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
                 ),
@@ -833,6 +898,7 @@
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
                   radius: 24,
@@ -851,6 +917,8 @@
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(staff.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -859,11 +927,16 @@
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
                           child: Text(staff.designation!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                   fontSize: 11, color: Colors.grey.shade600)),
                         ),
                       const SizedBox(height: 6),
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 4,
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -887,7 +960,6 @@
                               ],
                             ),
                           ),
-                          const SizedBox(width: 6),
                           Text('on ${latest.date}',
                               style: TextStyle(
                                   fontSize: 11, color: Colors.grey.shade500)),
@@ -896,12 +968,16 @@
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     const Text('Current',
                         style: TextStyle(fontSize: 10, color: Colors.grey)),
                     Text('Rs ${_formatMoney(staff.salary)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -912,10 +988,317 @@
                             fontSize: 10, color: Colors.grey.shade500)),
                   ],
                 ),
-                const SizedBox(width: 4),
                 Icon(Icons.chevron_right_rounded,
                     color: Colors.grey.shade400, size: 20),
               ],
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  //  Small, modern round icon button (used for the mobile search trigger)
+  // ─────────────────────────────────────────────
+  class _RoundIconButton extends StatelessWidget {
+    final IconData icon;
+    final VoidCallback onTap;
+
+    const _RoundIconButton({required this.icon, required this.onTap});
+
+    @override
+    Widget build(BuildContext context) {
+      return Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: Colors.grey.shade300),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onTap,
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Icon(icon, size: 20, color: _kPurple),
+          ),
+        ),
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  //  Compact, modern FAB — replaces the old FloatingActionButton.extended
+  // ─────────────────────────────────────────────
+  class _SmallAddFab extends StatelessWidget {
+    final VoidCallback onPressed;
+
+    const _SmallAddFab({required this.onPressed});
+
+    @override
+    Widget build(BuildContext context) {
+      return FloatingActionButton(
+        onPressed: onPressed,
+        backgroundColor: _kPurple,
+        foregroundColor: Colors.white,
+        elevation: 2,
+        mini: true,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        tooltip: 'Add Adjustment',
+        child: const Icon(Icons.add, size: 22),
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  //  Month/Year filter — dropdown-style popup (not a full dialog)
+  // ─────────────────────────────────────────────
+  class _MonthYearDropdown extends StatelessWidget {
+    final int? month;
+    final int? year;
+    final bool expand;
+    final void Function(int? month, int? year) onChanged;
+
+    const _MonthYearDropdown({
+      required this.month,
+      required this.year,
+      required this.onChanged,
+      this.expand = false,
+    });
+
+    bool get _isActive => month != null || year != null;
+
+    String get _label {
+      if (month == null && year == null) return 'Month/Year';
+      if (month != null && year != null) {
+        return '${_kMonthNames[month! - 1]} $year';
+      }
+      if (month != null) return _kMonthNames[month! - 1];
+      return '$year';
+    }
+
+    @override
+    Widget build(BuildContext context) {
+      final button = Material(
+        color: _isActive ? _kPurpleLight : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => _openMenu(context),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _isActive ? _kPurple : Colors.grey.shade300,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+              children: [
+                Icon(Icons.calendar_month_outlined,
+                    size: 17,
+                    color: _isActive ? _kPurple : Colors.grey.shade600),
+                const SizedBox(width: 6),
+                if (expand)
+                  Expanded(
+                    child: Text(
+                      _label,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: _isActive ? _kPurple : Colors.grey.shade700,
+                      ),
+                    ),
+                  )
+                else
+                  Text(
+                    _label,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: _isActive ? _kPurple : Colors.grey.shade700,
+                    ),
+                  ),
+                const SizedBox(width: 4),
+                Icon(Icons.arrow_drop_down,
+                    size: 18, color: _isActive ? _kPurple : Colors.grey.shade600),
+                if (_isActive) ...[
+                  const SizedBox(width: 2),
+                  InkWell(
+                    onTap: () => onChanged(null, null),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: Icon(Icons.close, size: 14, color: Colors.grey.shade600),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+
+      return expand ? button : button;
+    }
+
+    void _openMenu(BuildContext context) {
+      final RenderBox renderBox = context.findRenderObject() as RenderBox;
+      final offset = renderBox.localToGlobal(Offset.zero);
+      final size = renderBox.size;
+
+      showMenu<void>(
+        context: context,
+        position: RelativeRect.fromLTRB(
+          offset.dx,
+          offset.dy + size.height + 4,
+          offset.dx + size.width,
+          offset.dy + size.height + 4,
+        ),
+        color: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        constraints: const BoxConstraints(minWidth: 260, maxWidth: 300),
+        items: [
+          PopupMenuItem<void>(
+            enabled: false,
+            padding: EdgeInsets.zero,
+            child: StatefulBuilder(
+              builder: (context, setLocalState) {
+                int? tempMonth = month;
+                int? tempYear = year;
+
+                return StatefulBuilder(
+                  builder: (context, setInner) {
+                    final currentYear = DateTime.now().year;
+                    final years = List.generate(6, (i) => currentYear - i);
+
+                    return Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Month',
+                              style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey)),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: List.generate(12, (i) {
+                              final m = i + 1;
+                              final sel = tempMonth == m;
+                              return _chip(
+                                label: _kMonthNames[i],
+                                selected: sel,
+                                onTap: () => setInner(() {
+                                  tempMonth = sel ? null : m;
+                                }),
+                              );
+                            }),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text('Year',
+                              style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey)),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: years.map((y) {
+                              final sel = tempYear == y;
+                              return _chip(
+                                label: '$y',
+                                selected: sel,
+                                onTap: () => setInner(() {
+                                  tempYear = sel ? null : y;
+                                }),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextButton(
+                                  onPressed: () {
+                                    setInner(() {
+                                      tempMonth = null;
+                                      tempYear = null;
+                                    });
+                                  },
+                                  child: const Text('Clear',
+                                      style: TextStyle(
+                                          fontSize: 12.5, color: Colors.grey)),
+                                ),
+                              ),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    onChanged(tempMonth, tempYear);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _kPurple,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 10),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                        BorderRadius.circular(8)),
+                                  ),
+                                  child: const Text('Apply',
+                                      style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w600)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      );
+    }
+
+    Widget _chip({
+      required String label,
+      required bool selected,
+      required VoidCallback onTap,
+    }) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: selected ? _kPurple : const Color(0xFFF5F6FA),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : Colors.grey.shade700,
             ),
           ),
         ),
