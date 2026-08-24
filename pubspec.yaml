@@ -18,7 +18,7 @@ dependencies:
   google_fonts:
   fl_chart:
   pdf:
-  printing:
+  printing: ^5.15.0
   path_provider:
   image_picker:
   flutter_image_compress:
