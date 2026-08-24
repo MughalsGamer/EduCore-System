@@ -1,3 +1,5 @@
+//
+//
 // import 'package:flutter/material.dart';
 // import 'package:provider/provider.dart';
 //
@@ -7,6 +9,9 @@
 //
 // const _purple = Color(0xFF534AB7);
 // const _purpleLight = Color(0xFFF0EFFE);
+//
+// /// ★ NEW — which subset of events the list currently shows.
+// enum _EventFilter { active, expired }
 //
 // class EventListScreen extends StatefulWidget {
 //   final bool showAppBar;
@@ -29,6 +34,10 @@
 //
 // class _EventListScreenState extends State<EventListScreen> {
 //   String? _expandedEventId;
+//
+//   // ★ NEW — default view is Active only; Expired events (past date) are
+//   // hidden until the user explicitly switches the filter.
+//   _EventFilter _filter = _EventFilter.active;
 //
 //   @override
 //   void initState() {
@@ -114,8 +123,25 @@
 //     return '${d.day} ${months[d.month - 1]} ${d.year}';
 //   }
 //
+//   // ★ NEW — Active tab: not expired (date hasn't passed). Once the date
+//   // passes, the event automatically falls out of Active and into Expired,
+//   // regardless of its isActive flag.
+//   bool _isActiveEvent(EventModel e) => !e.isExpired;
+//
+//   // ★ NEW — Expired tab: date has passed.
+//   bool _isExpiredEvent(EventModel e) => e.isExpired;
+//
+//   List<EventModel> _filteredEvents(List<EventModel> all) {
+//     switch (_filter) {
+//       case _EventFilter.active:
+//         return all.where(_isActiveEvent).toList();
+//       case _EventFilter.expired:
+//         return all.where(_isExpiredEvent).toList();
+//     }
+//   }
+//
 //   Widget _statusChip(EventModel event) {
-//     final active = event.isActive && !event.isExpired;
+//     final active = !event.isExpired;
 //     return Container(
 //       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
 //       decoration: BoxDecoration(
@@ -128,6 +154,73 @@
 //           fontSize: 10,
 //           fontWeight: FontWeight.w600,
 //           color: active ? const Color(0xFF3B6D11) : Colors.grey.shade600,
+//         ),
+//       ),
+//     );
+//   }
+//
+//   // ★ NEW — Active/Expired filter chip bar, same visual pattern used
+//   // elsewhere in the app (pill-shaped chips with a purple active state).
+//   Widget _filterBar(int activeCount, int expiredCount) {
+//     Widget chip(String label, int count, _EventFilter value) {
+//       final selected = _filter == value;
+//       return Padding(
+//         padding: const EdgeInsets.only(right: 8),
+//         child: InkWell(
+//           onTap: () => setState(() => _filter = value),
+//           borderRadius: BorderRadius.circular(20),
+//           child: Container(
+//             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+//             decoration: BoxDecoration(
+//               color: selected ? _purple : Colors.white,
+//               borderRadius: BorderRadius.circular(20),
+//               border: Border.all(
+//                 color: selected ? _purple : Colors.grey.shade300,
+//               ),
+//             ),
+//             child: Row(
+//               mainAxisSize: MainAxisSize.min,
+//               children: [
+//                 Text(
+//                   label,
+//                   style: TextStyle(
+//                     fontSize: 12,
+//                     fontWeight: FontWeight.w600,
+//                     color: selected ? Colors.white : Colors.black87,
+//                   ),
+//                 ),
+//                 const SizedBox(width: 6),
+//                 Container(
+//                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+//                   decoration: BoxDecoration(
+//                     color: selected ? Colors.white.withOpacity(0.25) : _purpleLight,
+//                     borderRadius: BorderRadius.circular(10),
+//                   ),
+//                   child: Text(
+//                     '$count',
+//                     style: TextStyle(
+//                       fontSize: 10,
+//                       fontWeight: FontWeight.w600,
+//                       color: selected ? Colors.white : _purple,
+//                     ),
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ),
+//         ),
+//       );
+//     }
+//
+//     return Padding(
+//       padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+//       child: SingleChildScrollView(
+//         scrollDirection: Axis.horizontal,
+//         child: Row(
+//           children: [
+//             chip('Active', activeCount, _EventFilter.active),
+//             chip('Expired', expiredCount, _EventFilter.expired),
+//           ],
 //         ),
 //       ),
 //     );
@@ -267,6 +360,37 @@
 //     );
 //   }
 //
+//   Widget _emptyState() {
+//     final isExpiredTab = _filter == _EventFilter.expired;
+//     return Center(
+//       child: Padding(
+//         padding: const EdgeInsets.all(32),
+//         child: Column(
+//           mainAxisSize: MainAxisSize.min,
+//           children: [
+//             Icon(
+//               isExpiredTab ? Icons.history_rounded : Icons.event_busy_rounded,
+//               size: 40,
+//               color: Colors.grey.shade400,
+//             ),
+//             const SizedBox(height: 10),
+//             Text(
+//               isExpiredTab ? 'Koi expired event nahi hai' : 'Koi active event nahi hai',
+//               style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+//             ),
+//             const SizedBox(height: 4),
+//             Text(
+//               isExpiredTab
+//                   ? 'Guzray huay events yahan dikhengay'
+//                   : 'Naya event add karne ke liye + button dabayein',
+//               style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+//
 //   Widget _buildBody() {
 //     return Consumer<EventProvider>(
 //       builder: (context, provider, _) {
@@ -302,10 +426,26 @@
 //           );
 //         }
 //
-//         return ListView.builder(
-//           padding: const EdgeInsets.all(14),
-//           itemCount: provider.events.length,
-//           itemBuilder: (context, index) => _eventCard(provider.events[index]),
+//         // ★ NEW — counts for the filter chips (computed from the full,
+//         // unfiltered list so badges always reflect true totals).
+//         final activeCount = provider.events.where(_isActiveEvent).length;
+//         final expiredCount = provider.events.where(_isExpiredEvent).length;
+//
+//         final filtered = _filteredEvents(provider.events);
+//
+//         return Column(
+//           children: [
+//             _filterBar(activeCount, expiredCount),
+//             Expanded(
+//               child: filtered.isEmpty
+//                   ? _emptyState()
+//                   : ListView.builder(
+//                 padding: const EdgeInsets.all(14),
+//                 itemCount: filtered.length,
+//                 itemBuilder: (context, index) => _eventCard(filtered[index]),
+//               ),
+//             ),
+//           ],
 //         );
 //       },
 //     );
@@ -315,23 +455,28 @@
 //   Widget build(BuildContext context) {
 //     final body = _buildBody();
 //
-//     if (!widget.showAppBar) {
-//       return widget.showFAB
-//           ? Stack(
-//         children: [
-//           body,
-//           Positioned(
-//             right: 16,
-//             bottom: 16,
-//             child: FloatingActionButton(
-//               backgroundColor: _purple,
-//               onPressed: _openAddEvent,
-//               child: const Icon(Icons.add, color: Colors.white),
-//             ),
+//     Widget content = widget.showFAB
+//         ? Stack(
+//       children: [
+//         body,
+//         Positioned(
+//           right: 16,
+//           bottom: 16,
+//           child: FloatingActionButton(
+//             backgroundColor: _purple,
+//             onPressed: _openAddEvent,
+//             child: const Icon(Icons.add, color: Colors.white),
 //           ),
-//         ],
-//       )
-//           : body;
+//         ),
+//       ],
+//     )
+//         : body;
+//
+//     if (!widget.showAppBar) {
+//       return Material(
+//         color: const Color(0xFFF5F6FA),
+//         child: SafeArea(child: content),
+//       );
 //     }
 //
 //     return Scaffold(
@@ -351,8 +496,25 @@
 //           : null,
 //     );
 //   }
+//
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: const Text('Events'),
+//         backgroundColor: Colors.white,
+//         foregroundColor: Colors.black87,
+//         elevation: 0,
+//       ),
+//       body: body,
+//       floatingActionButton: widget.showFAB
+//           ? FloatingActionButton(
+//         backgroundColor: _purple,
+//         onPressed: _openAddEvent,
+//         child: const Icon(Icons.add, color: Colors.white),
+//       )
+//           : null,
+//     );
+//   }
 // }
-
 
 
 import 'package:flutter/material.dart';
@@ -517,6 +679,8 @@ class _EventListScreenState extends State<EventListScreen> {
   // ★ NEW — Active/Expired filter chip bar, same visual pattern used
   // elsewhere in the app (pill-shaped chips with a purple active state).
   Widget _filterBar(int activeCount, int expiredCount) {
+    final isMobile = MediaQuery.of(context).size.width < 720;
+
     Widget chip(String label, int count, _EventFilter value) {
       final selected = _filter == value;
       return Padding(
@@ -571,13 +735,36 @@ class _EventListScreenState extends State<EventListScreen> {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
       child: Row(
         children: [
-          chip('Active', activeCount, _EventFilter.active),
-          chip('Expired', expiredCount, _EventFilter.expired),
+          // Back arrow only on mobile, when no AppBar and can pop
+          if (isMobile && !widget.showAppBar && Navigator.of(context).canPop())
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: _purple),
+                onPressed: () => Navigator.of(context).maybePop(),
+                splashRadius: 20,
+                constraints: const BoxConstraints(
+                  minWidth: 36,
+                  minHeight: 36,
+                ),
+                padding: EdgeInsets.zero,
+              ),
+            ),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  chip('Active', activeCount, _EventFilter.active),
+                  chip('Expired', expiredCount, _EventFilter.expired),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
-
   Widget _eventCard(EventModel event) {
     final isExpanded = _expandedEventId == event.id;
 
@@ -807,23 +994,28 @@ class _EventListScreenState extends State<EventListScreen> {
   Widget build(BuildContext context) {
     final body = _buildBody();
 
-    if (!widget.showAppBar) {
-      return widget.showFAB
-          ? Stack(
-        children: [
-          body,
-          Positioned(
-            right: 16,
-            bottom: 16,
-            child: FloatingActionButton(
-              backgroundColor: _purple,
-              onPressed: _openAddEvent,
-              child: const Icon(Icons.add, color: Colors.white),
-            ),
+    Widget content = widget.showFAB
+        ? Stack(
+      children: [
+        body,
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingActionButton(
+            backgroundColor: _purple,
+            onPressed: _openAddEvent,
+            child: const Icon(Icons.add, color: Colors.white),
           ),
-        ],
-      )
-          : body;
+        ),
+      ],
+    )
+        : body;
+
+    if (!widget.showAppBar) {
+      return Material(
+        color: const Color(0xFFF5F6FA),
+        child: SafeArea(child: content),
+      );
     }
 
     return Scaffold(

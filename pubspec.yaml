@@ -9,16 +9,17 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
   firebase_core:
   firebase_auth:
   cloud_firestore:
   provider:
   intl:
   google_fonts:
-  fl_chart:            # reports ke liye (optional)
-  pdf:                  # PDF reports ke liye (optional)
-  printing:             # PDF print/share ke liye (optional)
-  path_provider:         # PDF save karne ke liye (optional)
+  fl_chart:
+  pdf:
+  printing:
+  path_provider:
   image_picker:
   flutter_image_compress:
   image_picker_web:
@@ -29,43 +30,30 @@ dependencies:
   universal_platform:
   share_plus:
 
-
-
-
-
-
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
 
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
 
 flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/EducoreLogo.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/EducoreLogo.png"
+
 flutter_native_splash:
-
-
-  flutter_launcher_icons:
-    android: true
-    ios: true
-    image_path: "assets/images/EducoreLogo.png"
-    adaptive_icon_background: "#FFFFFF"
-    adaptive_icon_foreground: "assets/images/EducoreLogo.png"
-
-
-  flutter_native_splash:
-    color: "#FFFFFF"
-    image: "assets/images/EducoreLogo.png"
-    android: true
-    ios: true
-    web: true
-
+  color: "#FFFFFF"
+  image: "assets/images/EducoreLogo.png"
+  android: true
+  ios: true
+  web: true
 
 flutter:
   uses-material-design: true
-  # assets add kar sakte ho agar koi image chahiye
+
   assets:
     - assets/images/
-    - assets/images/Logo.png
-    - assets/images/EduCoreSystem.png
-    - assets/images/EducoreLogo.png
