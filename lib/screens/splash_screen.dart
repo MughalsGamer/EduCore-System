@@ -51,7 +51,7 @@ class SplashScreen extends StatelessWidget {
                 end: Alignment.bottomRight,
               ).createShader(bounds),
               child: Text(
-                'EduCore System',
+                'EduCoreSystem',
                 style: GoogleFonts.poppins(
                   fontSize: fontSize,
                   fontWeight: FontWeight.w800,

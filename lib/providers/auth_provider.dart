@@ -21,7 +21,16 @@ class AuthProvider extends ChangeNotifier {
   // ── Initialize: load user and role from Firebase + SharedPreferences ──
   Future<void> _init() async {
     _isLoading = true;
+    final stopwatch = Stopwatch()..start();
+
     notifyListeners();
+
+    // ── Ensure splash shows for minimum 2.5 seconds ──
+    const minSplashDuration = Duration(milliseconds: 2500);
+    final elapsed = stopwatch.elapsed;
+    if (elapsed < minSplashDuration) {
+      await Future.delayed(minSplashDuration - elapsed);
+    }
 
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
