@@ -1,4 +1,5 @@
 //
+//
 // import 'dart:convert';
 // import 'dart:ui';
 // import 'package:cloud_firestore/cloud_firestore.dart';
@@ -161,19 +162,36 @@
 //   Stream<QuerySnapshot>? _classesStream;
 //   String? _todayAttendanceStreamDate;
 //
-//   late final AnimationController _entrance = AnimationController(
-//     vsync: this,
-//     duration: const Duration(milliseconds: 450),
-//   )..forward();
+//   late final AnimationController _entrance;
 //
 //   final Set<String> _collapsedGroups = {};
 //
 //   // ★ For double‑back‑to‑exit
 //   DateTime? _lastBackPressed;
 //
+//   // ✅ Bottom nav tab labels, in display order (index 0 = Dashboard)
+//   static const List<String> _bottomNavLabels = [
+//     'Dashboard',
+//     'Students',
+//     'Attendance',
+//     'Fee Collection',
+//     'Teachers',
+//   ];
+//
 //   @override
 //   void initState() {
 //     super.initState();
+//     // ✅ Initialize explicitly in initState (instead of a `late final` inline
+//     // initializer on the field) so the AnimationController is guaranteed to
+//     // be created during a valid widget-tree frame. The inline-initializer
+//     // form could get lazily created/ticked in a way that raced with
+//     // dispose() during hot reload, causing "Looking up a deactivated
+//     // widget's ancestor is unsafe" when TickerProviderStateMixin tried to
+//     // look up TickerMode on an already-deactivated element.
+//     _entrance = AnimationController(
+//       vsync: this,
+//       duration: const Duration(milliseconds: 450),
+//     )..forward();
 //     _mainContentWidget = _buildDashboardContent();
 //     _selectedLabel = 'Dashboard';
 //     _mobileNavIndex = 0; // Ensure bottom nav is on Dashboard
@@ -268,6 +286,43 @@
 //     );
 //   }
 //
+//   // ✅ Derive the bottom-nav highlighted index from the currently selected label,
+//   // instead of relying on a separately-tracked int that can go stale when the
+//   // user navigates via the sidebar/drawer or presses back from a pushed screen.
+//   int _bottomNavIndexForLabel(String? label) {
+//     final idx = _bottomNavLabels.indexOf(label ?? 'Dashboard');
+//     return idx == -1 ? 0 : idx;
+//   }
+//
+//   // ✅ SINGLE centralized helper for every mobile push-navigation in this
+//   // screen. Everything that used to call `Navigator.push(...).then(...)`
+//   // separately (sidebar items, quick actions, "View all" on Events) now
+//   // routes through here. Having exactly one code path means there's no risk
+//   // of a stale closure, a missed `.then()`, or two different reset
+//   // implementations drifting out of sync — which was the root cause of the
+//   // bottom nav sometimes not returning to "Dashboard".
+//   //
+//   // `await`ing the push (rather than chaining `.then`) also guarantees the
+//   // reset always runs on *this* State instance after the route is popped,
+//   // no matter how the pop happened (back button, back arrow, swipe-back).
+//   Future<void> _pushMobileAndReturnToDashboard(String label) async {
+//     setState(() {
+//       _selectedLabel = label;
+//       _mobileNavIndex = _bottomNavIndexForLabel(label);
+//     });
+//
+//     await Navigator.push(
+//       context,
+//       MaterialPageRoute(builder: (_) => _pushMobileScreen(label)),
+//     );
+//
+//     if (!mounted) return;
+//     setState(() {
+//       _selectedLabel = 'Dashboard';
+//       _mobileNavIndex = 0;
+//     });
+//   }
+//
 //   List<_NavItem> _navItems(String role) {
 //     if (_navItemsCache != null && _navItemsCacheRole == role) {
 //       return _navItemsCache!;
@@ -287,10 +342,10 @@
 //         });
 //         Navigator.popUntil(context, (route) => route.isFirst);
 //       } else {
-//         Navigator.push(
-//           context,
-//           MaterialPageRoute(builder: (_) => _pushMobileScreen(label)),
-//         );
+//         // ✅ Route through the single centralized helper (see
+//         // `_pushMobileAndReturnToDashboard`) so every push/return path is
+//         // identical and the bottom nav reliably re-selects Dashboard.
+//         _pushMobileAndReturnToDashboard(label);
 //       }
 //     };
 //
@@ -370,10 +425,7 @@
 //             _rightPanelWidget = null;
 //           });
 //         } else {
-//           Navigator.push(
-//             context,
-//             MaterialPageRoute(builder: (_) => const AttendanceScreen()),
-//           );
+//           _pushMobileAndReturnToDashboard('Attendance');
 //         }
 //       }),
 //     ];
@@ -449,10 +501,10 @@
 //         _rightPanelWidget = _screenBuilders[key]!();
 //       });
 //     } else {
-//       Navigator.push(
-//         context,
-//         MaterialPageRoute(builder: (_) => _screenBuilders[key]!()),
-//       );
+//       // ✅ Route through the same centralized helper so returning from a
+//       // quick-action form (Add Subject/Class/Admission/Staff/Transaction)
+//       // also correctly re-selects "Dashboard" on the bottom nav.
+//       _pushMobileAndReturnToDashboard(key);
 //     }
 //   }
 //
@@ -849,22 +901,26 @@
 //         );
 //       },
 //       child: Container(
-//         padding: const EdgeInsets.all(14),
+//         // ✅ Reduced padding (14 -> 11) so the fixed-height card (as low as
+//         // ~72px on some narrow/2-column layouts) has enough room for the
+//         // icon row + label + value without a RenderFlex overflow.
+//         padding: const EdgeInsets.all(11),
 //         decoration: _T.glass(radius: 16),
 //         child: Column(
 //           crossAxisAlignment: CrossAxisAlignment.start,
 //           mainAxisSize: MainAxisSize.min,
+//           mainAxisAlignment: MainAxisAlignment.center,
 //           children: [
 //             Row(
 //               children: [
 //                 Container(
-//                   width: 22,
-//                   height: 22,
+//                   width: 20,
+//                   height: 20,
 //                   decoration: BoxDecoration(
 //                     color: s.colorSoft,
-//                     borderRadius: BorderRadius.circular(10),
+//                     borderRadius: BorderRadius.circular(9),
 //                   ),
-//                   child: Icon(s.icon, color: s.color, size: 16),
+//                   child: Icon(s.icon, color: s.color, size: 14),
 //                 ),
 //                 const Spacer(),
 //                 if (s.isLive)
@@ -885,12 +941,12 @@
 //                   ),
 //               ],
 //             ),
-//             const SizedBox(height: 5),
+//             const SizedBox(height: 4),
 //             Text(s.label,
 //                 maxLines: 1,
 //                 overflow: TextOverflow.ellipsis,
 //                 style: const TextStyle(
-//                     fontSize:12, color: _T.inkFaint, fontWeight: FontWeight.w600)),
+//                     fontSize: 11, color: _T.inkFaint, fontWeight: FontWeight.w600)),
 //             const SizedBox(height: 1),
 //             s.isLoading
 //                 ? const SizedBox(
@@ -904,7 +960,7 @@
 //               child: Text(s.value,
 //                   maxLines: 1,
 //                   style: const TextStyle(
-//                       fontSize: 16,
+//                       fontSize: 15,
 //                       fontWeight: FontWeight.w800,
 //                       letterSpacing: -0.3,
 //                       color: _T.ink)),
@@ -1164,10 +1220,7 @@
 //                         _rightPanelWidget = null;
 //                       });
 //                     } else {
-//                       Navigator.push(
-//                         context,
-//                         MaterialPageRoute(builder: (_) => _pushMobileScreen('Events')),
-//                       );
+//                       _pushMobileAndReturnToDashboard('Events');
 //                     }
 //                   },
 //                   style: TextButton.styleFrom(
@@ -1207,6 +1260,9 @@
 //     );
 //   }
 //
+//   // ✅ Bottom nav now derives its "active" tab from `_selectedLabel`
+//   // (single source of truth) instead of a separately-tracked int that
+//   // could go stale when navigating via sidebar/drawer or via back button.
 //   Widget _buildBottomNav(String role) {
 //     final items = _navItems(role);
 //     final tabs = <_NavItem>[
@@ -1216,6 +1272,8 @@
 //       items.firstWhere((n) => n.label == 'Fee Collection'),
 //       items.firstWhere((n) => n.label == 'Teachers'),
 //     ];
+//
+//     final currentIndex = _bottomNavIndexForLabel(_selectedLabel);
 //
 //     return Container(
 //       decoration: BoxDecoration(
@@ -1230,16 +1288,23 @@
 //           height: 58,
 //           child: Row(
 //             children: List.generate(tabs.length, (i) {
-//               final active = _mobileNavIndex == i;
+//               final active = currentIndex == i;
 //               return Expanded(
 //                 child: InkWell(
 //                   onTap: () {
-//                     setState(() => _mobileNavIndex = i);
 //                     if (i == 0) {
-//                       setState(() => _selectedLabel = 'Dashboard');
+//                       setState(() {
+//                         _selectedLabel = 'Dashboard';
+//                         _mobileNavIndex = 0;
+//                       });
 //                       Navigator.popUntil(context, (route) => route.isFirst);
 //                       return;
 //                     }
+//                     // ✅ Just delegate to the nav item's onTap, which now
+//                     // routes through the single centralized
+//                     // `_pushMobileAndReturnToDashboard` helper. No separate
+//                     // setState here — avoids two competing state updates
+//                     // racing each other.
 //                     tabs[i].onTap();
 //                   },
 //                   child: Column(
@@ -1449,16 +1514,29 @@
 //
 //                       return LayoutBuilder(builder: (ctx, box) {
 //                         final w = box.maxWidth;
-//                         // ★ MODIFIED: Mobile par 2 columns, Desktop/wide par 4 columns
 //                         final isMobile = w < 700;
 //                         final crossCount = isMobile ? 2 : 4;
+//                         // ✅ Narrow phones (< 360 logical px) get a lower
+//                         // (taller-relative) aspect ratio so the stat card's
+//                         // icon row + label + value never gets squeezed into
+//                         // an overflow — fixes RenderFlex overflow on small
+//                         // mobile screens, especially with larger system font
+//                         // scaling.
+//                         // ✅ Lowered further (was 1.35/1.6) after real-device
+//                         // logs showed a 132.4x71.7 card still overflowing by
+//                         // ~4px with system font scaling in play. Combined
+//                         // with the reduced card padding above, this gives
+//                         // reliable headroom across narrow phones.
+//                         final aspectRatio = isMobile
+//                             ? (w < 360 ? 1.15 : 1.35)
+//                             : 1.4;
 //                         return GridView.count(
 //                           crossAxisCount: crossCount,
 //                           shrinkWrap: true,
 //                           physics: const NeverScrollableScrollPhysics(),
 //                           crossAxisSpacing: 8,
 //                           mainAxisSpacing: 8,
-//                           childAspectRatio: isMobile ? 1.6 : 1.4,
+//                           childAspectRatio: aspectRatio,
 //                           children: List.generate(
 //                               stats.length, (i) => _statCard(stats[i], i)),
 //                         );
@@ -1588,7 +1666,7 @@
 //             icon: const Icon(Icons.menu_rounded, color: _T.ink),
 //             onPressed: () => _scaffoldKey.currentState?.openDrawer(),
 //           ),
-//           // ★ MODIFIED: App bar title — logo center on mobile, left on desktop
+//           // App bar title — logo center on mobile, left on desktop
 //           title: isWide
 //               ? Row(
 //             children: [
@@ -1605,7 +1683,14 @@
 //           )
 //               : Center(
 //             child: SizedBox(
-//               height:70,
+//               height: 70,
+//               // ✅ Bound the width too — Image.asset inside a Center with
+//               // only a height constraint tries to size itself to its
+//               // intrinsic aspect ratio, which can exceed the AppBar's
+//               // narrow title slot on small screens and throw a RenderFlex
+//               // overflow. Capping width to a fraction of screen width
+//               // fixes this while BoxFit.contain keeps the logo un-stretched.
+//               width: MediaQuery.of(context).size.width * 0.55,
 //               child: Image.asset(
 //                 'assets/images/EduCoreSystem.png',
 //                 fit: BoxFit.contain,
@@ -1716,6 +1801,7 @@
 //     );
 //   }
 // }
+
 
 
 import 'dart:convert';
@@ -2696,7 +2782,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         onTap: a.onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -2711,11 +2798,13 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(a.icon, size: 16, color: _T.primary),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(a.label,
+                    textAlign: TextAlign.center,
                     style: const TextStyle(
                         fontSize: 12, fontWeight: FontWeight.w600, color: _T.ink),
                     overflow: TextOverflow.ellipsis),
@@ -3166,12 +3255,31 @@ class _DashboardScreenState extends State<DashboardScreen>
 
           const SizedBox(height: 18),
           _sectionHeader('Quick Actions', Icons.bolt_rounded),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: List.generate(
-                _quickActions().length, (i) => _qaChip(_quickActions()[i], i)),
-          ),
+          // ✅ On mobile, lay out Quick Action buttons as an equal-size,
+          // centered 2-column grid (instead of a left-aligned, content-hugging
+          // Wrap where each chip took only as much width as its label
+          // needed). Desktop/wide keeps the original Wrap behavior.
+          LayoutBuilder(builder: (ctx, box) {
+            final isMobile = box.maxWidth < 700;
+            if (isMobile) {
+              return GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 2.6,
+                children: List.generate(
+                    _quickActions().length, (i) => _qaChip(_quickActions()[i], i)),
+              );
+            }
+            return Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: List.generate(
+                  _quickActions().length, (i) => _qaChip(_quickActions()[i], i)),
+            );
+          }),
 
           const SizedBox(height: 20),
           _sectionHeader('Live Overview', Icons.insights_rounded),

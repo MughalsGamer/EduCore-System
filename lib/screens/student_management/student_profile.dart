@@ -753,7 +753,7 @@
 //         sectionName: result.sectionName,
 //         monthlyFee: result.monthlyFee,
 //         annualFee: result.annualFee,
-//         registrationFee: result.registrationFee,
+//         academyFee: result.academyFee,
 //       );
 //       if (context.mounted) {
 //         final label = result.action == 'promoted' ? 'promoted' : 'demoted';
@@ -1532,7 +1532,7 @@
 //   final String? sectionName;
 //   final double? monthlyFee;
 //   final double? annualFee;
-//   final double? registrationFee;
+//   final double? academyFee;
 //   final String? note;
 //   _PromoteResult({
 //     required this.action,
@@ -1543,7 +1543,7 @@
 //     this.sectionName,
 //     this.monthlyFee,
 //     this.annualFee,
-//     this.registrationFee,
+//     this.academyFee,
 //     this.note,
 //   });
 // }
@@ -1569,7 +1569,7 @@
 //
 //   late TextEditingController _monthlyCtrl;
 //   late TextEditingController _annualCtrl;
-//   late TextEditingController _regCtrl;
+//   late TextEditingController _academyCtrl;
 //   late TextEditingController _noteCtrl;
 //
 //   @override
@@ -1578,7 +1578,7 @@
 //     final s = widget.data.student;
 //     _monthlyCtrl = TextEditingController(text: s.monthlyFee?.toStringAsFixed(0) ?? '');
 //     _annualCtrl = TextEditingController(text: s.annualFee?.toStringAsFixed(0) ?? '');
-//     _regCtrl = TextEditingController(text: s.registrationFee?.toStringAsFixed(0) ?? '');
+//     _academyCtrl = TextEditingController(text: s.academyFee?.toStringAsFixed(0) ?? '');
 //     _noteCtrl = TextEditingController();
 //   }
 //
@@ -1586,7 +1586,7 @@
 //   void dispose() {
 //     _monthlyCtrl.dispose();
 //     _annualCtrl.dispose();
-//     _regCtrl.dispose();
+//     _academyCtrl.dispose();
 //     _noteCtrl.dispose();
 //     super.dispose();
 //   }
@@ -1605,7 +1605,7 @@
 //       setState(() {
 //         if (fees['monthlyFee'] != null) _monthlyCtrl.text = fees['monthlyFee']!.toStringAsFixed(0);
 //         if (fees['annualFee'] != null) _annualCtrl.text = fees['annualFee']!.toStringAsFixed(0);
-//         if (fees['registrationFee'] != null) _regCtrl.text = fees['registrationFee']!.toStringAsFixed(0);
+//         if (fees['academyFee'] != null) _academyCtrl.text = fees['academyFee']!.toStringAsFixed(0);
 //         _loadingFees = false;
 //       });
 //     } catch (e) {
@@ -1744,7 +1744,7 @@
 //               children: [
 //                 Expanded(child: _field('Annual Fee', _annualCtrl, isNumber: true)),
 //                 const SizedBox(width: 8),
-//                 Expanded(child: _field('Registration Fee', _regCtrl, isNumber: true)),
+//                 Expanded(child: _field('Academy Fee', _academyCtrl, isNumber: true)),
 //               ],
 //             ),
 //             const SizedBox(height: 16),
@@ -1789,7 +1789,7 @@
 //                 sectionName: _sectionName,
 //                 monthlyFee: _parse(_monthlyCtrl.text),
 //                 annualFee: _parse(_annualCtrl.text),
-//                 registrationFee: _parse(_regCtrl.text),
+//                 academyFee: _parse(_academyCtrl.text),
 //                 note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
 //               ),
 //             );
@@ -1835,6 +1835,7 @@
 //     );
 //   }
 // }
+
 
 
 import 'dart:convert';
@@ -1971,7 +1972,24 @@ class StudentProfileView extends StatelessWidget {
     return SingleChildScrollView(
       child: Column(
         children: [
-          SizedBox(height: 640, child: _buildSidebar(context)),
+          // ✅ Removed the fixed `SizedBox(height: 640, ...)` wrapper that
+          // used to surround the sidebar here. The sidebar's own content
+          // (avatar, a name that can wrap to 2 lines, status badges, up to
+          // 4 info rows, 1-2 action buttons, and a variable-length history
+          // timeline) has a height that depends entirely on the student's
+          // data — it is NOT a fixed size. Forcing it into a rigid 640px
+          // box meant that as soon as any student had a longer name, more
+          // history events, or extra info rows, the sidebar's inner Column
+          // (sized to its natural/intrinsic content height) exceeded the
+          // available 640px and Flutter threw a RenderFlex overflow error
+          // on mobile.
+          //
+          // Fix: let the sidebar size itself naturally. Since the whole
+          // mobile layout is already wrapped in a SingleChildScrollView,
+          // there's no need to pre-constrain its height — the page simply
+          // scrolls further if the sidebar content is taller. This removes
+          // the overflow while keeping the exact same visual design.
+          _buildSidebar(context),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(children: _contentWidgets(context)),
