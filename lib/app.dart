@@ -114,6 +114,7 @@ import 'package:educoresystem/providers/employee_transaction_provider.dart';
 import 'package:educoresystem/providers/event_provider.dart';
 import 'package:educoresystem/providers/exam_result_card_provider.dart';
 import 'package:educoresystem/providers/fee_collection_provider.dart';
+import 'package:educoresystem/providers/profit_loss_provider.dart';
 import 'package:educoresystem/providers/salary_adjustment_history_provider.dart';
 import 'package:educoresystem/providers/salary_provider.dart';
 import 'package:educoresystem/providers/school_setting_prodvider.dart';
@@ -163,6 +164,7 @@ class SchoolApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ClassAttendanceReportProvider()),
         ChangeNotifierProvider(create: (_) => ExamResultCardProvider()),
         ChangeNotifierProvider(create: (_) => EventProvider()),
+        ChangeNotifierProvider(create: (_) => ProfitLossProvider()),
       ],
       child: MaterialApp(
         title: 'School Management',

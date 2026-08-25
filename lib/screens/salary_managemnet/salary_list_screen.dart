@@ -1,5 +1,4 @@
 //
-//
 // import 'package:flutter/material.dart';
 // import 'package:intl/intl.dart';
 // import 'package:printing/printing.dart';
@@ -48,9 +47,12 @@
 // class _SalaryListScreenState extends State<SalaryListScreen> {
 //   int _selectedYear = DateTime.now().year;
 //   int _selectedMonth = DateTime.now().month;
+//   bool _isOverall = false; // true when "Overall" button is active
+//
 //   String _statusFilter = 'All';
-//   String _typeFilter = 'All';
+//   String _typeFilter = 'All'; // 'All', 'teacher', 'school_staff', 'academy_staff'
 //   final TextEditingController _searchController = TextEditingController();
+//
 //
 //   // ─── Bulk selection ───
 //   bool _selectMode = false;
@@ -63,8 +65,19 @@
 //   }
 //
 //   void _loadData() {
-//     context.read<SalaryProvider>().fetchSalaries(_selectedYear, _selectedMonth);
+//     final provider = context.read<SalaryProvider>();
+//     if (_isOverall) {
+//       provider.fetchAllSalaries();
+//     } else if (_selectedMonth == -1) {
+//       provider.fetchSalariesByYear(_selectedYear);
+//     } else {
+//       provider.fetchSalaries(_selectedYear, _selectedMonth);
+//     }
 //   }
+//
+//   // void _loadData() {
+//   //   context.read<SalaryProvider>().fetchSalaries(_selectedYear, _selectedMonth);
+//   // }
 //
 //   @override
 //   void dispose() {
@@ -159,24 +172,11 @@
 //     }
 //   }
 //
-//   // List<SalaryRecord> _filteredSalaries(List<SalaryRecord> all) {
-//   //   return all.where((s) {
-//   //     if (_statusFilter != 'All' && s.status != _statusFilter) return false;
-//   //     if (_typeFilter != 'All' && s.employeeType != _typeFilter) return false;
-//   //     final query = _searchController.text.trim().toLowerCase();
-//   //     if (query.isNotEmpty && !s.employeeName.toLowerCase().contains(query)) {
-//   //       return false;
-//   //     }
-//   //     return true;
-//   //   }).toList();
-//   // }
-//
-//   // Inside _SalaryListScreenState, remove _typeFilter or set it to 'All' but don't use it.
-// // In _filteredSalaries:
+//   // ─── Filtered salaries with type filter ──────────────────────
 //   List<SalaryRecord> _filteredSalaries(List<SalaryRecord> all) {
 //     return all.where((s) {
 //       if (_statusFilter != 'All' && s.status != _statusFilter) return false;
-//       // REMOVE type filter condition
+//       if (_typeFilter != 'All' && s.employeeType != _typeFilter) return false;
 //       final query = _searchController.text.trim().toLowerCase();
 //       if (query.isNotEmpty && !s.employeeName.toLowerCase().contains(query)) {
 //         return false;
@@ -184,9 +184,6 @@
 //       return true;
 //     }).toList();
 //   }
-//
-// // In _buildDesktopFilters, remove the _typeFilter dropdown and adjust spacing.
-// // In _buildMobileFilters, remove the row containing the type filter.
 //
 //   Future<void> _pickYear() async {
 //     final currentYear = DateTime.now().year;
@@ -196,14 +193,30 @@
 //           initialYear: _selectedYear, minYear: 2015, maxYear: currentYear),
 //     );
 //     if (result != null) {
-//       setState(() => _selectedYear = result);
+//       setState(() {
+//         _selectedYear = result;
+//         _isOverall = false;
+//       });
 //       _loadData();
 //     }
 //   }
+//   // void _onMonthChanged(int? month) {
+//   //   if (month == null) return;
+//   //   setState(() => _selectedMonth = month);
+//   //   _loadData();
+//   // }
 //
 //   void _onMonthChanged(int? month) {
 //     if (month == null) return;
-//     setState(() => _selectedMonth = month);
+//     setState(() {
+//       _selectedMonth = month;
+//       _isOverall = false;
+//     });
+//     _loadData();
+//   }
+//
+//   void _toggleOverall() {
+//     setState(() => _isOverall = !_isOverall);
 //     _loadData();
 //   }
 //
@@ -548,6 +561,7 @@
 //     );
 //   }
 //
+//   // ─── Desktop filters with updated type dropdown ──────────────
 //   Widget _buildDesktopFilters() {
 //     return Row(
 //       children: [
@@ -612,8 +626,9 @@
 //           ),
 //         ),
 //         const SizedBox(width: 10),
+//         // ─── Updated Type Dropdown ──────────────────────────────
 //         _pillDropdown(
-//           width: 140,
+//           width: 160,
 //           child: DropdownButtonHideUnderline(
 //             child: DropdownButton<String>(
 //               value: _typeFilter,
@@ -622,13 +637,12 @@
 //               const Icon(Icons.expand_more, size: 18, color: _kSlateLight),
 //               style: const TextStyle(
 //                   fontWeight: FontWeight.w600, fontSize: 13, color: _kInk),
-//               items: ['All', 'teacher', 'staff']
-//                   .map((t) => DropdownMenuItem(
-//                   value: t,
-//                   child: Text(t == 'All'
-//                       ? 'All Types'
-//                       : t.capitalize())))
-//                   .toList(),
+//               items: const [
+//                 DropdownMenuItem(value: 'All', child: Text('All')),
+//                 DropdownMenuItem(value: 'teacher', child: Text('Teacher')),
+//                 DropdownMenuItem(value: 'school_staff', child: Text('School Staff')),
+//                 DropdownMenuItem(value: 'academy_staff', child: Text('Academy Staff')),
+//               ],
 //               onChanged: (v) => setState(() => _typeFilter = v!),
 //             ),
 //           ),
@@ -673,6 +687,7 @@
 //     );
 //   }
 //
+//   // ─── Mobile filters with updated type dropdown ───────────────
 //   Widget _buildMobileFilters() {
 //     return Column(
 //       children: [
@@ -762,13 +777,12 @@
 //                         fontWeight: FontWeight.w600,
 //                         fontSize: 13,
 //                         color: _kInk),
-//                     items: ['All', 'teacher', 'staff']
-//                         .map((t) => DropdownMenuItem(
-//                         value: t,
-//                         child: Text(t == 'All'
-//                             ? 'All Types'
-//                             : t.capitalize())))
-//                         .toList(),
+//                     items: const [
+//                       DropdownMenuItem(value: 'All', child: Text('All')),
+//                       DropdownMenuItem(value: 'teacher', child: Text('Teacher')),
+//                       DropdownMenuItem(value: 'school_staff', child: Text('School Staff')),
+//                       DropdownMenuItem(value: 'academy_staff', child: Text('Academy Staff')),
+//                     ],
 //                     onChanged: (v) => setState(() => _typeFilter = v!),
 //                   ),
 //                 ),
@@ -1294,7 +1308,7 @@
 //     letterSpacing: 0.2);
 //
 // // ────────────────────────────────────────────────────────────
-// //  Salary Detail Screen (unchanged, kept as before)
+// //  Salary Detail Screen (unchanged)
 // // ────────────────────────────────────────────────────────────
 // class SalaryDetailScreen extends StatefulWidget {
 //   final SalaryRecord record;
@@ -2214,7 +2228,9 @@ class SalaryListScreen extends StatefulWidget {
 
 class _SalaryListScreenState extends State<SalaryListScreen> {
   int _selectedYear = DateTime.now().year;
-  int _selectedMonth = DateTime.now().month;
+  int _selectedMonth = DateTime.now().month; // -1 means "All Months"
+  bool _isOverall = false; // true when "Overall" button is active
+
   String _statusFilter = 'All';
   String _typeFilter = 'All'; // 'All', 'teacher', 'school_staff', 'academy_staff'
   final TextEditingController _searchController = TextEditingController();
@@ -2230,7 +2246,14 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
   }
 
   void _loadData() {
-    context.read<SalaryProvider>().fetchSalaries(_selectedYear, _selectedMonth);
+    final provider = context.read<SalaryProvider>();
+    if (_isOverall) {
+      provider.fetchAllSalaries();
+    } else if (_selectedMonth == -1) {
+      provider.fetchSalariesByYear(_selectedYear);
+    } else {
+      provider.fetchSalaries(_selectedYear, _selectedMonth);
+    }
   }
 
   @override
@@ -2347,14 +2370,25 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
           initialYear: _selectedYear, minYear: 2015, maxYear: currentYear),
     );
     if (result != null) {
-      setState(() => _selectedYear = result);
+      setState(() {
+        _selectedYear = result;
+        _isOverall = false;
+      });
       _loadData();
     }
   }
 
   void _onMonthChanged(int? month) {
     if (month == null) return;
-    setState(() => _selectedMonth = month);
+    setState(() {
+      _selectedMonth = month;
+      _isOverall = false;
+    });
+    _loadData();
+  }
+
+  void _toggleOverall() {
+    setState(() => _isOverall = !_isOverall);
     _loadData();
   }
 
@@ -2699,6 +2733,39 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
     );
   }
 
+  // ★ NEW — "Overall" pill button. Bypasses year/month filters entirely.
+  Widget _overallButton({bool compact = false}) {
+    return InkWell(
+      onTap: _toggleOverall,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 44,
+        width: compact ? double.infinity : null,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: _isOverall ? _kPurple : _kSurface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _isOverall ? _kPurple : _kBorder),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.all_inclusive_rounded,
+                size: 16, color: _isOverall ? Colors.white : _kSlate),
+            const SizedBox(width: 6),
+            Text('Overall',
+                style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: _isOverall ? Colors.white : _kInk)),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ─── Desktop filters with updated type dropdown ──────────────
   Widget _buildDesktopFilters() {
     return Row(
@@ -2726,7 +2793,7 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
         ),
         const SizedBox(width: 10),
         _pillDropdown(
-          width: 130,
+          width: 140,
           child: DropdownButtonHideUnderline(
             child: DropdownButton<int>(
               value: _selectedMonth,
@@ -2735,16 +2802,23 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
               const Icon(Icons.expand_more, size: 18, color: _kSlateLight),
               style: const TextStyle(
                   fontWeight: FontWeight.w600, fontSize: 13, color: _kInk),
-              items: List.generate(12, (i) => i + 1)
-                  .map((m) => DropdownMenuItem(
-                  value: m,
-                  child: Text(
-                      DateFormat('MMMM').format(DateTime(0, m)))))
-                  .toList(),
+              items: [
+                const DropdownMenuItem(
+                  value: -1,
+                  child: Text('All Months'),
+                ),
+                ...List.generate(12, (i) => i + 1).map((m) =>
+                    DropdownMenuItem(
+                        value: m,
+                        child: Text(
+                            DateFormat('MMMM').format(DateTime(0, m))))),
+              ],
               onChanged: _onMonthChanged,
             ),
           ),
         ),
+        const SizedBox(width: 10),
+        _overallButton(),
         const SizedBox(width: 10),
         _pillDropdown(
           width: 140,
@@ -2832,6 +2906,7 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
         Row(
           children: [
             Expanded(
+              flex: 3,
               child: InkWell(
                 onTap: _pickYear,
                 borderRadius: BorderRadius.circular(12),
@@ -2854,6 +2929,15 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
             ),
             const SizedBox(width: 8),
             Expanded(
+              flex: 2,
+              child: _overallButton(compact: true),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
               child: _pillDropdown(
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<int>(
@@ -2865,22 +2949,23 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                         color: _kInk),
-                    items: List.generate(12, (i) => i + 1)
-                        .map((m) => DropdownMenuItem(
-                        value: m,
-                        child: Text(DateFormat('MMM')
-                            .format(DateTime(0, m)))))
-                        .toList(),
+                    items: [
+                      const DropdownMenuItem(
+                        value: -1,
+                        child: Text('All'),
+                      ),
+                      ...List.generate(12, (i) => i + 1).map((m) =>
+                          DropdownMenuItem(
+                              value: m,
+                              child: Text(DateFormat('MMM')
+                                  .format(DateTime(0, m))))),
+                    ],
                     onChanged: _onMonthChanged,
                   ),
                 ),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
+            const SizedBox(width: 8),
             Expanded(
               child: _pillDropdown(
                 child: DropdownButtonHideUnderline(
@@ -2902,7 +2987,11 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
             Expanded(
               child: _pillDropdown(
                 child: DropdownButtonHideUnderline(
@@ -2998,6 +3087,9 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
                     const Expanded(
                         flex: 2,
                         child: Text('Designation', style: _headerStyle)),
+                    const Expanded(
+                        flex: 2,
+                        child: Text('Date', style: _headerStyle)),
                     const Expanded(
                         flex: 2,
                         child: Text('Base Salary', style: _headerStyle)),
@@ -3109,6 +3201,15 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                   fontSize: 13, color: _kSlate)),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                              DateFormat('dd MMM yyyy')
+                                  .format(s.generatedDate),
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 12.5, color: _kSlate)),
                         ),
                         Expanded(
                           flex: 2,
@@ -3269,7 +3370,16 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
                                         fontSize: 14.5,
                                         color: _kInk)),
                                 if (s.designation != null)
-                                  Text(s.designation!,
+                                  Text(
+                                      '${s.designation!} • ${DateFormat('dd MMM yyyy').format(s.generatedDate)}',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          color: _kSlate,
+                                          fontSize: 12.5))
+                                else
+                                  Text(
+                                      DateFormat('dd MMM yyyy')
+                                          .format(s.generatedDate),
                                       style: TextStyle(
                                           color: _kSlate,
                                           fontSize: 12.5)),
