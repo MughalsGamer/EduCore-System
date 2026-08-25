@@ -10,9 +10,9 @@ dependencies:
   flutter:
     sdk: flutter
 
-  firebase_core:
-  firebase_auth:
-  cloud_firestore:
+  firebase_core: ^4.14.0
+  firebase_auth: ^6.6.0
+  cloud_firestore: ^6.9.0
   provider:
   intl:
   google_fonts:
@@ -26,14 +26,14 @@ dependencies:
   image:
   shared_preferences:
   shimmer:
-  open_file:
+  open_file: ^3.5.10
   universal_platform:
   share_plus:
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^6.0.0
 
   flutter_launcher_icons: ^0.14.4
   flutter_native_splash: ^2.4.6
