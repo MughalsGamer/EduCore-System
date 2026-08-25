@@ -108,7 +108,7 @@ class ProfitLossProvider extends ChangeNotifier {
     try {
       final results = await Future.wait([
         _db.collection('fee_collections').get(),
-        _db.collection('salary_records').get(),
+        _db.collection('salaries').get(),
         _db.collection('staff_transactions').get(),
       ]);
 
