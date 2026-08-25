@@ -1824,6 +1824,7 @@ import 'package:educoresystem/screens/teacher_management/staff_id_cards_screen.d
 import 'package:educoresystem/screens/teacher_management/staff_list_screen.dart';
 import 'package:educoresystem/screens/teacher_management/academy_staff_list_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/teacher.dart';
 import '../models/event.dart';
@@ -3475,8 +3476,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         if (didPop) return;
         final shouldPop = await _onWillPop();
         if (shouldPop) {
-          Navigator.of(context).pop();
-        }
+          SystemNavigator.pop();        }
       },
       child: Scaffold(
         key: _scaffoldKey,
