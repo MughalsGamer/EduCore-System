@@ -1,4 +1,5 @@
 //
+//
 // import 'package:flutter/material.dart';
 // import 'package:intl/intl.dart';
 // import 'package:printing/printing.dart';
@@ -46,13 +47,12 @@
 //
 // class _SalaryListScreenState extends State<SalaryListScreen> {
 //   int _selectedYear = DateTime.now().year;
-//   int _selectedMonth = DateTime.now().month;
+//   int _selectedMonth = DateTime.now().month; // -1 means "All Months"
 //   bool _isOverall = false; // true when "Overall" button is active
 //
 //   String _statusFilter = 'All';
 //   String _typeFilter = 'All'; // 'All', 'teacher', 'school_staff', 'academy_staff'
 //   final TextEditingController _searchController = TextEditingController();
-//
 //
 //   // ─── Bulk selection ───
 //   bool _selectMode = false;
@@ -74,10 +74,6 @@
 //       provider.fetchSalaries(_selectedYear, _selectedMonth);
 //     }
 //   }
-//
-//   // void _loadData() {
-//   //   context.read<SalaryProvider>().fetchSalaries(_selectedYear, _selectedMonth);
-//   // }
 //
 //   @override
 //   void dispose() {
@@ -200,11 +196,6 @@
 //       _loadData();
 //     }
 //   }
-//   // void _onMonthChanged(int? month) {
-//   //   if (month == null) return;
-//   //   setState(() => _selectedMonth = month);
-//   //   _loadData();
-//   // }
 //
 //   void _onMonthChanged(int? month) {
 //     if (month == null) return;
@@ -561,6 +552,39 @@
 //     );
 //   }
 //
+//   // ★ NEW — "Overall" pill button. Bypasses year/month filters entirely.
+//   Widget _overallButton({bool compact = false}) {
+//     return InkWell(
+//       onTap: _toggleOverall,
+//       borderRadius: BorderRadius.circular(12),
+//       child: Container(
+//         height: 44,
+//         width: compact ? double.infinity : null,
+//         alignment: Alignment.center,
+//         padding: const EdgeInsets.symmetric(horizontal: 14),
+//         decoration: BoxDecoration(
+//           color: _isOverall ? _kPurple : _kSurface,
+//           borderRadius: BorderRadius.circular(12),
+//           border: Border.all(color: _isOverall ? _kPurple : _kBorder),
+//         ),
+//         child: Row(
+//           mainAxisSize: MainAxisSize.min,
+//           mainAxisAlignment: MainAxisAlignment.center,
+//           children: [
+//             Icon(Icons.all_inclusive_rounded,
+//                 size: 16, color: _isOverall ? Colors.white : _kSlate),
+//             const SizedBox(width: 6),
+//             Text('Overall',
+//                 style: TextStyle(
+//                     fontWeight: FontWeight.w600,
+//                     fontSize: 13,
+//                     color: _isOverall ? Colors.white : _kInk)),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+//
 //   // ─── Desktop filters with updated type dropdown ──────────────
 //   Widget _buildDesktopFilters() {
 //     return Row(
@@ -588,7 +612,7 @@
 //         ),
 //         const SizedBox(width: 10),
 //         _pillDropdown(
-//           width: 130,
+//           width: 140,
 //           child: DropdownButtonHideUnderline(
 //             child: DropdownButton<int>(
 //               value: _selectedMonth,
@@ -597,16 +621,23 @@
 //               const Icon(Icons.expand_more, size: 18, color: _kSlateLight),
 //               style: const TextStyle(
 //                   fontWeight: FontWeight.w600, fontSize: 13, color: _kInk),
-//               items: List.generate(12, (i) => i + 1)
-//                   .map((m) => DropdownMenuItem(
-//                   value: m,
-//                   child: Text(
-//                       DateFormat('MMMM').format(DateTime(0, m)))))
-//                   .toList(),
+//               items: [
+//                 const DropdownMenuItem(
+//                   value: -1,
+//                   child: Text('All Months'),
+//                 ),
+//                 ...List.generate(12, (i) => i + 1).map((m) =>
+//                     DropdownMenuItem(
+//                         value: m,
+//                         child: Text(
+//                             DateFormat('MMMM').format(DateTime(0, m))))),
+//               ],
 //               onChanged: _onMonthChanged,
 //             ),
 //           ),
 //         ),
+//         const SizedBox(width: 10),
+//         _overallButton(),
 //         const SizedBox(width: 10),
 //         _pillDropdown(
 //           width: 140,
@@ -694,6 +725,7 @@
 //         Row(
 //           children: [
 //             Expanded(
+//               flex: 3,
 //               child: InkWell(
 //                 onTap: _pickYear,
 //                 borderRadius: BorderRadius.circular(12),
@@ -716,6 +748,15 @@
 //             ),
 //             const SizedBox(width: 8),
 //             Expanded(
+//               flex: 2,
+//               child: _overallButton(compact: true),
+//             ),
+//           ],
+//         ),
+//         const SizedBox(height: 8),
+//         Row(
+//           children: [
+//             Expanded(
 //               child: _pillDropdown(
 //                 child: DropdownButtonHideUnderline(
 //                   child: DropdownButton<int>(
@@ -727,22 +768,23 @@
 //                         fontWeight: FontWeight.w600,
 //                         fontSize: 13,
 //                         color: _kInk),
-//                     items: List.generate(12, (i) => i + 1)
-//                         .map((m) => DropdownMenuItem(
-//                         value: m,
-//                         child: Text(DateFormat('MMM')
-//                             .format(DateTime(0, m)))))
-//                         .toList(),
+//                     items: [
+//                       const DropdownMenuItem(
+//                         value: -1,
+//                         child: Text('All'),
+//                       ),
+//                       ...List.generate(12, (i) => i + 1).map((m) =>
+//                           DropdownMenuItem(
+//                               value: m,
+//                               child: Text(DateFormat('MMM')
+//                                   .format(DateTime(0, m))))),
+//                     ],
 //                     onChanged: _onMonthChanged,
 //                   ),
 //                 ),
 //               ),
 //             ),
-//           ],
-//         ),
-//         const SizedBox(height: 8),
-//         Row(
-//           children: [
+//             const SizedBox(width: 8),
 //             Expanded(
 //               child: _pillDropdown(
 //                 child: DropdownButtonHideUnderline(
@@ -764,7 +806,11 @@
 //                 ),
 //               ),
 //             ),
-//             const SizedBox(width: 8),
+//           ],
+//         ),
+//         const SizedBox(height: 8),
+//         Row(
+//           children: [
 //             Expanded(
 //               child: _pillDropdown(
 //                 child: DropdownButtonHideUnderline(
@@ -860,6 +906,9 @@
 //                     const Expanded(
 //                         flex: 2,
 //                         child: Text('Designation', style: _headerStyle)),
+//                     const Expanded(
+//                         flex: 2,
+//                         child: Text('Date', style: _headerStyle)),
 //                     const Expanded(
 //                         flex: 2,
 //                         child: Text('Base Salary', style: _headerStyle)),
@@ -971,6 +1020,15 @@
 //                               overflow: TextOverflow.ellipsis,
 //                               style: TextStyle(
 //                                   fontSize: 13, color: _kSlate)),
+//                         ),
+//                         Expanded(
+//                           flex: 2,
+//                           child: Text(
+//                               DateFormat('dd MMM yyyy')
+//                                   .format(s.generatedDate),
+//                               overflow: TextOverflow.ellipsis,
+//                               style: TextStyle(
+//                                   fontSize: 12.5, color: _kSlate)),
 //                         ),
 //                         Expanded(
 //                           flex: 2,
@@ -1131,7 +1189,16 @@
 //                                         fontSize: 14.5,
 //                                         color: _kInk)),
 //                                 if (s.designation != null)
-//                                   Text(s.designation!,
+//                                   Text(
+//                                       '${s.designation!} • ${DateFormat('dd MMM yyyy').format(s.generatedDate)}',
+//                                       overflow: TextOverflow.ellipsis,
+//                                       style: TextStyle(
+//                                           color: _kSlate,
+//                                           fontSize: 12.5))
+//                                 else
+//                                   Text(
+//                                       DateFormat('dd MMM yyyy')
+//                                           .format(s.generatedDate),
 //                                       style: TextStyle(
 //                                           color: _kSlate,
 //                                           fontSize: 12.5)),
@@ -2181,6 +2248,7 @@
 // }
 
 
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
@@ -2610,6 +2678,13 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
             isDesktop ? _buildDesktopFilters() : _buildMobileFilters(),
           ),
           Container(height: 8, color: _kSurface),
+          Container(
+            color: Colors.white,
+            padding: EdgeInsets.fromLTRB(
+                isDesktop ? 24 : 16, 12, isDesktop ? 24 : 16, 16),
+            child: _buildSummaryRow(filtered, isDesktop),
+          ),
+          Container(height: 8, color: _kSurface),
           Expanded(
             child: provider.loadingSalaries
                 ? const Center(
@@ -2730,6 +2805,121 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
         border: Border.all(color: _kBorder),
       ),
       child: child,
+    );
+  }
+
+  // ★ NEW — Summary cards: Total Pending, Total Paid, Total Salary.
+  // Based on the currently filtered list (status/type/search applied),
+  // using payableNetSalary so it matches what's shown per-row.
+  Widget _buildSummaryRow(List<SalaryRecord> records, bool isDesktop) {
+    double totalPending = 0;
+    double totalPaid = 0;
+
+    for (final s in records) {
+      if (s.status == 'Paid') {
+        totalPaid += s.payableNetSalary;
+      } else {
+        totalPending += s.payableNetSalary;
+      }
+    }
+
+    final totalSalary = totalPending + totalPaid;
+
+    final cards = [
+      _SummaryCardData(
+        label: 'Total Pending',
+        value: totalPending,
+        icon: Icons.schedule_rounded,
+        color: _kOrange,
+        bg: _kOrangeBg,
+        border: _kOrangeBorder,
+      ),
+      _SummaryCardData(
+        label: 'Total Paid',
+        value: totalPaid,
+        icon: Icons.check_circle_rounded,
+        color: _kGreen,
+        bg: _kGreenBg,
+        border: _kGreenBorder,
+      ),
+      _SummaryCardData(
+        label: 'Total Salary',
+        value: totalSalary,
+        icon: Icons.account_balance_wallet_rounded,
+        color: _kPurple,
+        bg: _kPurpleLight,
+        border: _kPurpleSoft,
+      ),
+    ];
+
+    if (isDesktop) {
+      return Row(
+        children: List.generate(cards.length, (i) {
+          return Expanded(
+            child: Padding(
+              padding:
+              EdgeInsets.only(right: i == cards.length - 1 ? 0 : 12),
+              child: _summaryCard(cards[i]),
+            ),
+          );
+        }),
+      );
+    }
+
+    return Row(
+      children: List.generate(cards.length, (i) {
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(right: i == cards.length - 1 ? 0 : 8),
+            child: _summaryCard(cards[i], compact: true),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _summaryCard(_SummaryCardData data, {bool compact = false}) {
+    return Container(
+      padding: EdgeInsets.all(compact ? 10 : 14),
+      decoration: BoxDecoration(
+        color: data.bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: data.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(data.icon, size: compact ? 14 : 16, color: data.color),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  data.label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: compact ? 10.5 : 12,
+                      fontWeight: FontWeight.w600,
+                      color: data.color),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: compact ? 4 : 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '${data.value < 0 ? '- ' : ''}Rs ${NumberFormat('#,##0').format(data.value.abs())}',
+              style: TextStyle(
+                fontSize: compact ? 14 : 17,
+                fontWeight: FontWeight.w800,
+                color: data.color,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -4326,6 +4516,24 @@ class _SalaryDetailScreenState extends State<SalaryDetailScreen> {
         color: _kSlate,
         letterSpacing: 0.3);
   }
+}
+
+class _SummaryCardData {
+  final String label;
+  final double value;
+  final IconData icon;
+  final Color color;
+  final Color bg;
+  final Color border;
+
+  _SummaryCardData({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.bg,
+    required this.border,
+  });
 }
 
 class _StatCardData {
