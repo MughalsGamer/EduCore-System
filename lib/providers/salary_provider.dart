@@ -605,6 +605,9 @@ class SalaryProvider extends ChangeNotifier {
   List<SalaryRecord> _salaries = [];
   List<SalaryRecord> get salaries => _salaries;
 
+  List<SalaryRecord> get pendingSalaries =>
+      _salaries.where((s) => s.status == 'Pending').toList();
+
   bool _loadingSalaries = false;
   bool get loadingSalaries => _loadingSalaries;
 

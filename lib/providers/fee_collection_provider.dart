@@ -91,6 +91,57 @@ class FeeCollectionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ═════════════════════════════════════════════════════════
+  //  DASHBOARD — Families with NO fee collected this month
+  // ═════════════════════════════════════════════════════════
+  bool _isLoadingPendingFamilies = false;
+  bool get isLoadingPendingFamilies => _isLoadingPendingFamilies;
+
+  List<FamilyForCollection> _pendingFamilies = [];
+  List<FamilyForCollection> get pendingFamilies => _pendingFamilies;
+
+  /// Families that have NOT made ANY fee_collections payment during the
+  /// current calendar month. `paymentDate` is stored as an ISO8601
+  /// string (see FeeCollectionModel.toMap()), so we compare against
+  /// the current month's "YYYY-MM" prefix rather than a Timestamp range.
+  Future<void> loadPendingFamiliesForCurrentMonth(
+      List<FamilyForCollection> allFamilies) async {
+    _isLoadingPendingFamilies = true;
+    notifyListeners();
+
+    try {
+      final now = DateTime.now();
+      final monthPrefix =
+          '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}';
+
+      final snap = await _db.collection(_collectionsCollection).get();
+
+      final paidFamilyIds = <String>{};
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final paymentDateStr = data['paymentDate'] as String?;
+        final familyDocId = data['familyDocId'] as String?;
+        if (paymentDateStr == null || familyDocId == null) continue;
+
+        // ISO8601 strings start with "YYYY-MM-DD...", so a prefix check
+        // on "YYYY-MM" is a safe and correct "same calendar month" test.
+        if (paymentDateStr.startsWith(monthPrefix)) {
+          paidFamilyIds.add(familyDocId);
+        }
+      }
+
+      _pendingFamilies = allFamilies
+          .where((f) => !paidFamilyIds.contains(f.familyDocId))
+          .toList();
+    } catch (e) {
+      _pendingFamilies = [];
+      debugPrint('Error loading pending families: $e');
+    } finally {
+      _isLoadingPendingFamilies = false;
+      notifyListeners();
+    }
+  }
+
   // ── Balance lookup (per selected family) ──
   bool _isLoadingBalance = false;
   bool get isLoadingBalance => _isLoadingBalance;

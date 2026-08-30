@@ -13,6 +13,8 @@ class FeeProvider extends ChangeNotifier {
   List<FeeReceipt> get receipts => _receipts;
   bool get loading => _loading;
 
+
+
   Future<void> fetchStructures() async {
     _structures = await _firestoreService.getFeeStructures();
     notifyListeners();
